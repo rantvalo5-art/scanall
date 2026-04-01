@@ -28,7 +28,7 @@ jobs:
           cache: "pip"
 
       - name: Install dependencies
-        run: pip install requests pandas pandas-ta
+        run: pip install requests pandas==2.2.3 pandas-ta==0.3.14b0
 
       - name: Run screener
         env:
