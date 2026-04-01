@@ -26,7 +26,7 @@ VOLUME_MULT    = 2.5    # Spike si volumen > 2.5x promedio 20 velas
 
 # ── Datos ──────────────────────────────────────────────────────────────────────
 def get_top_usdt_pairs(n=TOP_N):
-    r = requests.get("https://api.binance.com/api/v3/ticker/24hr", timeout=10)
+    r = requests.get("https://data-api.binance.vision/api/v3/ticker/24hr", timeout=10)
     r.raise_for_status()
     pairs = [x for x in r.json() if x["symbol"].endswith("USDT") and float(x["quoteVolume"]) > 0]
     pairs.sort(key=lambda x: float(x["quoteVolume"]), reverse=True)
@@ -35,7 +35,7 @@ def get_top_usdt_pairs(n=TOP_N):
 
 def get_klines(symbol):
     r = requests.get(
-        "https://api.binance.com/api/v3/klines",
+        "https://data-api.binance.vision/api/v3/klines",
         params={"symbol": symbol, "interval": INTERVAL, "limit": LIMIT},
         timeout=10
     )
