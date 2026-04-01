@@ -1,5 +1,5 @@
 """
-Binance Spot USDT Crypto Screener
+Binance Spot USDT Crypto Screener — TODOS los pares, paralelo
 Indicadores: RSI, MACD, EMA crossover, Bollinger Bands (breakout + width), Volumen spike
 Alertas via Telegram
 """
@@ -9,14 +9,16 @@ import requests
 import pandas as pd
 import ta
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ── Configuración ──────────────────────────────────────────────────────────────
 TELEGRAM_TOKEN   = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
-INTERVAL      = "15m"   # Timeframe
-LIMIT         = 100     # Velas a traer por símbolo
-TOP_N         = 80      # Top pares USDT por volumen 24h
+INTERVAL     = "15m"   # Timeframe
+LIMIT        = 100     # Velas a traer por símbolo
+TOP_N        = 9999    # 9999 = todos los pares USDT
+MAX_WORKERS  = 20      # Requests en paralelo (no subir mucho para no ser baneado)
 
 RSI_OVERSOLD   = 30
 RSI_OVERBOUGHT = 70
@@ -25,10 +27,15 @@ VOLUME_MULT    = 2.5    # Spike si volumen > 2.5x promedio 20 velas
 
 
 # ── Datos ──────────────────────────────────────────────────────────────────────
-def get_top_usdt_pairs(n=TOP_N):
-    r = requests.get("https://data-api.binance.vision/api/v3/ticker/24hr", timeout=10)
+def get_all_usdt_pairs(n=TOP_N):
+    r = requests.get("https://data-api.binance.vision/api/v3/ticker/24hr", timeout=15)
     r.raise_for_status()
-    pairs = [x for x in r.json() if x["symbol"].endswith("USDT") and float(x["quoteVolume"]) > 0]
+    pairs = [
+        x for x in r.json()
+        if x["symbol"].endswith("USDT")
+        and x["symbol"].encode("ascii", errors="ignore").decode() == x["symbol"]  # solo ASCII
+        and float(x["quoteVolume"]) > 0
+    ]
     pairs.sort(key=lambda x: float(x["quoteVolume"]), reverse=True)
     return [x["symbol"] for x in pairs[:n]]
 
@@ -54,15 +61,14 @@ def analyze(symbol):
     try:
         df = get_klines(symbol)
     except Exception:
-        return None
+        return symbol, None
 
     signals = []
     close  = df["close"]
     volume = df["volume"]
 
     # RSI
-    rsi = ta.momentum.RSIIndicator(close, window=14).rsi()
-    rsi_val = rsi.iloc[-1]
+    rsi_val = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]
     if rsi_val <= RSI_OVERSOLD:
         signals.append(f"📉 RSI={rsi_val:.1f} (sobreventa)")
     elif rsi_val >= RSI_OVERBOUGHT:
@@ -86,12 +92,12 @@ def analyze(symbol):
         signals.append("🔀 EMA9 cruzó abajo EMA21 (bajista)")
 
     # Bollinger Bands
-    bb     = ta.volatility.BollingerBands(close, window=20, window_dev=2)
-    upper  = bb.bollinger_hband().iloc[-1]
-    lower  = bb.bollinger_lband().iloc[-1]
-    mid    = bb.bollinger_mavg().iloc[-1]
-    price  = close.iloc[-1]
-    width  = (upper - lower) / mid if mid != 0 else 0
+    bb    = ta.volatility.BollingerBands(close, window=20, window_dev=2)
+    upper = bb.bollinger_hband().iloc[-1]
+    lower = bb.bollinger_lband().iloc[-1]
+    mid   = bb.bollinger_mavg().iloc[-1]
+    price = close.iloc[-1]
+    width = (upper - lower) / mid if mid != 0 else 0
 
     if price > upper:
         signals.append(f"🔥 BB breakout arriba (close={price:.4f} > upper={upper:.4f})")
@@ -99,7 +105,7 @@ def analyze(symbol):
         signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lower:.4f})")
 
     if width < BB_WIDTH_MIN:
-        signals.append(f"🤏 BB squeeze (width={width:.2%}) — posible movimiento fuerte")
+        signals.append(f"🤏 BB squeeze (width={width:.2%}) — movimiento fuerte próximo")
 
     # Volumen spike
     vol_mean = volume.iloc[-21:-1].mean()
@@ -107,12 +113,11 @@ def analyze(symbol):
     if vol_mean > 0 and vol_curr > vol_mean * VOLUME_MULT:
         signals.append(f"🚀 Volumen spike {vol_curr/vol_mean:.1f}x promedio")
 
-    return signals if signals else None
+    return symbol, (signals if signals else None)
 
 
 # ── Telegram ───────────────────────────────────────────────────────────────────
 def send_telegram(text):
-    # Sin parse_mode HTML para evitar errores con caracteres especiales
     requests.post(
         f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
         json={"chat_id": TELEGRAM_CHAT_ID, "text": text},
@@ -120,40 +125,38 @@ def send_telegram(text):
     ).raise_for_status()
 
 
-def safe_symbol(symbol):
-    # Filtrar solo ASCII — evita que pares con nombres chinos rompan el mensaje
-    return symbol.encode("ascii", errors="ignore").decode()
-
-
 # ── Main ───────────────────────────────────────────────────────────────────────
 def main():
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-    print(f"[{now}] Escaneando top {TOP_N} pares USDT ({INTERVAL})...")
+    pairs = get_all_usdt_pairs()
+    print(f"[{now}] Escaneando {len(pairs)} pares USDT ({INTERVAL}) con {MAX_WORKERS} workers...")
 
-    pairs       = get_top_usdt_pairs()
-    all_signals = []
+    results = {}
 
-    for symbol in pairs:
-        sigs = analyze(symbol)
-        if sigs:
-            all_signals.append((symbol, sigs))
-            print(f"  ✅ {symbol}: {sigs}")
-        else:
-            print(f"  — {symbol}")
+    # Scan en paralelo
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {executor.submit(analyze, sym): sym for sym in pairs}
+        for future in as_completed(futures):
+            symbol, sigs = future.result()
+            results[symbol] = sigs
+            if sigs:
+                print(f"  ✅ {symbol}: {sigs}")
+
+    # Mantener orden original (por volumen)
+    all_signals = [(sym, results[sym]) for sym in pairs if results.get(sym)]
+
+    print(f"\nTotal señales: {len(all_signals)} / {len(pairs)} pares")
 
     if not all_signals:
         print("Sin señales en este scan.")
         return
 
-    # Armar y enviar mensajes (máx 4096 chars por mensaje de Telegram)
-    header  = f"🔍 Crypto Screener | {now}\n\n"
+    # Enviar a Telegram (máx 4096 chars por mensaje)
+    header  = f"🔍 Crypto Screener | {now}\n{len(all_signals)} señales en {len(pairs)} pares\n\n"
     current = header
 
     for symbol, sigs in all_signals:
-        clean = safe_symbol(symbol)
-        if not clean:
-            continue
-        block = f"▶ {clean}\n" + "\n".join(f"  {s}" for s in sigs) + "\n\n"
+        block = f"▶ {symbol}\n" + "\n".join(f"  {s}" for s in sigs) + "\n\n"
         if len(current) + len(block) > 4000:
             send_telegram(current)
             current = block
@@ -163,7 +166,7 @@ def main():
     if current.strip():
         send_telegram(current)
 
-    print(f"\n✅ {len(all_signals)} señales enviadas a Telegram.")
+    print(f"✅ Mensajes enviados a Telegram.")
 
 
 if __name__ == "__main__":
