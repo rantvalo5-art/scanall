@@ -1,7 +1,9 @@
 name: Crypto Screener
 
 on:
-  workflow_dispatch: # Activar manualmente desde la UI de GitHub
+  workflow_dispatch:
+  repository_dispatch:
+    types: [run-screener]
 
   schedule:
     - cron: "*/5 * * * *" # Cada 5 min (puede tener 5-15 min delay en horas pico)
