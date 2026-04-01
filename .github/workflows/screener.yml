@@ -1,0 +1,37 @@
+name: Crypto Screener
+
+on:
+  # Disparado por cron-job.org via HTTP (reemplaza el cron nativo de GitHub que tiene delay)
+  repository_dispatch:
+    types: [run-screener]
+
+  # Cron de GitHub como backup (cada 15 min, puede tener hasta 10 min de delay)
+  schedule:
+    - cron: "*/15 * * * *"
+
+  # Para correrlo manualmente desde la UI de GitHub
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install requests pandas pandas-ta
+
+      - name: Run screener
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python screener.py
