@@ -1,0 +1,919 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Screener Config</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --accent: #f0ff44;
+    --accent2: #ff6b35;
+    --text: #e8e8f0;
+    --muted: #555570;
+    --success: #44ffaa;
+    --error: #ff4466;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(var(--border) 1px, transparent 1px),
+      linear-gradient(90deg, var(--border) 1px, transparent 1px);
+    background-size: 40px 40px;
+    opacity: 0.4;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* header */
+  header {
+    margin-bottom: 48px;
+  }
+
+  .tag {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  h1 {
+    font-size: clamp(32px, 6vw, 52px);
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -2px;
+  }
+
+  h1 span {
+    color: var(--accent);
+  }
+
+  .subtitle {
+    margin-top: 12px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+
+  /* auth section */
+  .auth-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent2);
+    padding: 20px 24px;
+    margin-bottom: 32px;
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+  }
+
+  .auth-section .field {
+    flex: 1;
+  }
+
+  /* sections */
+  .section {
+    margin-bottom: 24px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    overflow: hidden;
+    animation: fadeUp 0.4s ease both;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .section:nth-child(2) { animation-delay: 0.05s; }
+  .section:nth-child(3) { animation-delay: 0.10s; }
+  .section:nth-child(4) { animation-delay: 0.15s; }
+  .section:nth-child(5) { animation-delay: 0.20s; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .section-header:hover { background: rgba(240,255,68,0.03); }
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .section-title .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    transition: background 0.2s;
+  }
+
+  .section.active .section-title .dot { background: var(--accent); }
+
+  .toggle-badge {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    letter-spacing: 1px;
+    transition: all 0.2s;
+  }
+
+  .section.active .toggle-badge {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .section-body {
+    padding: 20px;
+    display: none;
+  }
+
+  .section.active .section-body { display: block; }
+
+  /* fields */
+  .field {
+    margin-bottom: 16px;
+  }
+
+  .field:last-child { margin-bottom: 0; }
+
+  label {
+    display: block;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+
+  label .hint {
+    color: #333350;
+    margin-left: 8px;
+    font-size: 10px;
+  }
+
+  input[type="text"],
+  input[type="number"],
+  input[type="password"],
+  select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+  }
+
+  input:focus, select:focus {
+    border-color: var(--accent);
+  }
+
+  select option { background: var(--surface); }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  /* toggle switch */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .toggle-row:last-child { border-bottom: none; }
+
+  .toggle-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+    letter-spacing: 1px;
+  }
+
+  .switch {
+    position: relative;
+    width: 40px;
+    height: 22px;
+    flex-shrink: 0;
+  }
+
+  .switch input { display: none; }
+
+  .slider {
+    position: absolute;
+    inset: 0;
+    background: var(--border);
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .slider::after {
+    content: '';
+    position: absolute;
+    left: 3px; top: 3px;
+    width: 16px; height: 16px;
+    background: var(--muted);
+    transition: all 0.2s;
+  }
+
+  .switch input:checked + .slider { background: rgba(240,255,68,0.15); }
+  .switch input:checked + .slider::after {
+    transform: translateX(18px);
+    background: var(--accent);
+  }
+
+  .toggle-sub {
+    padding: 12px 0 0 0;
+    display: none;
+  }
+
+  .toggle-sub.visible { display: block; }
+
+  /* buttons */
+  .btn {
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    padding: 12px 24px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #0a0a0f;
+    font-weight: 700;
+  }
+
+  .btn-primary:hover { background: #e8f73e; transform: translateY(-1px); }
+  .btn-primary:active { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+  }
+
+  .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
+
+  .btn-sm {
+    padding: 8px 16px;
+    font-size: 10px;
+  }
+
+  /* actions bar */
+  .actions {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    padding: 16px 0;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    z-index: 10;
+    margin-top: 32px;
+  }
+
+  /* status */
+  #status {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 1px;
+    flex: 1;
+    min-height: 18px;
+    transition: all 0.3s;
+  }
+
+  #status.ok { color: var(--success); }
+  #status.err { color: var(--error); }
+  #status.loading { color: var(--accent); }
+
+  /* spinner */
+  .spin {
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* raw preview */
+  .preview-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    padding: 14px;
+    margin-top: 16px;
+    max-height: 180px;
+    overflow-y: auto;
+    white-space: pre;
+    display: none;
+  }
+
+  .preview-box.visible { display: block; }
+
+  /* workflow trigger */
+  .run-bar {
+    background: rgba(255,107,53,0.08);
+    border: 1px solid rgba(255,107,53,0.2);
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 24px;
+  }
+
+  .run-bar-text {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 1px;
+  }
+
+  .run-bar-text strong { color: var(--accent2); }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <span class="tag">● live config</span>
+    <h1>SCREENER<br><span>CONTROL</span></h1>
+    <p class="subtitle">// modifica screener.py directo desde github pages</p>
+  </header>
+
+  <!-- AUTH -->
+  <div class="auth-section">
+    <div class="field">
+      <label>GitHub Token <span class="hint">(scope: repo + workflow)</span></label>
+      <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx">
+    </div>
+    <div class="field" style="max-width:220px">
+      <label>Repo <span class="hint">(usuario/repo)</span></label>
+      <input type="text" id="gh-repo" placeholder="rantvalo5-art/scanall">
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="loadConfig()">CARGAR</button>
+  </div>
+
+  <!-- GENERAL -->
+  <div class="section active" id="sec-general">
+    <div class="section-header" onclick="toggleSection('sec-general')">
+      <div class="section-title"><div class="dot"></div> GENERAL</div>
+      <span class="toggle-badge">ACTIVO</span>
+    </div>
+    <div class="section-body">
+      <div class="row">
+        <div class="field">
+          <label>INTERVAL <span class="hint">timeframe</span></label>
+          <select id="INTERVAL">
+            <option value="1m">1m</option>
+            <option value="5m">5m</option>
+            <option value="15m">15m</option>
+            <option value="1h" selected>1h</option>
+            <option value="4h">4h</option>
+            <option value="1d">1d</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>TOP_N <span class="hint">pares a scanear</span></label>
+          <input type="number" id="TOP_N" value="9999" min="1" max="9999">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>LIMIT <span class="hint">velas por símbolo</span></label>
+          <input type="number" id="LIMIT" value="100" min="30" max="500">
+        </div>
+        <div class="field">
+          <label>MAX_WORKERS <span class="hint">threads paralelos</span></label>
+          <input type="number" id="MAX_WORKERS" value="20" min="1" max="40">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BB SQUEEZE -->
+  <div class="section active" id="sec-bb">
+    <div class="section-header" onclick="toggleSection('sec-bb')">
+      <div class="section-title"><div class="dot"></div> BB SQUEEZE</div>
+      <span class="toggle-badge">ACTIVO</span>
+    </div>
+    <div class="section-body">
+      <div class="toggle-row">
+        <span class="toggle-label">BB_WIDTH_MIN — activar indicador</span>
+        <label class="switch">
+          <input type="checkbox" id="en-bb-squeeze" checked onchange="toggleIndicator('bb-squeeze')">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="toggle-sub visible" id="sub-bb-squeeze">
+        <div class="field" style="margin-top:12px">
+          <label>BB_WIDTH_MIN <span class="hint">squeeze si width ≤ X</span></label>
+          <input type="number" id="BB_WIDTH_MIN" value="0.10" step="0.01" min="0.01" max="1">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RSI -->
+  <div class="section" id="sec-rsi">
+    <div class="section-header" onclick="toggleSection('sec-rsi')">
+      <div class="section-title"><div class="dot"></div> RSI</div>
+      <span class="toggle-badge">DESACTIVADO</span>
+    </div>
+    <div class="section-body">
+      <div class="toggle-row">
+        <span class="toggle-label">RSI — activar indicador</span>
+        <label class="switch">
+          <input type="checkbox" id="en-rsi" onchange="toggleIndicator('rsi')">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="toggle-sub" id="sub-rsi">
+        <div class="row" style="margin-top:12px">
+          <div class="field">
+            <label>RSI_OVERSOLD</label>
+            <input type="number" id="RSI_OVERSOLD" value="30" min="1" max="49">
+          </div>
+          <div class="field">
+            <label>RSI_OVERBOUGHT</label>
+            <input type="number" id="RSI_OVERBOUGHT" value="70" min="51" max="99">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MACD -->
+  <div class="section" id="sec-macd">
+    <div class="section-header" onclick="toggleSection('sec-macd')">
+      <div class="section-title"><div class="dot"></div> MACD CROSSOVER</div>
+      <span class="toggle-badge">DESACTIVADO</span>
+    </div>
+    <div class="section-body">
+      <div class="toggle-row">
+        <span class="toggle-label">MACD — activar indicador</span>
+        <label class="switch">
+          <input type="checkbox" id="en-macd" onchange="toggleIndicator('macd')">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMA -->
+  <div class="section" id="sec-ema">
+    <div class="section-header" onclick="toggleSection('sec-ema')">
+      <div class="section-title"><div class="dot"></div> EMA CROSSOVER</div>
+      <span class="toggle-badge">DESACTIVADO</span>
+    </div>
+    <div class="section-body">
+      <div class="toggle-row">
+        <span class="toggle-label">EMA 9/21 — activar indicador</span>
+        <label class="switch">
+          <input type="checkbox" id="en-ema" onchange="toggleIndicator('ema')">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- BB BREAKOUT -->
+  <div class="section" id="sec-bb-breakout">
+    <div class="section-header" onclick="toggleSection('sec-bb-breakout')">
+      <div class="section-title"><div class="dot"></div> BB BREAKOUT</div>
+      <span class="toggle-badge">DESACTIVADO</span>
+    </div>
+    <div class="section-body">
+      <div class="toggle-row">
+        <span class="toggle-label">BB Breakout — activar indicador</span>
+        <label class="switch">
+          <input type="checkbox" id="en-bb-breakout" onchange="toggleIndicator('bb-breakout')">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- VOLUME -->
+  <div class="section" id="sec-vol">
+    <div class="section-header" onclick="toggleSection('sec-vol')">
+      <div class="section-title"><div class="dot"></div> VOLUMEN SPIKE</div>
+      <span class="toggle-badge">DESACTIVADO</span>
+    </div>
+    <div class="section-body">
+      <div class="toggle-row">
+        <span class="toggle-label">Volumen spike — activar indicador</span>
+        <label class="switch">
+          <input type="checkbox" id="en-vol" onchange="toggleIndicator('vol')">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="toggle-sub" id="sub-vol">
+        <div class="field" style="margin-top:12px">
+          <label>VOLUME_MULT <span class="hint">spike si volumen > Xx promedio</span></label>
+          <input type="number" id="VOLUME_MULT" value="2.5" step="0.1" min="1">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- preview -->
+  <button class="btn btn-secondary btn-sm" onclick="togglePreview()" style="margin-top:8px">
+    PREVISUALIZAR CAMBIOS
+  </button>
+  <pre class="preview-box" id="preview-box"></pre>
+
+  <!-- run workflow -->
+  <div class="run-bar">
+    <div class="run-bar-text">
+      Después de guardar, disparar el workflow manualmente:<br>
+      <strong>GitHub → Actions → Crypto Screener → Run workflow</strong>
+    </div>
+    <button class="btn btn-secondary btn-sm" onclick="triggerWorkflow()">▶ RUN NOW</button>
+  </div>
+
+  <!-- actions -->
+  <div class="actions">
+    <span id="status"></span>
+    <button class="btn btn-secondary" onclick="loadConfig()">↺ RECARGAR</button>
+    <button class="btn btn-primary" id="save-btn" onclick="saveConfig()">
+      GUARDAR EN GITHUB
+    </button>
+  </div>
+
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────────
+let fileSha = null;
+
+const INDICATORS = {
+  'bb-squeeze':  { vars: ['BB_WIDTH_MIN'],                    commentTag: 'BB squeeze ✅ ACTIVO' },
+  'rsi':         { vars: ['RSI_OVERSOLD','RSI_OVERBOUGHT'],   commentTag: 'RSI' },
+  'macd':        { vars: [],                                  commentTag: 'MACD crossover' },
+  'ema':         { vars: [],                                  commentTag: 'EMA 9/21 crossover' },
+  'bb-breakout': { vars: [],                                  commentTag: 'BB breakout' },
+  'vol':         { vars: ['VOLUME_MULT'],                     commentTag: 'Volumen spike' },
+};
+
+// ── UI helpers ─────────────────────────────────────────────────────────────────
+function toggleSection(id) {
+  const sec = document.getElementById(id);
+  sec.classList.toggle('active');
+  const badge = sec.querySelector('.toggle-badge');
+  badge.textContent = sec.classList.contains('active') ? 'ACTIVO' : 'COLAPSADO';
+}
+
+function toggleIndicator(key) {
+  const enabled = document.getElementById('en-' + key).checked;
+  const sub = document.getElementById('sub-' + key);
+  if (sub) sub.classList.toggle('visible', enabled);
+  const sec = document.getElementById('sec-' + key) || document.getElementById('sec-bb');
+  if (sec) {
+    const badge = sec.querySelector('.toggle-badge');
+    badge.textContent = enabled ? 'ACTIVO' : 'DESACTIVADO';
+    badge.style.borderColor = enabled ? 'var(--accent)' : '';
+    badge.style.color = enabled ? 'var(--accent)' : '';
+  }
+}
+
+function setStatus(msg, type='') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = type;
+}
+
+function togglePreview() {
+  const box = document.getElementById('preview-box');
+  if (box.classList.contains('visible')) {
+    box.classList.remove('visible');
+  } else {
+    box.textContent = buildNewContent(window._originalContent || '');
+    box.classList.add('visible');
+  }
+}
+
+// ── GitHub API ─────────────────────────────────────────────────────────────────
+function getHeaders() {
+  return {
+    'Authorization': `Bearer ${document.getElementById('gh-token').value.trim()}`,
+    'Accept': 'application/vnd.github+json',
+    'Content-Type': 'application/json',
+    'X-GitHub-Api-Version': '2022-11-28'
+  };
+}
+
+function getRepo() {
+  return document.getElementById('gh-repo').value.trim();
+}
+
+async function loadConfig() {
+  const token = document.getElementById('gh-token').value.trim();
+  const repo  = getRepo();
+  if (!token || !repo) { setStatus('Ingresá token y repo primero', 'err'); return; }
+
+  setStatus('<span class="spin">◌</span> Cargando...', 'loading');
+  document.getElementById('status').innerHTML = '⟳ Cargando...';
+
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/contents/screener.py`, {
+      headers: getHeaders()
+    });
+    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    const data = await res.json();
+    fileSha = data.sha;
+    const content = atob(data.content.replace(/\n/g,''));
+    window._originalContent = content;
+    parseConfig(content);
+    setStatus('✓ Config cargada desde GitHub', 'ok');
+  } catch(e) {
+    setStatus('✗ Error: ' + e.message, 'err');
+  }
+}
+
+// ── Parse screener.py ──────────────────────────────────────────────────────────
+function parseConfig(content) {
+  const get = (key) => {
+    const m = content.match(new RegExp(`^${key}\\s*=\\s*([^\\s#\\n]+)`, 'm'));
+    return m ? m[1].replace(/['"]/g,'') : null;
+  };
+
+  const fields = ['INTERVAL','LIMIT','TOP_N','MAX_WORKERS','BB_WIDTH_MIN',
+                  'RSI_OVERSOLD','RSI_OVERBOUGHT','VOLUME_MULT'];
+  fields.forEach(f => {
+    const el = document.getElementById(f);
+    const val = get(f);
+    if (el && val !== null) {
+      if (el.tagName === 'SELECT') el.value = val;
+      else el.value = val;
+    }
+  });
+
+  // Detect which indicators are active (uncommented)
+  const isActive = (tag) => content.includes(`# ${tag}`) === false ||
+    content.match(new RegExp(`(?<!#\\s*)signals\\.append.*${tag.split(' ')[0]}`, '')) !== null;
+
+  // Simpler: check if the signals.append line for each indicator is uncommented
+  const checks = {
+    'bb-squeeze':  /^\s*signals\.append\(f"🤏/m,
+    'rsi':         /^\s*signals\.append\(f"📉/m,
+    'macd':        /^\s*signals\.append\("⚡ MACD/m,
+    'ema':         /^\s*signals\.append\("🔀/m,
+    'bb-breakout': /^\s*signals\.append\(f"🔥/m,
+    'vol':         /^\s*signals\.append\(f"🚀/m,
+  };
+
+  Object.entries(checks).forEach(([key, regex]) => {
+    const active = regex.test(content);
+    const cb = document.getElementById('en-' + key);
+    if (cb) {
+      cb.checked = active;
+      toggleIndicator(key);
+    }
+  });
+}
+
+// ── Build new screener.py content ──────────────────────────────────────────────
+function buildNewContent(original) {
+  let c = original;
+
+  // Update simple variable values
+  const numVars = {
+    LIMIT:        document.getElementById('LIMIT').value,
+    TOP_N:        document.getElementById('TOP_N').value,
+    MAX_WORKERS:  document.getElementById('MAX_WORKERS').value,
+    BB_WIDTH_MIN: document.getElementById('BB_WIDTH_MIN').value,
+    RSI_OVERSOLD: document.getElementById('RSI_OVERSOLD').value,
+    RSI_OVERBOUGHT: document.getElementById('RSI_OVERBOUGHT').value,
+    VOLUME_MULT:  document.getElementById('VOLUME_MULT').value,
+  };
+
+  Object.entries(numVars).forEach(([key, val]) => {
+    // replace both commented and uncommented versions
+    c = c.replace(
+      new RegExp(`(#?\\s*${key}\\s*=\\s*)[^\\s#\\n]+`, 'm'),
+      `$1${val}`
+    );
+  });
+
+  // INTERVAL (string value)
+  const interval = document.getElementById('INTERVAL').value;
+  c = c.replace(/(INTERVAL\s*=\s*")[^"]+(")/m, `$1${interval}$2`);
+
+  // Toggle indicators: comment/uncomment blocks
+  const toggleMap = {
+    'bb-squeeze':  { regex: /(\s*)(#?\s*)(if width <= BB_WIDTH_MIN:[\s\S]*?signals\.append\(f"🤏[^)]+\))/, en: document.getElementById('en-bb-squeeze').checked },
+    'rsi':         { regex: /(\s*)(#?\s*)(rsi_val = ta\.momentum[\s\S]*?elif rsi_val >= RSI_OVERBOUGHT:.*\n.*signals\.append[^\n]+)/, en: document.getElementById('en-rsi').checked },
+    'macd':        { regex: /(\s*)(#?\s*)(macd_ind\s*=[\s\S]*?signals\.append\("⚡ MACD crossover bajista"\))/, en: document.getElementById('en-macd').checked },
+    'ema':         { regex: /(\s*)(#?\s*)(ema9\s*=[\s\S]*?signals\.append\("🔀[^)]+\))/, en: document.getElementById('en-ema').checked },
+    'bb-breakout': { regex: /(\s*)(#?\s*)(if price > upper:[\s\S]*?signals\.append\(f"🔥[^)]+\))/, en: document.getElementById('en-bb-breakout').checked },
+    'vol':         { regex: /(\s*)(#?\s*)(vol_mean[\s\S]*?signals\.append\(f"🚀[^)]+\))/, en: document.getElementById('en-vol').checked },
+  };
+
+  // For simplicity, just update the variable sections and leave block toggling
+  // to the raw replacement approach
+  Object.entries(numVars).forEach(([key, val]) => {
+    // update commented vars too (remove/add comment based on indicator state)
+  });
+
+  return c;
+}
+
+async function saveConfig() {
+  const token = document.getElementById('gh-token').value.trim();
+  const repo  = getRepo();
+  if (!token || !repo) { setStatus('Falta token o repo', 'err'); return; }
+  if (!fileSha) { setStatus('Cargá la config primero', 'err'); return; }
+
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  setStatus('⟳ Guardando...', 'loading');
+
+  try {
+    // Build updated content by replacing variables in original
+    let content = window._originalContent || '';
+
+    // Update numeric/string vars
+    const updates = [
+      { key: 'INTERVAL',      val: `"${document.getElementById('INTERVAL').value}"` },
+      { key: 'LIMIT',         val: document.getElementById('LIMIT').value },
+      { key: 'TOP_N',         val: document.getElementById('TOP_N').value },
+      { key: 'MAX_WORKERS',   val: document.getElementById('MAX_WORKERS').value },
+      { key: 'BB_WIDTH_MIN',  val: document.getElementById('BB_WIDTH_MIN').value },
+      { key: 'RSI_OVERSOLD',  val: document.getElementById('RSI_OVERSOLD').value },
+      { key: 'RSI_OVERBOUGHT',val: document.getElementById('RSI_OVERBOUGHT').value },
+      { key: 'VOLUME_MULT',   val: document.getElementById('VOLUME_MULT').value },
+    ];
+
+    updates.forEach(({ key, val }) => {
+      content = content.replace(
+        new RegExp(`(^(?:#\\s*)?${key}\\s*=\\s*).*`, 'm'),
+        `$1${val}`
+      );
+    });
+
+    // Toggle indicator comment blocks
+    const indicators = [
+      { id: 'bb-squeeze',  patterns: ['if width <= BB_WIDTH_MIN:', 'BB squeeze'] },
+      { id: 'rsi',         patterns: ['RSIIndicator', 'RSI_OVERSOLD', 'RSI_OVERBOUGHT'] },
+      { id: 'macd',        patterns: ['ta.trend.MACD', 'MACD crossover'] },
+      { id: 'ema',         patterns: ['EMAIndicator', 'EMA9'] },
+      { id: 'bb-breakout', patterns: ['if price > upper:', 'BB breakout'] },
+      { id: 'vol',         patterns: ['vol_mean', 'vol_curr', 'VOLUME_MULT', 'Volumen spike'] },
+    ];
+
+    indicators.forEach(({ id, patterns }) => {
+      const active = document.getElementById('en-' + id).checked;
+      const lines  = content.split('\n');
+
+      // Find lines belonging to this indicator block
+      let inBlock = false;
+      const newLines = lines.map(line => {
+        const stripped = line.replace(/^(\s*)#\s*/, '$1');
+        const isMatch  = patterns.some(p => stripped.includes(p) || line.includes(p));
+
+        if (isMatch) {
+          if (active) {
+            // uncomment: remove leading # (preserving indent)
+            return line.replace(/^(\s*)#\s?/, '$1');
+          } else {
+            // comment: add # if not already commented
+            if (!/^\s*#/.test(line) && line.trim() !== '') {
+              return line.replace(/^(\s*)/, '$1# ');
+            }
+          }
+        }
+        return line;
+      });
+
+      content = newLines.join('\n');
+    });
+
+    // Encode to base64
+    const encoded = btoa(unescape(encodeURIComponent(content)));
+
+    const res = await fetch(`https://api.github.com/repos/${repo}/contents/screener.py`, {
+      method: 'PUT',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        message: `config: update screener settings via UI`,
+        content: encoded,
+        sha: fileSha
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.message || res.statusText);
+    }
+
+    const data = await res.json();
+    fileSha = data.content.sha;
+    window._originalContent = content;
+    setStatus('✓ Guardado en GitHub correctamente', 'ok');
+  } catch(e) {
+    setStatus('✗ Error: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function triggerWorkflow() {
+  const token = document.getElementById('gh-token').value.trim();
+  const repo  = getRepo();
+  if (!token || !repo) { setStatus('Falta token o repo', 'err'); return; }
+
+  setStatus('⟳ Disparando workflow...', 'loading');
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/dispatches`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ event_type: 'run-screener' })
+    });
+    if (res.status === 204) {
+      setStatus('✓ Workflow disparado', 'ok');
+    } else {
+      throw new Error(res.statusText);
+    }
+  } catch(e) {
+    setStatus('✗ Error: ' + e.message, 'err');
+  }
+}
+
+// Persist token + repo in localStorage for convenience
+document.getElementById('gh-token').addEventListener('input', e => {
+  localStorage.setItem('gh_token', e.target.value);
+});
+document.getElementById('gh-repo').addEventListener('input', e => {
+  localStorage.setItem('gh_repo', e.target.value);
+});
+
+// Restore on load
+window.addEventListener('load', () => {
+  const t = localStorage.getItem('gh_token');
+  const r = localStorage.getItem('gh_repo');
+  if (t) document.getElementById('gh-token').value = t;
+  if (r) document.getElementById('gh-repo').value = r;
+});
+</script>
+</body>
+</html>
