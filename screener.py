@@ -112,11 +112,17 @@ def analyze(symbol):
 
 # ── Telegram ───────────────────────────────────────────────────────────────────
 def send_telegram(text):
+    # Sin parse_mode HTML para evitar errores con caracteres especiales
     requests.post(
         f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-        json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "HTML"},
+        json={"chat_id": TELEGRAM_CHAT_ID, "text": text},
         timeout=10
     ).raise_for_status()
+
+
+def safe_symbol(symbol):
+    # Filtrar solo ASCII — evita que pares con nombres chinos rompan el mensaje
+    return symbol.encode("ascii", errors="ignore").decode()
 
 
 # ── Main ───────────────────────────────────────────────────────────────────────
@@ -140,11 +146,14 @@ def main():
         return
 
     # Armar y enviar mensajes (máx 4096 chars por mensaje de Telegram)
-    header  = f"🔍 <b>Crypto Screener</b> | {now}\n\n"
+    header  = f"🔍 Crypto Screener | {now}\n\n"
     current = header
 
     for symbol, sigs in all_signals:
-        block = f"<b>{symbol}</b>\n" + "\n".join(f"  {s}" for s in sigs) + "\n\n"
+        clean = safe_symbol(symbol)
+        if not clean:
+            continue
+        block = f"▶ {clean}\n" + "\n".join(f"  {s}" for s in sigs) + "\n\n"
         if len(current) + len(block) > 4000:
             send_telegram(current)
             current = block
