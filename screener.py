@@ -34,9 +34,9 @@ BB_WIDTH_MAX        = 5.0    # filtra pares con width anómalo
 # (price up se detecta automáticamente: close > open en la vela actual)
 
 # ── Niveles de volumen ────────────────────────────────────────────────────────
-VOL_NORMAL  = 2.0   # 2x–5x
-VOL_FUERTE  = 5.0   # 5x–10x
-VOL_EXTREMO = 10.0  # +10x
+VOL_NORMAL  = 3
+VOL_FUERTE  = 5.0
+VOL_EXTREMO = 10.0
 
 # ── Indicadores comentados ────────────────────────────────────────────────────
 # RSI_OVERSOLD   = 30
@@ -170,13 +170,13 @@ def analyze(symbol):
             f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
         )
 
-    # ── Vol Spike standalone (sin requerir BB expansion ni precio) ────────────
-    # if vol_ratio >= VOL_EXTREMO:
-    #     signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
-    # elif vol_ratio >= VOL_FUERTE:
-    #     signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
-    # elif vol_ratio >= VOL_NORMAL:
-    #     signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
+    ── Vol Spike standalone (sin requerir BB expansion ni precio) ────────────
+    if vol_ratio >= VOL_EXTREMO:
+        signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
+    elif vol_ratio >= VOL_FUERTE:
+        signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
+    elif vol_ratio >= VOL_NORMAL:
+        signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
 
     return symbol, (signals if signals else None)
 
