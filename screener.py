@@ -23,7 +23,7 @@ MAX_WORKERS  = 20      # Requests en paralelo
 
 # RSI_OVERSOLD   = 30
 # RSI_OVERBOUGHT = 70
-BB_WIDTH_MIN   = 0.10   # Squeeze si width <= 10%
+BB_WIDTH_MIN   = 0.02   # Squeeze si width <= 10%
 # VOLUME_MULT    = 2.5
 
 
