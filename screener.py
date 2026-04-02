@@ -122,7 +122,7 @@ def analyze(symbol):
 
     # BB squeeze â ACTIVO
     # if width_curr <= BB_WIDTH_MIN:
-        signals.append(f"ð¤ BB squeeze (width={width_curr:.2%}) â movimiento fuerte prÃ³ximo")
+    signals.append(f"ð¤ BB squeeze (width={width_curr:.2%}) â movimiento fuerte prÃ³ximo")
 
     # ââ BB Width Expansion + Volume Spike + Price Up (combo) â ACTIVO ââââââââ
     width_delta    = width_curr - width_prev
