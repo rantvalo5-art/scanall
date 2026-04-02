@@ -1,7 +1,7 @@
 """
 Binance Spot USDT Crypto Screener — TODOS los pares, paralelo
-Indicadores activos: BB squeeze, BB width expansion + volume spike + price up (combo)
-Indicadores comentados: RSI, MACD, EMA crossover, BB breakout, Volumen spike standalone
+Indicadores activos: BB width expansion + volume spike + price up (combo)
+Indicadores comentados: RSI, MACD, EMA crossover, BB breakout, BB squeeze, Volumen spike standalone
 Alertas vía Telegram
 """
 
@@ -78,11 +78,11 @@ def analyze(symbol):
     volume = df["volume"]
 
     # ── RSI ───────────────────────────────────────────────────────────────────
-    rsi_val = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]
-    if rsi_val <= RSI_OVERSOLD:
-    signals.append(f"📉 RSI={rsi_val:.1f} (sobreventa)")
-    elif rsi_val >= RSI_OVERBOUGHT:
-    signals.append(f"📈 RSI={rsi_val:.1f} (sobrecompra)")
+    # rsi_val = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]
+    # if rsi_val <= RSI_OVERSOLD:
+    #     signals.append(f"📉 RSI={rsi_val:.1f} (sobreventa)")
+    # elif rsi_val >= RSI_OVERBOUGHT:
+    #     signals.append(f"📈 RSI={rsi_val:.1f} (sobrecompra)")
 
     # ── MACD crossover ────────────────────────────────────────────────────────
     # macd_ind  = ta.trend.MACD(close, window_slow=26, window_fast=12, window_sign=9)
@@ -116,13 +116,13 @@ def analyze(symbol):
 
     # ── BB breakout ───────────────────────────────────────────────────────────
     # if price > hband.iloc[-1]:
-    # signals.append(f"🔥 BB breakout arriba (close={price:.4f} > upper={hband.iloc[-1]:.4f})")
+    #     signals.append(f"🔥 BB breakout arriba (close={price:.4f} > upper={hband.iloc[-1]:.4f})")
     # elif price < lband.iloc[-1]:
-    # signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")
+    #     signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")
 
     # ── BB squeeze ──────────────────────────────────────────────────
-    if width_curr <= BB_WIDTH_MIN:
-    signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
+    # if width_curr <= BB_WIDTH_MIN:
+    #     signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
 
     # ── BB Width Expansion + Volume Spike + Price Up (combo) ✅ ACTIVO ───────
     width_delta    = width_curr - width_prev
@@ -141,9 +141,9 @@ def analyze(symbol):
             f"(+{width_pct_chg:.0%}) | vol {vol_curr/vol_mean:.1f}x"
         )
 
-    # ── Volumen spike standalone ──────────────────────────────────────────────
+    #     signals.append(f"🚀 Volumen spike {vol_curr/vol_mean:.1f}x promedio")
     # if vol_mean > 0 and vol_curr > vol_mean * VOLUME_MULT:
-    # signals.append(f"🚀 Volumen spike {vol_curr/vol_mean:.1f}x promedio")
+    #     signals.append(f"🚀 Volumen spike {vol_curr/vol_mean:.1f}x promedio")
 
     return symbol, (signals if signals else None)
 
