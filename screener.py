@@ -155,28 +155,28 @@ def analyze(symbol):
 
     expansion_ok  = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT
 
-    if vol_ratio >= VOL_EXTREMO:
-        vol_label = "🔴 vol extremo"
-    elif vol_ratio >= VOL_FUERTE:
-        vol_label = "🟡 vol fuerte"
-    elif vol_ratio >= VOL_NORMAL:
-        vol_label = "🟢 vol normal"
-    else:
-        vol_label = None
-
-    if expansion_ok and vol_label and price_up and width_curr < BB_WIDTH_MAX:
-        signals.append(
-            f"{vol_label} {vol_ratio:.1f}x | BB expansion "
-            f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
-        )
-
-    #── Vol Spike standalone (sin requerir BB expansion ni precio) ────────────
-    if vol_ratio >= VOL_EXTREMO:
-        signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
-    elif vol_ratio >= VOL_FUERTE:
-        signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
-    elif vol_ratio >= VOL_NORMAL:
-        signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
+    # if vol_ratio >= VOL_EXTREMO:
+        # vol_label = "🔴 vol extremo"
+    # elif vol_ratio >= VOL_FUERTE:
+        # vol_label = "🟡 vol fuerte"
+    # elif vol_ratio >= VOL_NORMAL:
+        # vol_label = "🟢 vol normal"
+    # else:
+        # vol_label = None
+# 
+    # if expansion_ok and vol_label and price_up and width_curr < BB_WIDTH_MAX:
+        # signals.append(
+            # f"{vol_label} {vol_ratio:.1f}x | BB expansion "
+            # f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
+        # )
+# 
+    # ── Vol Spike standalone (sin requerir BB expansion ni precio) ────────────
+    # if vol_ratio >= VOL_EXTREMO:
+        # signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
+    # elif vol_ratio >= VOL_FUERTE:
+        # signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
+    # elif vol_ratio >= VOL_NORMAL:
+        # signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
 
     return symbol, (signals if signals else None)
 
