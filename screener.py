@@ -30,9 +30,13 @@ BB_WIDTH_MIN        = 0.1
 # ── BB Width Expansion + Volume + Price (combo) ──────────────────────────────
 BB_EXPANSION_MIN    = 0.095
 BB_EXPANSION_PCT    = 0.03
-VOLUME_MULT         = 2.0
 BB_WIDTH_MAX        = 5.0    # filtra pares con width anómalo
 # (price up se detecta automáticamente: close > open en la vela actual)
+
+# ── Niveles de volumen ────────────────────────────────────────────────────────
+VOL_NORMAL  = 2.0   # 2x–5x
+VOL_FUERTE  = 5.0   # 5x–10x
+VOL_EXTREMO = 10.0  # +10x
 
 # ── Indicadores comentados ────────────────────────────────────────────────────
 # RSI_OVERSOLD   = 30
@@ -106,17 +110,17 @@ def analyze(symbol):
     # macd_line = macd_ind.macd()
     # sig_line  = macd_ind.macd_signal()
     # if macd_line.iloc[-2] < sig_line.iloc[-2] and macd_line.iloc[-1] > sig_line.iloc[-1]:
-    # signals.append("⚡ MACD crossover alcista")
+    #     signals.append("⚡ MACD crossover alcista")
     # elif macd_line.iloc[-2] > sig_line.iloc[-2] and macd_line.iloc[-1] < sig_line.iloc[-1]:
-    # signals.append("⚡ MACD crossover bajista")
+    #     signals.append("⚡ MACD crossover bajista")
 
     # ── EMA 9/21 crossover ────────────────────────────────────────────────────
     # ema9  = ta.trend.EMAIndicator(close, window=9).ema_indicator()
     # ema21 = ta.trend.EMAIndicator(close, window=21).ema_indicator()
     # if ema9.iloc[-2] < ema21.iloc[-2] and ema9.iloc[-1] > ema21.iloc[-1]:
-    # signals.append("🔀 EMA9 cruzó arriba EMA21 (alcista)")
+    #     signals.append("🔀 EMA9 cruzó arriba EMA21 (alcista)")
     # elif ema9.iloc[-2] > ema21.iloc[-2] and ema9.iloc[-1] < ema21.iloc[-1]:
-    # signals.append("🔀 EMA9 cruzó abajo EMA21 (bajista)")
+    #     signals.append("🔀 EMA9 cruzó abajo EMA21 (bajista)")
 
     # ── Bollinger Bands ───────────────────────────────────────────────────────
     bb     = ta.volatility.BollingerBands(close, window=20, window_dev=2)
@@ -137,34 +141,36 @@ def analyze(symbol):
     # elif price < lband.iloc[-1]:
     #     signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")
 
-    # ── BB squeeze ──────────────────────────────────────────────────
+    # ── BB squeeze ────────────────────────────────────────────────────────────
     # if width_curr <= BB_WIDTH_MIN:
-        # signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
+    #     signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
 
     # ── BB Width Expansion + Volume Spike + Price Up (combo) ✅ ACTIVO ───────
-    width_delta    = width_curr - width_prev
-    width_pct_chg  = width_delta / width_prev if width_prev > 0 else 0
-    vol_mean       = volume.iloc[-21:-1].mean()
-    vol_curr       = volume.iloc[-1]
-    vol_ratio = vol_curr / vol_mean if vol_mean > 0 else 0
-    price_up       = close.iloc[-1] > open_.iloc[-1]
+    width_delta   = width_curr - width_prev
+    width_pct_chg = width_delta / width_prev if width_prev > 0 else 0
+    vol_mean      = volume.iloc[-21:-1].mean()
+    vol_curr      = volume.iloc[-1]
+    vol_ratio     = vol_curr / vol_mean if vol_mean > 0 else 0
+    price_up      = close.iloc[-1] > open_.iloc[-1]
 
-    expansion_ok   = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT
+    expansion_ok  = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT
 
-    if vol_ratio >= 10:
+    if vol_ratio >= VOL_EXTREMO:
         vol_label = "🔴 vol extremo"
-    elif vol_ratio >= 5:
+    elif vol_ratio >= VOL_FUERTE:
         vol_label = "🟡 vol fuerte"
-    elif vol_ratio >= 2:
+    elif vol_ratio >= VOL_NORMAL:
         vol_label = "🟢 vol normal"
     else:
         vol_label = None
-    
+
     if expansion_ok and vol_label and price_up and width_curr < BB_WIDTH_MAX:
         signals.append(
             f"{vol_label} {vol_ratio:.1f}x | BB expansion "
             f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
         )
+
+    return symbol, (signals if signals else None)
 
 
 # ── Telegram ──────────────────────────────────────────────────────────────────
