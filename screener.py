@@ -41,6 +41,7 @@ BB_WIDTH_MAX        = 5.0    # filtra pares con width anómalo (delisting, colap
 
 # ── Datos ─────────────────────────────────────────────────────────────────────
 def get_all_usdt_pairs(n=TOP_N):
+    print(f"[DEBUG] Filtro activo: quoteVolume > {MIN_QUOTE_VOLUME:,}")
     r = requests.get("https://data-api.binance.vision/api/v3/ticker/24hr", timeout=15)
     r.raise_for_status()
     pairs = [
