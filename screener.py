@@ -78,11 +78,11 @@ def analyze(symbol):
     volume = df["volume"]
 
     # ── RSI ───────────────────────────────────────────────────────────────────
-    # rsi_val = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]
-    # if rsi_val <= RSI_OVERSOLD:
-    # signals.append(f"📉 RSI={rsi_val:.1f} (sobreventa)")
-    # elif rsi_val >= RSI_OVERBOUGHT:
-    # signals.append(f"📈 RSI={rsi_val:.1f} (sobrecompra)")
+    rsi_val = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]
+    if rsi_val <= RSI_OVERSOLD:
+    signals.append(f"📉 RSI={rsi_val:.1f} (sobreventa)")
+    elif rsi_val >= RSI_OVERBOUGHT:
+    signals.append(f"📈 RSI={rsi_val:.1f} (sobrecompra)")
 
     # ── MACD crossover ────────────────────────────────────────────────────────
     # macd_ind  = ta.trend.MACD(close, window_slow=26, window_fast=12, window_sign=9)
@@ -121,8 +121,8 @@ def analyze(symbol):
     # signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")
 
     # ── BB squeeze ──────────────────────────────────────────────────
-    # if width_curr <= BB_WIDTH_MIN:
-    #   signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
+    if width_curr <= BB_WIDTH_MIN:
+    signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
 
     # ── BB Width Expansion + Volume Spike + Price Up (combo) ✅ ACTIVO ───────
     width_delta    = width_curr - width_prev
