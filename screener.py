@@ -22,10 +22,10 @@ TOP_N        = 9999
 MAX_WORKERS  = 20
 
 # ── Filtro de liquidez ────────────────────────────────────────────────────────
-MIN_QUOTE_VOLUME = 100_000
+MIN_QUOTE_VOLUME = 
 
 # ── BB Squeeze ────────────────────────────────────────────────────────────────
-BB_WIDTH_MIN     = 0.6
+BB_WIDTH_MIN     = 0.02
 
 # ── BB Width Expansion + Volume + Price Up (combo) ───────────────────────────
 BB_EXPANSION_MIN = 0.095
@@ -161,8 +161,8 @@ def analyze(symbol):
     #     signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")
 
     # ── BB squeeze ────────────────────────────────────────────────────────────
-    if width_curr <= BB_WIDTH_MIN:
-        signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
+        if width_curr <= BB_WIDTH_MIN:
+                signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
 
     # ── BB Width Expansion + Volume Spike + Price Up (combo) ✅ ACTIVO ───────
     price_up      = close.iloc[-1] > open_.iloc[-1]
@@ -186,12 +186,12 @@ def analyze(symbol):
         )
 
     # ── Vol Spike standalone (sin requerir BB expansion ni precio) ───────────
-    if vol_ratio >= VOL_EXTREMO:
-        signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
-    elif vol_ratio >= VOL_FUERTE:
-        signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
-    elif vol_ratio >= VOL_NORMAL:
-        signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
+        if vol_ratio >= VOL_EXTREMO:
+                signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
+        elif vol_ratio >= VOL_FUERTE:
+                signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
+        elif vol_ratio >= VOL_NORMAL:
+                signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
 
     return symbol, (signals if signals else None)
 
