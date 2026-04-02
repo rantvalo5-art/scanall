@@ -121,8 +121,8 @@ def analyze(symbol):
     #     signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")
 
     # ── BB squeeze ──────────────────────────────────────────────────
-    # if width_curr <= BB_WIDTH_MIN:
-    #     signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
+    if width_curr <= BB_WIDTH_MIN:
+        signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
 
     # ── BB Width Expansion + Volume Spike + Price Up (combo) ✅ ACTIVO ───────
     width_delta    = width_curr - width_prev
