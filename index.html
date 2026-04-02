@@ -3,426 +3,459 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Screener Config</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<title>Screener Control</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #0a0a0f;
-    --surface: #111118;
-    --border: #1e1e2e;
-    --accent: #f0ff44;
-    --accent2: #ff6b35;
-    --text: #e8e8f0;
-    --muted: #555570;
-    --success: #44ffaa;
-    --error: #ff4466;
-  }
+:root {
+  --bg: #080b10;
+  --surface: #0d1117;
+  --surface2: #161b22;
+  --border: #21262d;
+  --accent: #39d353;
+  --accent-dim: rgba(57,211,83,0.12);
+  --orange: #f78166;
+  --blue: #58a6ff;
+  --yellow: #e3b341;
+  --text: #c9d1d9;
+  --muted: #484f58;
+  --muted2: #30363d;
+}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+* { margin:0; padding:0; box-sizing:border-box; }
 
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: 'Syne', sans-serif;
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
 
-  /* grid background */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image:
-      linear-gradient(var(--border) 1px, transparent 1px),
-      linear-gradient(90deg, var(--border) 1px, transparent 1px);
-    background-size: 40px 40px;
-    opacity: 0.4;
-    pointer-events: none;
-    z-index: 0;
-  }
+/* scanline effect */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 999;
+}
 
-  .container {
-    position: relative;
-    z-index: 1;
-    max-width: 780px;
-    margin: 0 auto;
-    padding: 48px 24px 80px;
-  }
+.layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
 
-  /* header */
-  header {
-    margin-bottom: 48px;
-  }
+/* sidebar */
+.sidebar {
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  padding: 24px 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
 
-  .tag {
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    color: var(--accent);
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    margin-bottom: 12px;
-    display: block;
-  }
+.logo {
+  padding: 0 20px 24px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
 
-  h1 {
-    font-size: clamp(32px, 6vw, 52px);
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -2px;
-  }
+.logo-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.5px;
+  color: #fff;
+  line-height: 1;
+}
 
-  h1 span {
-    color: var(--accent);
-  }
+.logo-sub {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  margin-top: 4px;
+}
 
-  .subtitle {
-    margin-top: 12px;
-    color: var(--muted);
-    font-family: 'Space Mono', monospace;
-    font-size: 12px;
-    letter-spacing: 1px;
-  }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 20px;
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  border-left: 2px solid transparent;
+  transition: all 0.15s;
+  text-decoration: none;
+}
 
-  /* auth section */
-  .auth-section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--accent2);
-    padding: 20px 24px;
-    margin-bottom: 32px;
-    display: flex;
-    gap: 12px;
-    align-items: flex-end;
-  }
+.nav-item:hover { color: var(--text); background: var(--surface2); }
+.nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); }
 
-  .auth-section .field {
-    flex: 1;
-  }
+.nav-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 
-  /* sections */
-  .section {
-    margin-bottom: 24px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    overflow: hidden;
-    animation: fadeUp 0.4s ease both;
-  }
+.nav-section-label {
+  padding: 16px 20px 6px;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
 
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(16px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
+.sidebar-footer {
+  margin-top: auto;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+}
 
-  .section:nth-child(2) { animation-delay: 0.05s; }
-  .section:nth-child(3) { animation-delay: 0.10s; }
-  .section:nth-child(4) { animation-delay: 0.15s; }
-  .section:nth-child(5) { animation-delay: 0.20s; }
+/* main */
+.main {
+  padding: 32px 40px 80px;
+  max-width: 800px;
+}
 
-  .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    user-select: none;
-  }
+.page-header {
+  margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+}
 
-  .section-header:hover { background: rgba(240,255,68,0.03); }
+.breadcrumb {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
 
-  .section-title {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-weight: 600;
-    font-size: 13px;
-    letter-spacing: 1px;
-    text-transform: uppercase;
-  }
+.breadcrumb span { color: var(--accent); }
 
-  .section-title .dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--muted);
-    transition: background 0.2s;
-  }
+h1 {
+  font-family: 'Syne', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -1px;
+}
 
-  .section.active .section-title .dot { background: var(--accent); }
+/* auth bar */
+.auth-bar {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  padding: 16px 20px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  margin-bottom: 28px;
+}
 
-  .toggle-badge {
-    font-family: 'Space Mono', monospace;
-    font-size: 10px;
-    padding: 3px 8px;
-    border: 1px solid var(--border);
-    color: var(--muted);
-    letter-spacing: 1px;
-    transition: all 0.2s;
-  }
+/* cards */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+  animation: slideIn 0.3s ease both;
+}
 
-  .section.active .toggle-badge {
-    border-color: var(--accent);
-    color: var(--accent);
-  }
+@keyframes slideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
-  .section-body {
-    padding: 20px;
-    display: none;
-  }
+.card:nth-child(2) { animation-delay: 0.04s; }
+.card:nth-child(3) { animation-delay: 0.08s; }
+.card:nth-child(4) { animation-delay: 0.12s; }
+.card:nth-child(5) { animation-delay: 0.16s; }
+.card:nth-child(6) { animation-delay: 0.20s; }
 
-  .section.active .section-body { display: block; }
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
 
-  /* fields */
-  .field {
-    margin-bottom: 16px;
-  }
+.card-header:hover { background: rgba(255,255,255,0.02); }
 
-  .field:last-child { margin-bottom: 0; }
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #fff;
+}
 
-  label {
-    display: block;
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-    letter-spacing: 1px;
-    margin-bottom: 6px;
-    text-transform: uppercase;
-  }
+.pill {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 2px;
+  letter-spacing: 1px;
+  font-weight: 700;
+}
 
-  label .hint {
-    color: #333350;
-    margin-left: 8px;
-    font-size: 10px;
-  }
+.pill-on  { background: var(--accent-dim); color: var(--accent); }
+.pill-off { background: var(--muted2); color: var(--muted); }
+.pill-new { background: rgba(88,166,255,0.15); color: var(--blue); }
 
-  input[type="text"],
-  input[type="number"],
-  input[type="password"],
-  select {
-    width: 100%;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    font-family: 'Space Mono', monospace;
-    font-size: 13px;
-    padding: 10px 14px;
-    outline: none;
-    transition: border-color 0.2s;
-    -webkit-appearance: none;
-  }
+.card-body {
+  padding: 20px;
+}
 
-  input:focus, select:focus {
-    border-color: var(--accent);
-  }
+.card-body.hidden { display: none; }
 
-  select option { background: var(--surface); }
+/* fields */
+.field-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
 
-  .row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-  }
+.field-group.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+.field-group.cols-1 { grid-template-columns: 1fr; }
 
-  /* toggle switch */
-  .toggle-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--border);
-  }
+.field { display: flex; flex-direction: column; gap: 5px; }
 
-  .toggle-row:last-child { border-bottom: none; }
+.field label {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
 
-  .toggle-label {
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    color: var(--text);
-    letter-spacing: 1px;
-  }
+.field label em {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 9px;
+  margin-left: 6px;
+}
 
-  .switch {
-    position: relative;
-    width: 40px;
-    height: 22px;
-    flex-shrink: 0;
-  }
+input[type=text], input[type=password], input[type=number], select {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  padding: 8px 12px;
+  outline: none;
+  width: 100%;
+  transition: border-color 0.15s;
+  -webkit-appearance: none;
+}
 
-  .switch input { display: none; }
+input:focus, select:focus { border-color: var(--accent); }
+select option { background: var(--surface2); }
 
-  .slider {
-    position: absolute;
-    inset: 0;
-    background: var(--border);
-    cursor: pointer;
-    transition: background 0.2s;
-  }
+.field-desc {
+  font-size: 10px;
+  color: var(--muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
 
-  .slider::after {
-    content: '';
-    position: absolute;
-    left: 3px; top: 3px;
-    width: 16px; height: 16px;
-    background: var(--muted);
-    transition: all 0.2s;
-  }
+/* toggle row */
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.toggle-row:last-child { border-bottom: none; }
+.toggle-label { font-size: 11px; color: var(--text); letter-spacing: 0.5px; }
+.toggle-label small { display: block; color: var(--muted); font-size: 10px; margin-top: 2px; }
 
-  .switch input:checked + .slider { background: rgba(240,255,68,0.15); }
-  .switch input:checked + .slider::after {
-    transform: translateX(18px);
-    background: var(--accent);
-  }
+.switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
+.switch input { display: none; }
+.slider { position: absolute; inset: 0; background: var(--muted2); cursor: pointer; transition: background 0.2s; border-radius: 0; }
+.slider::after { content: ''; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; background: var(--muted); transition: all 0.2s; }
+.switch input:checked + .slider { background: rgba(57,211,83,0.2); }
+.switch input:checked + .slider::after { transform: translateX(16px); background: var(--accent); }
 
-  .toggle-sub {
-    padding: 12px 0 0 0;
-    display: none;
-  }
+.sub-fields { padding-top: 16px; border-top: 1px solid var(--border); margin-top: 12px; }
+.sub-fields.hidden { display: none; }
 
-  .toggle-sub.visible { display: block; }
+/* combo highlight */
+.combo-box {
+  background: rgba(88,166,255,0.05);
+  border: 1px solid rgba(88,166,255,0.2);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 11px;
+  color: var(--blue);
+  line-height: 1.6;
+}
 
-  /* buttons */
-  .btn {
-    font-family: 'Space Mono', monospace;
-    font-size: 12px;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    padding: 12px 24px;
-    border: none;
-    cursor: pointer;
-    transition: all 0.15s;
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
+.combo-box strong { color: #fff; }
 
-  .btn-primary {
-    background: var(--accent);
-    color: #0a0a0f;
-    font-weight: 700;
-  }
+/* example */
+.example {
+  background: var(--bg);
+  border-left: 2px solid var(--muted2);
+  padding: 10px 14px;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 12px;
+  line-height: 1.7;
+}
 
-  .btn-primary:hover { background: #e8f73e; transform: translateY(-1px); }
-  .btn-primary:active { transform: translateY(0); }
-  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.example .hi { color: var(--accent); }
+.example .warn { color: var(--yellow); }
 
-  .btn-secondary {
-    background: transparent;
-    color: var(--muted);
-    border: 1px solid var(--border);
-  }
+/* divider */
+.divider {
+  height: 1px;
+  background: var(--border);
+  margin: 16px 0;
+}
 
-  .btn-secondary:hover { border-color: var(--muted); color: var(--text); }
+/* buttons */
+.btn {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 10px 20px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
 
-  .btn-sm {
-    padding: 8px 16px;
-    font-size: 10px;
-  }
+.btn-primary { background: var(--accent); color: #0d1117; font-weight: 700; }
+.btn-primary:hover { filter: brightness(1.1); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; filter: none; }
 
-  /* actions bar */
-  .actions {
-    position: sticky;
-    bottom: 0;
-    background: var(--bg);
-    border-top: 1px solid var(--border);
-    padding: 16px 0;
-    display: flex;
-    gap: 12px;
-    align-items: center;
-    z-index: 10;
-    margin-top: 32px;
-  }
+.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+.btn-ghost:hover { border-color: var(--text); color: var(--text); }
 
-  /* status */
-  #status {
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 1px;
-    flex: 1;
-    min-height: 18px;
-    transition: all 0.3s;
-  }
+.btn-run { background: rgba(247,129,102,0.1); color: var(--orange); border: 1px solid rgba(247,129,102,0.3); }
+.btn-run:hover { background: rgba(247,129,102,0.2); }
 
-  #status.ok { color: var(--success); }
-  #status.err { color: var(--error); }
-  #status.loading { color: var(--accent); }
+.btn-sm { padding: 7px 14px; font-size: 10px; }
 
-  /* spinner */
-  .spin {
-    display: inline-block;
-    animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
+/* sticky footer */
+.footer-bar {
+  position: fixed;
+  bottom: 0;
+  left: 220px;
+  right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 14px 40px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  z-index: 100;
+}
 
-  /* raw preview */
-  .preview-box {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-    padding: 14px;
-    margin-top: 16px;
-    max-height: 180px;
-    overflow-y: auto;
-    white-space: pre;
-    display: none;
-  }
+#status {
+  flex: 1;
+  font-size: 11px;
+  letter-spacing: 1px;
+  min-height: 16px;
+}
+#status.ok     { color: var(--accent); }
+#status.err    { color: var(--orange); }
+#status.loading { color: var(--blue); }
 
-  .preview-box.visible { display: block; }
-
-  /* workflow trigger */
-  .run-bar {
-    background: rgba(255,107,53,0.08);
-    border: 1px solid rgba(255,107,53,0.2);
-    padding: 16px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: 24px;
-  }
-
-  .run-bar-text {
-    font-family: 'Space Mono', monospace;
-    font-size: 11px;
-    color: var(--muted);
-    letter-spacing: 1px;
-  }
-
-  .run-bar-text strong { color: var(--accent2); }
+@media (max-width: 700px) {
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .footer-bar { left: 0; }
+  .main { padding: 20px 16px 80px; }
+}
 </style>
 </head>
 <body>
-<div class="container">
+<div class="layout">
 
-  <header>
-    <span class="tag">● live config</span>
-    <h1>SCREENER<br><span>CONTROL</span></h1>
-    <p class="subtitle">// modifica screener.py directo desde github pages</p>
-  </header>
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-title">SCREENER</div>
+    <div class="logo-sub">// config panel</div>
+  </div>
+
+  <span class="nav-section-label">Setup</span>
+  <a class="nav-item active" href="#auth"><div class="nav-dot"></div> GitHub Auth</a>
+  <a class="nav-item" href="#general"><div class="nav-dot"></div> General</a>
+
+  <span class="nav-section-label">Indicadores</span>
+  <a class="nav-item" href="#bb-squeeze"><div class="nav-dot"></div> BB Squeeze</a>
+  <a class="nav-item" href="#expansion"><div class="nav-dot"></div> BB Expansion</a>
+  <a class="nav-item" href="#rsi"><div class="nav-dot"></div> RSI</a>
+  <a class="nav-item" href="#macd"><div class="nav-dot"></div> MACD</a>
+  <a class="nav-item" href="#ema"><div class="nav-dot"></div> EMA Cross</a>
+  <a class="nav-item" href="#bb-breakout"><div class="nav-dot"></div> BB Breakout</a>
+  <a class="nav-item" href="#vol"><div class="nav-dot"></div> Vol Spike</a>
+
+  <div class="sidebar-footer">
+    <button class="btn btn-run btn-sm" onclick="triggerWorkflow()" style="width:100%">▶ RUN NOW</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <div class="page-header">
+    <div class="breadcrumb">screener / <span>config</span></div>
+    <h1>Control Panel</h1>
+  </div>
 
   <!-- AUTH -->
-  <div class="auth-section">
-    <div class="field">
-      <label>GitHub Token <span class="hint">(scope: repo + workflow)</span></label>
-      <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx">
+  <div class="card" id="auth">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><span>🔑</span> GitHub Auth</div>
+      <span class="pill pill-on">REQUIRED</span>
     </div>
-    <div class="field" style="max-width:220px">
-      <label>Repo <span class="hint">(usuario/repo)</span></label>
-      <input type="text" id="gh-repo" placeholder="rantvalo5-art/scanall">
+    <div class="card-body">
+      <div class="field-group">
+        <div class="field">
+          <label>Personal Access Token <em>(scope: repo + workflow)</em></label>
+          <input type="password" id="gh-token" placeholder="ghp_xxxxxxxxxxxx" autocomplete="off">
+        </div>
+        <div class="field">
+          <label>Repositorio <em>usuario/repo</em></label>
+          <input type="text" id="gh-repo" placeholder="rantvalo5-art/scanall">
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="loadConfig()">↓ CARGAR CONFIG ACTUAL</button>
     </div>
-    <button class="btn btn-secondary btn-sm" onclick="loadConfig()">CARGAR</button>
   </div>
 
   <!-- GENERAL -->
-  <div class="section active" id="sec-general">
-    <div class="section-header" onclick="toggleSection('sec-general')">
-      <div class="section-title"><div class="dot"></div> GENERAL</div>
-      <span class="toggle-badge">ACTIVO</span>
+  <div class="card" id="general">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><span>⚙</span> General</div>
+      <span class="pill pill-on">ACTIVO</span>
     </div>
-    <div class="section-body">
-      <div class="row">
+    <div class="card-body">
+      <div class="field-group cols-3">
         <div class="field">
-          <label>INTERVAL <span class="hint">timeframe</span></label>
+          <label>INTERVAL</label>
           <select id="INTERVAL">
             <option value="1m">1m</option>
             <option value="5m">5m</option>
@@ -433,69 +466,140 @@
           </select>
         </div>
         <div class="field">
-          <label>TOP_N <span class="hint">pares a scanear</span></label>
+          <label>TOP_N <em>pares</em></label>
           <input type="number" id="TOP_N" value="9999" min="1" max="9999">
         </div>
-      </div>
-      <div class="row">
         <div class="field">
-          <label>LIMIT <span class="hint">velas por símbolo</span></label>
-          <input type="number" id="LIMIT" value="100" min="30" max="500">
-        </div>
-        <div class="field">
-          <label>MAX_WORKERS <span class="hint">threads paralelos</span></label>
+          <label>MAX_WORKERS</label>
           <input type="number" id="MAX_WORKERS" value="20" min="1" max="40">
+        </div>
+      </div>
+      <div class="field-group cols-1">
+        <div class="field">
+          <label>LIMIT <em>velas por símbolo</em></label>
+          <input type="number" id="LIMIT" value="100" min="30" max="500">
         </div>
       </div>
     </div>
   </div>
 
   <!-- BB SQUEEZE -->
-  <div class="section active" id="sec-bb">
-    <div class="section-header" onclick="toggleSection('sec-bb')">
-      <div class="section-title"><div class="dot"></div> BB SQUEEZE</div>
-      <span class="toggle-badge">ACTIVO</span>
+  <div class="card" id="bb-squeeze">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><span>🤏</span> BB Squeeze</div>
+      <span class="pill pill-on" id="badge-bb-squeeze">ON</span>
     </div>
-    <div class="section-body">
+    <div class="card-body">
       <div class="toggle-row">
-        <span class="toggle-label">BB_WIDTH_MIN — activar indicador</span>
+        <div class="toggle-label">
+          Activar BB Squeeze
+          <small>Alerta cuando las bandas están muy comprimidas</small>
+        </div>
         <label class="switch">
-          <input type="checkbox" id="en-bb-squeeze" checked onchange="toggleIndicator('bb-squeeze')">
+          <input type="checkbox" id="en-bb-squeeze" checked onchange="onToggle('bb-squeeze')">
           <span class="slider"></span>
         </label>
       </div>
-      <div class="toggle-sub visible" id="sub-bb-squeeze">
-        <div class="field" style="margin-top:12px">
-          <label>BB_WIDTH_MIN <span class="hint">squeeze si width ≤ X</span></label>
-          <input type="number" id="BB_WIDTH_MIN" value="0.10" step="0.01" min="0.01" max="1">
+      <div class="sub-fields" id="sub-bb-squeeze">
+        <div class="field-group cols-1">
+          <div class="field">
+            <label>BB_WIDTH_MIN <em>width ≤ este valor dispara alerta</em></label>
+            <input type="number" id="BB_WIDTH_MIN" value="0.10" step="0.01" min="0.001" max="1">
+            <div class="field-desc">Ej: 0.10 = alerta si el ancho de las BB es ≤ 10% del precio medio</div>
+          </div>
+        </div>
+        <div class="example">
+          width <span class="hi">0.04</span> → ✅ alerta (muy comprimido)<br>
+          width <span class="warn">0.15</span> → ✗ sin alerta (sobre el umbral)
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BB EXPANSION COMBO -->
+  <div class="card" id="expansion">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><span>🚀</span> BB Expansion + Vol + Price Up</div>
+      <span class="pill pill-new" id="badge-expansion">NEW</span>
+    </div>
+    <div class="card-body">
+
+      <div class="combo-box">
+        <strong>Combo de 3 condiciones simultáneas:</strong><br>
+        1. BB width se expande rápido (delta absoluto <em>o</em> porcentual)<br>
+        2. Volumen actual supera el promedio X veces<br>
+        3. Vela alcista (close &gt; open)
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-label">
+          Activar combo BB Expansion
+          <small>Las 3 condiciones deben cumplirse al mismo tiempo</small>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="en-expansion" checked onchange="onToggle('expansion')">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="sub-fields" id="sub-expansion">
+        <div class="divider"></div>
+        <div class="field-group">
+          <div class="field">
+            <label>BB_EXPANSION_MIN <em>delta absoluto mínimo</em></label>
+            <input type="number" id="BB_EXPANSION_MIN" value="0.05" step="0.01" min="0.001" max="1">
+            <div class="field-desc">Si el width sube al menos este valor en 1 vela<br>Ej: de 0.10 → 0.15 (delta = 0.05) ✅</div>
+          </div>
+          <div class="field">
+            <label>BB_EXPANSION_PCT <em>o delta % mínimo</em></label>
+            <input type="number" id="BB_EXPANSION_PCT" value="0.30" step="0.05" min="0.01" max="10">
+            <div class="field-desc">Si el width creció al menos X% relativo<br>Ej: de 0.10 → 0.13 (+30%) ✅</div>
+          </div>
+        </div>
+        <div class="field-group cols-1">
+          <div class="field">
+            <label>VOLUME_MULT <em>multiplicador de volumen</em></label>
+            <input type="number" id="VOLUME_MULT" value="2.0" step="0.1" min="1" max="20">
+            <div class="field-desc">Volumen de la vela actual > X × promedio últimas 20 velas</div>
+          </div>
+        </div>
+
+        <div class="example">
+          <strong>Ejemplo que dispara alerta:</strong><br>
+          width vela anterior: <span class="warn">0.08</span> → vela actual: <span class="hi">0.14</span> (delta +<span class="hi">0.06</span>, +<span class="hi">75%</span>)<br>
+          volumen: <span class="hi">3.2x</span> promedio | vela: <span class="hi">verde ↑</span><br><br>
+          <strong>Ejemplo que NO dispara:</strong><br>
+          width: <span class="warn">0.01</span> → <span class="warn">0.02</span> (delta 0.01, insuficiente aunque +100%)
         </div>
       </div>
     </div>
   </div>
 
   <!-- RSI -->
-  <div class="section" id="sec-rsi">
-    <div class="section-header" onclick="toggleSection('sec-rsi')">
-      <div class="section-title"><div class="dot"></div> RSI</div>
-      <span class="toggle-badge">DESACTIVADO</span>
+  <div class="card" id="rsi">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><span>📊</span> RSI</div>
+      <span class="pill pill-off" id="badge-rsi">OFF</span>
     </div>
-    <div class="section-body">
+    <div class="card-body hidden">
       <div class="toggle-row">
-        <span class="toggle-label">RSI — activar indicador</span>
+        <div class="toggle-label">Activar RSI</div>
         <label class="switch">
-          <input type="checkbox" id="en-rsi" onchange="toggleIndicator('rsi')">
+          <input type="checkbox" id="en-rsi" onchange="onToggle('rsi')">
           <span class="slider"></span>
         </label>
       </div>
-      <div class="toggle-sub" id="sub-rsi">
-        <div class="row" style="margin-top:12px">
+      <div class="sub-fields hidden" id="sub-rsi">
+        <div class="field-group">
           <div class="field">
             <label>RSI_OVERSOLD</label>
             <input type="number" id="RSI_OVERSOLD" value="30" min="1" max="49">
+            <div class="field-desc">Alerta bearish si RSI ≤ este valor</div>
           </div>
           <div class="field">
             <label>RSI_OVERBOUGHT</label>
             <input type="number" id="RSI_OVERBOUGHT" value="70" min="51" max="99">
+            <div class="field-desc">Alerta bullish si RSI ≥ este valor</div>
           </div>
         </div>
       </div>
@@ -503,16 +607,19 @@
   </div>
 
   <!-- MACD -->
-  <div class="section" id="sec-macd">
-    <div class="section-header" onclick="toggleSection('sec-macd')">
-      <div class="section-title"><div class="dot"></div> MACD CROSSOVER</div>
-      <span class="toggle-badge">DESACTIVADO</span>
+  <div class="card" id="macd">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><span>⚡</span> MACD Crossover</div>
+      <span class="pill pill-off" id="badge-macd">OFF</span>
     </div>
-    <div class="section-body">
+    <div class="card-body hidden">
       <div class="toggle-row">
-        <span class="toggle-label">MACD — activar indicador</span>
+        <div class="toggle-label">
+          Activar MACD crossover
+          <small>Detecta cruces alcistas y bajistas (12/26/9)</small>
+        </div>
         <label class="switch">
-          <input type="checkbox" id="en-macd" onchange="toggleIndicator('macd')">
+          <input type="checkbox" id="en-macd" onchange="onToggle('macd')">
           <span class="slider"></span>
         </label>
       </div>
@@ -520,16 +627,19 @@
   </div>
 
   <!-- EMA -->
-  <div class="section" id="sec-ema">
-    <div class="section-header" onclick="toggleSection('sec-ema')">
-      <div class="section-title"><div class="dot"></div> EMA CROSSOVER</div>
-      <span class="toggle-badge">DESACTIVADO</span>
+  <div class="card" id="ema">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><span>🔀</span> EMA 9/21 Crossover</div>
+      <span class="pill pill-off" id="badge-ema">OFF</span>
     </div>
-    <div class="section-body">
+    <div class="card-body hidden">
       <div class="toggle-row">
-        <span class="toggle-label">EMA 9/21 — activar indicador</span>
+        <div class="toggle-label">
+          Activar EMA crossover
+          <small>Detecta cuando EMA9 cruza EMA21 arriba o abajo</small>
+        </div>
         <label class="switch">
-          <input type="checkbox" id="en-ema" onchange="toggleIndicator('ema')">
+          <input type="checkbox" id="en-ema" onchange="onToggle('ema')">
           <span class="slider"></span>
         </label>
       </div>
@@ -537,123 +647,97 @@
   </div>
 
   <!-- BB BREAKOUT -->
-  <div class="section" id="sec-bb-breakout">
-    <div class="section-header" onclick="toggleSection('sec-bb-breakout')">
-      <div class="section-title"><div class="dot"></div> BB BREAKOUT</div>
-      <span class="toggle-badge">DESACTIVADO</span>
+  <div class="card" id="bb-breakout">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><span>🔥</span> BB Breakout</div>
+      <span class="pill pill-off" id="badge-bb-breakout">OFF</span>
     </div>
-    <div class="section-body">
+    <div class="card-body hidden">
       <div class="toggle-row">
-        <span class="toggle-label">BB Breakout — activar indicador</span>
-        <label class="switch">
-          <input type="checkbox" id="en-bb-breakout" onchange="toggleIndicator('bb-breakout')">
-          <span class="slider"></span>
-        </label>
-      </div>
-    </div>
-  </div>
-
-  <!-- VOLUME -->
-  <div class="section" id="sec-vol">
-    <div class="section-header" onclick="toggleSection('sec-vol')">
-      <div class="section-title"><div class="dot"></div> VOLUMEN SPIKE</div>
-      <span class="toggle-badge">DESACTIVADO</span>
-    </div>
-    <div class="section-body">
-      <div class="toggle-row">
-        <span class="toggle-label">Volumen spike — activar indicador</span>
-        <label class="switch">
-          <input type="checkbox" id="en-vol" onchange="toggleIndicator('vol')">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="toggle-sub" id="sub-vol">
-        <div class="field" style="margin-top:12px">
-          <label>VOLUME_MULT <span class="hint">spike si volumen > Xx promedio</span></label>
-          <input type="number" id="VOLUME_MULT" value="2.5" step="0.1" min="1">
+        <div class="toggle-label">
+          Activar BB Breakout
+          <small>Precio rompe la banda superior o inferior</small>
         </div>
+        <label class="switch">
+          <input type="checkbox" id="en-bb-breakout" onchange="onToggle('bb-breakout')">
+          <span class="slider"></span>
+        </label>
       </div>
     </div>
   </div>
 
-  <!-- preview -->
-  <button class="btn btn-secondary btn-sm" onclick="togglePreview()" style="margin-top:8px">
-    PREVISUALIZAR CAMBIOS
-  </button>
-  <pre class="preview-box" id="preview-box"></pre>
-
-  <!-- run workflow -->
-  <div class="run-bar">
-    <div class="run-bar-text">
-      Después de guardar, disparar el workflow manualmente:<br>
-      <strong>GitHub → Actions → Crypto Screener → Run workflow</strong>
+  <!-- VOL STANDALONE -->
+  <div class="card" id="vol">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><span>📈</span> Volumen Spike (standalone)</div>
+      <span class="pill pill-off" id="badge-vol">OFF</span>
     </div>
-    <button class="btn btn-secondary btn-sm" onclick="triggerWorkflow()">▶ RUN NOW</button>
+    <div class="card-body hidden">
+      <div class="toggle-row">
+        <div class="toggle-label">
+          Activar volumen spike independiente
+          <small>Sin requerir BB expansion ni precio subiendo</small>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="en-vol" onchange="onToggle('vol')">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
   </div>
 
-  <!-- actions -->
-  <div class="actions">
-    <span id="status"></span>
-    <button class="btn btn-secondary" onclick="loadConfig()">↺ RECARGAR</button>
-    <button class="btn btn-primary" id="save-btn" onclick="saveConfig()">
-      GUARDAR EN GITHUB
-    </button>
-  </div>
+</main>
+</div>
 
+<!-- FOOTER -->
+<div class="footer-bar">
+  <span id="status"></span>
+  <button class="btn btn-ghost btn-sm" onclick="loadConfig()">↺ RECARGAR</button>
+  <button class="btn btn-primary" id="save-btn" onclick="saveConfig()">
+    ↑ GUARDAR EN GITHUB
+  </button>
 </div>
 
 <script>
-// ── State ──────────────────────────────────────────────────────────────────────
-let fileSha = null;
+// ── Persist auth ───────────────────────────────────────────────────────────────
+['gh-token','gh-repo'].forEach(id => {
+  const el = document.getElementById(id);
+  const saved = localStorage.getItem(id);
+  if (saved) el.value = saved;
+  el.addEventListener('input', () => localStorage.setItem(id, el.value));
+});
 
-const INDICATORS = {
-  'bb-squeeze':  { vars: ['BB_WIDTH_MIN'],                    commentTag: 'BB squeeze ✅ ACTIVO' },
-  'rsi':         { vars: ['RSI_OVERSOLD','RSI_OVERBOUGHT'],   commentTag: 'RSI' },
-  'macd':        { vars: [],                                  commentTag: 'MACD crossover' },
-  'ema':         { vars: [],                                  commentTag: 'EMA 9/21 crossover' },
-  'bb-breakout': { vars: [],                                  commentTag: 'BB breakout' },
-  'vol':         { vars: ['VOLUME_MULT'],                     commentTag: 'Volumen spike' },
-};
-
-// ── UI helpers ─────────────────────────────────────────────────────────────────
-function toggleSection(id) {
-  const sec = document.getElementById(id);
-  sec.classList.toggle('active');
-  const badge = sec.querySelector('.toggle-badge');
-  badge.textContent = sec.classList.contains('active') ? 'ACTIVO' : 'COLAPSADO';
+// ── Card toggle ────────────────────────────────────────────────────────────────
+function toggleCard(header) {
+  const body = header.nextElementSibling;
+  body.classList.toggle('hidden');
 }
 
-function toggleIndicator(key) {
-  const enabled = document.getElementById('en-' + key).checked;
+// ── Indicator toggle ───────────────────────────────────────────────────────────
+function onToggle(key) {
+  const on  = document.getElementById('en-' + key).checked;
   const sub = document.getElementById('sub-' + key);
-  if (sub) sub.classList.toggle('visible', enabled);
-  const sec = document.getElementById('sec-' + key) || document.getElementById('sec-bb');
-  if (sec) {
-    const badge = sec.querySelector('.toggle-badge');
-    badge.textContent = enabled ? 'ACTIVO' : 'DESACTIVADO';
-    badge.style.borderColor = enabled ? 'var(--accent)' : '';
-    badge.style.color = enabled ? 'var(--accent)' : '';
+  const badge = document.getElementById('badge-' + key);
+  if (sub) sub.classList.toggle('hidden', !on);
+  if (badge) {
+    if (key === 'expansion') {
+      badge.className = on ? 'pill pill-new' : 'pill pill-off';
+      badge.textContent = on ? 'ON' : 'OFF';
+    } else {
+      badge.className = on ? 'pill pill-on' : 'pill pill-off';
+      badge.textContent = on ? 'ON' : 'OFF';
+    }
   }
 }
 
+// ── Status ─────────────────────────────────────────────────────────────────────
 function setStatus(msg, type='') {
   const el = document.getElementById('status');
   el.textContent = msg;
   el.className = type;
 }
 
-function togglePreview() {
-  const box = document.getElementById('preview-box');
-  if (box.classList.contains('visible')) {
-    box.classList.remove('visible');
-  } else {
-    box.textContent = buildNewContent(window._originalContent || '');
-    box.classList.add('visible');
-  }
-}
-
-// ── GitHub API ─────────────────────────────────────────────────────────────────
-function getHeaders() {
+function headers() {
   return {
     'Authorization': `Bearer ${document.getElementById('gh-token').value.trim()}`,
     'Accept': 'application/vnd.github+json',
@@ -662,214 +746,144 @@ function getHeaders() {
   };
 }
 
-function getRepo() {
-  return document.getElementById('gh-repo').value.trim();
-}
+function repo() { return document.getElementById('gh-repo').value.trim(); }
+
+// ── Load config from GitHub ────────────────────────────────────────────────────
+let _sha = null, _original = '';
 
 async function loadConfig() {
-  const token = document.getElementById('gh-token').value.trim();
-  const repo  = getRepo();
-  if (!token || !repo) { setStatus('Ingresá token y repo primero', 'err'); return; }
-
-  setStatus('<span class="spin">◌</span> Cargando...', 'loading');
-  document.getElementById('status').innerHTML = '⟳ Cargando...';
-
+  if (!document.getElementById('gh-token').value.trim()) {
+    setStatus('Ingresá el token primero', 'err'); return;
+  }
+  setStatus('Cargando...', 'loading');
   try {
-    const res = await fetch(`https://api.github.com/repos/${repo}/contents/screener.py`, {
-      headers: getHeaders()
-    });
+    const res  = await fetch(`https://api.github.com/repos/${repo()}/contents/screener.py`, { headers: headers() });
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     const data = await res.json();
-    fileSha = data.sha;
-    const content = atob(data.content.replace(/\n/g,''));
-    window._originalContent = content;
-    parseConfig(content);
-    setStatus('✓ Config cargada desde GitHub', 'ok');
-  } catch(e) {
-    setStatus('✗ Error: ' + e.message, 'err');
-  }
+    _sha = data.sha;
+    _original = atob(data.content.replace(/\n/g,''));
+    parseIntoUI(_original);
+    setStatus('✓ Config cargada', 'ok');
+  } catch(e) { setStatus('✗ ' + e.message, 'err'); }
 }
 
-// ── Parse screener.py ──────────────────────────────────────────────────────────
-function parseConfig(content) {
-  const get = (key) => {
-    const m = content.match(new RegExp(`^${key}\\s*=\\s*([^\\s#\\n]+)`, 'm'));
+function parseIntoUI(c) {
+  const getVal = key => {
+    const m = c.match(new RegExp(`^${key}\\s*=\\s*([^\\s#\\n]+)`, 'm'));
     return m ? m[1].replace(/['"]/g,'') : null;
   };
 
-  const fields = ['INTERVAL','LIMIT','TOP_N','MAX_WORKERS','BB_WIDTH_MIN',
-                  'RSI_OVERSOLD','RSI_OVERBOUGHT','VOLUME_MULT'];
-  fields.forEach(f => {
-    const el = document.getElementById(f);
-    const val = get(f);
-    if (el && val !== null) {
-      if (el.tagName === 'SELECT') el.value = val;
-      else el.value = val;
-    }
+  ['INTERVAL','LIMIT','TOP_N','MAX_WORKERS',
+   'BB_WIDTH_MIN','BB_EXPANSION_MIN','BB_EXPANSION_PCT','VOLUME_MULT',
+   'RSI_OVERSOLD','RSI_OVERBOUGHT'].forEach(k => {
+    const el = document.getElementById(k);
+    const v  = getVal(k);
+    if (el && v !== null) el.value = v;
   });
 
-  // Detect which indicators are active (uncommented)
-  const isActive = (tag) => content.includes(`# ${tag}`) === false ||
-    content.match(new RegExp(`(?<!#\\s*)signals\\.append.*${tag.split(' ')[0]}`, '')) !== null;
-
-  // Simpler: check if the signals.append line for each indicator is uncommented
+  // Detect active indicators by checking if signals.append is uncommented
   const checks = {
-    'bb-squeeze':  /^\s*signals\.append\(f"🤏/m,
-    'rsi':         /^\s*signals\.append\(f"📉/m,
-    'macd':        /^\s*signals\.append\("⚡ MACD/m,
-    'ema':         /^\s*signals\.append\("🔀/m,
-    'bb-breakout': /^\s*signals\.append\(f"🔥/m,
-    'vol':         /^\s*signals\.append\(f"🚀/m,
+    'bb-squeeze':  /^\s+signals\.append\(f"🤏/m,
+    'expansion':   /^\s+signals\.append\(\s*\n?\s*f"🚀 BB expansion/m,
+    'rsi':         /^\s+rsi_val = ta\.momentum/m,
+    'macd':        /^\s+macd_ind\s*=/m,
+    'ema':         /^\s+ema9\s*=/m,
+    'bb-breakout': /^\s+if price > hband/m,
+    'vol':         /^\s+# if vol_mean/m,
   };
 
-  Object.entries(checks).forEach(([key, regex]) => {
-    const active = regex.test(content);
-    const cb = document.getElementById('en-' + key);
-    if (cb) {
-      cb.checked = active;
-      toggleIndicator(key);
-    }
+  // For vol standalone: active if the standalone block is uncommented
+  const volStandaloneActive = /^\s+if vol_mean > 0 and vol_curr > vol_mean \* VOLUME_MULT:/m.test(c)
+    && !/^\s+# if vol_mean > 0 and vol_curr > vol_mean \* VOLUME_MULT:/m.test(c);
+
+  Object.entries(checks).forEach(([key, rx]) => {
+    if (key === 'vol') return;
+    const active = rx.test(c);
+    document.getElementById('en-' + key).checked = active;
+    onToggle(key);
   });
+
+  document.getElementById('en-vol').checked = volStandaloneActive;
+  onToggle('vol');
 }
 
-// ── Build new screener.py content ──────────────────────────────────────────────
-function buildNewContent(original) {
-  let c = original;
-
-  // Update simple variable values
-  const numVars = {
-    LIMIT:        document.getElementById('LIMIT').value,
-    TOP_N:        document.getElementById('TOP_N').value,
-    MAX_WORKERS:  document.getElementById('MAX_WORKERS').value,
-    BB_WIDTH_MIN: document.getElementById('BB_WIDTH_MIN').value,
-    RSI_OVERSOLD: document.getElementById('RSI_OVERSOLD').value,
-    RSI_OVERBOUGHT: document.getElementById('RSI_OVERBOUGHT').value,
-    VOLUME_MULT:  document.getElementById('VOLUME_MULT').value,
-  };
-
-  Object.entries(numVars).forEach(([key, val]) => {
-    // replace both commented and uncommented versions
-    c = c.replace(
-      new RegExp(`(#?\\s*${key}\\s*=\\s*)[^\\s#\\n]+`, 'm'),
-      `$1${val}`
-    );
-  });
-
-  // INTERVAL (string value)
-  const interval = document.getElementById('INTERVAL').value;
-  c = c.replace(/(INTERVAL\s*=\s*")[^"]+(")/m, `$1${interval}$2`);
-
-  // Toggle indicators: comment/uncomment blocks
-  const toggleMap = {
-    'bb-squeeze':  { regex: /(\s*)(#?\s*)(if width <= BB_WIDTH_MIN:[\s\S]*?signals\.append\(f"🤏[^)]+\))/, en: document.getElementById('en-bb-squeeze').checked },
-    'rsi':         { regex: /(\s*)(#?\s*)(rsi_val = ta\.momentum[\s\S]*?elif rsi_val >= RSI_OVERBOUGHT:.*\n.*signals\.append[^\n]+)/, en: document.getElementById('en-rsi').checked },
-    'macd':        { regex: /(\s*)(#?\s*)(macd_ind\s*=[\s\S]*?signals\.append\("⚡ MACD crossover bajista"\))/, en: document.getElementById('en-macd').checked },
-    'ema':         { regex: /(\s*)(#?\s*)(ema9\s*=[\s\S]*?signals\.append\("🔀[^)]+\))/, en: document.getElementById('en-ema').checked },
-    'bb-breakout': { regex: /(\s*)(#?\s*)(if price > upper:[\s\S]*?signals\.append\(f"🔥[^)]+\))/, en: document.getElementById('en-bb-breakout').checked },
-    'vol':         { regex: /(\s*)(#?\s*)(vol_mean[\s\S]*?signals\.append\(f"🚀[^)]+\))/, en: document.getElementById('en-vol').checked },
-  };
-
-  // For simplicity, just update the variable sections and leave block toggling
-  // to the raw replacement approach
-  Object.entries(numVars).forEach(([key, val]) => {
-    // update commented vars too (remove/add comment based on indicator state)
-  });
-
-  return c;
-}
-
+// ── Save config ────────────────────────────────────────────────────────────────
 async function saveConfig() {
-  const token = document.getElementById('gh-token').value.trim();
-  const repo  = getRepo();
-  if (!token || !repo) { setStatus('Falta token o repo', 'err'); return; }
-  if (!fileSha) { setStatus('Cargá la config primero', 'err'); return; }
-
+  if (!_sha) { setStatus('Cargá la config primero', 'err'); return; }
   const btn = document.getElementById('save-btn');
   btn.disabled = true;
-  setStatus('⟳ Guardando...', 'loading');
+  setStatus('Guardando...', 'loading');
 
   try {
-    // Build updated content by replacing variables in original
-    let content = window._originalContent || '';
+    let c = _original;
 
-    // Update numeric/string vars
+    // Update variable values
     const updates = [
-      { key: 'INTERVAL',      val: `"${document.getElementById('INTERVAL').value}"` },
-      { key: 'LIMIT',         val: document.getElementById('LIMIT').value },
-      { key: 'TOP_N',         val: document.getElementById('TOP_N').value },
-      { key: 'MAX_WORKERS',   val: document.getElementById('MAX_WORKERS').value },
-      { key: 'BB_WIDTH_MIN',  val: document.getElementById('BB_WIDTH_MIN').value },
-      { key: 'RSI_OVERSOLD',  val: document.getElementById('RSI_OVERSOLD').value },
-      { key: 'RSI_OVERBOUGHT',val: document.getElementById('RSI_OVERBOUGHT').value },
-      { key: 'VOLUME_MULT',   val: document.getElementById('VOLUME_MULT').value },
+      { k: 'INTERVAL',         v: `"${document.getElementById('INTERVAL').value}"` },
+      { k: 'LIMIT',            v: document.getElementById('LIMIT').value },
+      { k: 'TOP_N',            v: document.getElementById('TOP_N').value },
+      { k: 'MAX_WORKERS',      v: document.getElementById('MAX_WORKERS').value },
+      { k: 'BB_WIDTH_MIN',     v: document.getElementById('BB_WIDTH_MIN').value },
+      { k: 'BB_EXPANSION_MIN', v: document.getElementById('BB_EXPANSION_MIN').value },
+      { k: 'BB_EXPANSION_PCT', v: document.getElementById('BB_EXPANSION_PCT').value },
+      { k: 'VOLUME_MULT',      v: document.getElementById('VOLUME_MULT').value },
+      { k: 'RSI_OVERSOLD',     v: document.getElementById('RSI_OVERSOLD').value },
+      { k: 'RSI_OVERBOUGHT',   v: document.getElementById('RSI_OVERBOUGHT').value },
     ];
 
-    updates.forEach(({ key, val }) => {
-      content = content.replace(
-        new RegExp(`(^(?:#\\s*)?${key}\\s*=\\s*).*`, 'm'),
-        `$1${val}`
-      );
+    updates.forEach(({ k, v }) => {
+      c = c.replace(new RegExp(`(^(?:#\\s*)?${k}\\s*=\\s*).*`, 'm'), `$1${v}`);
     });
 
-    // Toggle indicator comment blocks
-    const indicators = [
-      { id: 'bb-squeeze',  patterns: ['if width <= BB_WIDTH_MIN:', 'BB squeeze'] },
-      { id: 'rsi',         patterns: ['RSIIndicator', 'RSI_OVERSOLD', 'RSI_OVERBOUGHT'] },
-      { id: 'macd',        patterns: ['ta.trend.MACD', 'MACD crossover'] },
-      { id: 'ema',         patterns: ['EMAIndicator', 'EMA9'] },
-      { id: 'bb-breakout', patterns: ['if price > upper:', 'BB breakout'] },
-      { id: 'vol',         patterns: ['vol_mean', 'vol_curr', 'VOLUME_MULT', 'Volumen spike'] },
-    ];
+    // Comment/uncomment indicator lines based on toggle state
+    const patterns = {
+      'bb-squeeze':  [/^(\s+)(#?\s*)(if width_curr <= BB_WIDTH_MIN:)/m,
+                      /^(\s+)(#?\s*)(signals\.append\(f"🤏)/m],
+      'expansion':   [/^(\s+)(#?\s*)(expansion_ok\s*=)/m,
+                      /^(\s+)(#?\s*)(if expansion_ok and vol_spike and price_up:)/m,
+                      /^(\s+)(#?\s*)(signals\.append\()/m],
+      'rsi':         [/^(\s+)(#?\s*)(rsi_val = ta\.momentum)/m,
+                      /^(\s+)(#?\s*)(if rsi_val <= RSI_OVERSOLD:)/m,
+                      /^(\s+)(#?\s*)(elif rsi_val >= RSI_OVERBOUGHT:)/m],
+      'macd':        [/^(\s+)(#?\s*)(macd_ind\s*=)/m,
+                      /^(\s+)(#?\s*)(macd_line =)/m,
+                      /^(\s+)(#?\s*)(sig_line\s*=)/m,
+                      /^(\s+)(#?\s*)(if macd_line\.iloc\[-2\] < sig_line)/m,
+                      /^(\s+)(#?\s*)(elif macd_line\.iloc\[-2\] > sig_line)/m],
+      'ema':         [/^(\s+)(#?\s*)(ema9\s*=)/m,
+                      /^(\s+)(#?\s*)(ema21\s*=)/m,
+                      /^(\s+)(#?\s*)(if ema9\.iloc\[-2\] < ema21)/m,
+                      /^(\s+)(#?\s*)(elif ema9\.iloc\[-2\] > ema21)/m],
+      'bb-breakout': [/^(\s+)(#?\s*)(if price > hband)/m,
+                      /^(\s+)(#?\s*)(elif price < lband)/m],
+    };
 
-    indicators.forEach(({ id, patterns }) => {
-      const active = document.getElementById('en-' + id).checked;
-      const lines  = content.split('\n');
-
-      // Find lines belonging to this indicator block
-      let inBlock = false;
-      const newLines = lines.map(line => {
-        const stripped = line.replace(/^(\s*)#\s*/, '$1');
-        const isMatch  = patterns.some(p => stripped.includes(p) || line.includes(p));
-
-        if (isMatch) {
-          if (active) {
-            // uncomment: remove leading # (preserving indent)
-            return line.replace(/^(\s*)#\s?/, '$1');
-          } else {
-            // comment: add # if not already commented
-            if (!/^\s*#/.test(line) && line.trim() !== '') {
-              return line.replace(/^(\s*)/, '$1# ');
-            }
-          }
-        }
-        return line;
+    Object.entries(patterns).forEach(([key, rxList]) => {
+      const active = document.getElementById('en-' + key).checked;
+      rxList.forEach(rx => {
+        c = c.replace(rx, (_, indent, hash, code) => {
+          if (active) return `${indent}${code}`;         // remove comment
+          return `${indent}# ${code}`;                   // add comment
+        });
       });
-
-      content = newLines.join('\n');
     });
 
-    // Encode to base64
-    const encoded = btoa(unescape(encodeURIComponent(content)));
-
-    const res = await fetch(`https://api.github.com/repos/${repo}/contents/screener.py`, {
+    const encoded = btoa(unescape(encodeURIComponent(c)));
+    const res = await fetch(`https://api.github.com/repos/${repo()}/contents/screener.py`, {
       method: 'PUT',
-      headers: getHeaders(),
+      headers: headers(),
       body: JSON.stringify({
-        message: `config: update screener settings via UI`,
+        message: 'config: update screener via control panel',
         content: encoded,
-        sha: fileSha
+        sha: _sha
       })
     });
 
-    if (!res.ok) {
-      const err = await res.json();
-      throw new Error(err.message || res.statusText);
-    }
-
+    if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
     const data = await res.json();
-    fileSha = data.content.sha;
-    window._originalContent = content;
-    setStatus('✓ Guardado en GitHub correctamente', 'ok');
+    _sha = data.content.sha;
+    _original = c;
+    setStatus('✓ Guardado correctamente en GitHub', 'ok');
   } catch(e) {
     setStatus('✗ Error: ' + e.message, 'err');
   } finally {
@@ -877,43 +891,22 @@ async function saveConfig() {
   }
 }
 
+// ── Trigger workflow ───────────────────────────────────────────────────────────
 async function triggerWorkflow() {
-  const token = document.getElementById('gh-token').value.trim();
-  const repo  = getRepo();
-  if (!token || !repo) { setStatus('Falta token o repo', 'err'); return; }
-
-  setStatus('⟳ Disparando workflow...', 'loading');
+  if (!document.getElementById('gh-token').value.trim()) {
+    setStatus('Ingresá el token primero', 'err'); return;
+  }
+  setStatus('Disparando workflow...', 'loading');
   try {
-    const res = await fetch(`https://api.github.com/repos/${repo}/dispatches`, {
+    const res = await fetch(`https://api.github.com/repos/${repo()}/dispatches`, {
       method: 'POST',
-      headers: getHeaders(),
+      headers: headers(),
       body: JSON.stringify({ event_type: 'run-screener' })
     });
-    if (res.status === 204) {
-      setStatus('✓ Workflow disparado', 'ok');
-    } else {
-      throw new Error(res.statusText);
-    }
-  } catch(e) {
-    setStatus('✗ Error: ' + e.message, 'err');
-  }
+    if (res.status === 204) setStatus('✓ Workflow disparado exitosamente', 'ok');
+    else throw new Error(res.statusText);
+  } catch(e) { setStatus('✗ ' + e.message, 'err'); }
 }
-
-// Persist token + repo in localStorage for convenience
-document.getElementById('gh-token').addEventListener('input', e => {
-  localStorage.setItem('gh_token', e.target.value);
-});
-document.getElementById('gh-repo').addEventListener('input', e => {
-  localStorage.setItem('gh_repo', e.target.value);
-});
-
-// Restore on load
-window.addEventListener('load', () => {
-  const t = localStorage.getItem('gh_token');
-  const r = localStorage.getItem('gh_repo');
-  if (t) document.getElementById('gh-token').value = t;
-  if (r) document.getElementById('gh-repo').value = r;
-});
 </script>
 </body>
 </html>
