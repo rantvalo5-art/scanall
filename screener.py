@@ -146,19 +146,25 @@ def analyze(symbol):
     width_pct_chg  = width_delta / width_prev if width_prev > 0 else 0
     vol_mean       = volume.iloc[-21:-1].mean()
     vol_curr       = volume.iloc[-1]
-    vol_spike      = vol_mean > 0 and vol_curr > vol_mean * VOLUME_MULT
+    vol_ratio = vol_curr / vol_mean if vol_mean > 0 else 0
     price_up       = close.iloc[-1] > open_.iloc[-1]
 
     expansion_ok   = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT
 
-    if expansion_ok and vol_spike and price_up and width_curr < BB_WIDTH_MAX:
+    if vol_ratio >= 10:
+        vol_label = "🔴 vol extremo"
+    elif vol_ratio >= 5:
+        vol_label = "🟡 vol fuerte"
+    elif vol_ratio >= 2:
+        vol_label = "🟢 vol normal"
+    else:
+        vol_label = None
+    
+    if expansion_ok and vol_label and price_up and width_curr < BB_WIDTH_MAX:
         signals.append(
-            f"🚀 BB expansion + vol + precio sube\n"
-            f"     width {width_prev:.2%} → {width_curr:.2%} "
-            f"(+{width_pct_chg:.0%}) | vol {vol_curr/vol_mean:.1f}x"
+            f"{vol_label} {vol_ratio:.1f}x | BB expansion "
+            f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
         )
-
-    return symbol, (signals if signals else None)
 
 
 # ── Telegram ──────────────────────────────────────────────────────────────────
