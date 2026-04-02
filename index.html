@@ -798,13 +798,16 @@ function parseIntoUI(c) {
     c.split('\n').some(line => pattern.test(line) && !/^\s*#/.test(line));
 
   const states = {
-    'bb-squeeze':  isLiveLine(/signals\.append\(f["']🤏/),
-    'expansion':   isLiveLine(/BB expansion/) || isLiveLine(/if expansion_ok and vol_spike and price_up:/),
-    'rsi':         isLiveLine(/rsi_val\s*=/),
-    'macd':        isLiveLine(/macd_ind\s*=/),
-    'ema':         isLiveLine(/ema9\s*=/),
-    'bb-breakout': isLiveLine(/if price > hband/) || isLiveLine(/elif price < lband/),
-    'vol':         isLiveLine(/signals\.append\(f["']📦 VOL x/)
+    'bb-squeeze':  isLiveLine(/if width_curr <= BB_WIDTH_MIN:/) &&
+                   isLiveLine(/signals\.append\(f["']🤏 BB squeeze/),
+    'expansion':   isLiveLine(/if expansion_ok and vol_spike and price_up:/),
+    'rsi':         isLiveLine(/rsi_val\s*=\s*ta\.momentum\.RSIIndicator\(close,\s*window=14\)/),
+    'macd':        isLiveLine(/macd_ind\s*=\s*ta\.trend\.MACD\(close,/),
+    'ema':         isLiveLine(/ema9\s*=\s*ta\.trend\.EMAIndicator\(close,\s*window=9\)/),
+    'bb-breakout': isLiveLine(/if price > hband\.iloc\[-1\]:/) ||
+                   isLiveLine(/elif price < lband\.iloc\[-1\]:/),
+    'vol':         isLiveLine(/if vol_mean > 0 and vol_curr > vol_mean \* VOLUME_MULT:/) &&
+                   isLiveLine(/signals\.append\(f["']🚀 Volumen spike/)
   };
 
   Object.entries(states).forEach(([key, active]) => {
@@ -888,27 +891,28 @@ async function saveConfig() {
       'bb-squeeze': {
         lines: [
           'if width_curr <= BB_WIDTH_MIN:',
-          'signals.append(f"🤏 BB squeeze (width={width_curr:.4f})")'
+          'signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")'
         ]
       },
       'expansion': {
         lines: [
-          'expansion_abs = width_curr - width_prev',
-          'expansion_pct = (expansion_abs / width_prev) if width_prev > 0 else 0',
-          'expansion_ok = (expansion_abs >= BB_EXPANSION_MIN) or (expansion_pct >= BB_EXPANSION_PCT)',
-          'vol_mean = df["volume"].iloc[-21:-1].mean()',
-          'vol_curr = df["volume"].iloc[-1]',
-          'vol_spike = vol_mean > 0 and vol_curr > vol_mean * VOLUME_MULT',
-          'price_up = df["close"].iloc[-1] > df["open"].iloc[-1]',
-          'if expansion_ok and vol_spike and price_up:'
-        ],
-        blocks: [
-          { start: 'signals.append(f"🚀 BB expansion', end: '")' }
+          'width_delta    = width_curr - width_prev',
+          'width_pct_chg  = width_delta / width_prev if width_prev > 0 else 0',
+          'vol_mean       = volume.iloc[-21:-1].mean()',
+          'vol_curr       = volume.iloc[-1]',
+          'vol_spike      = vol_mean > 0 and vol_curr > vol_mean * VOLUME_MULT',
+          'price_up       = close.iloc[-1] > open_.iloc[-1]',
+          'expansion_ok   = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT',
+          'if expansion_ok and vol_spike and price_up:',
+          'signals.append(',
+          'f"🚀 BB expansion + vol + precio sube\n"',
+          'f"     width {width_prev:.2%} → {width_curr:.2%} "',
+          'f"(+{width_pct_chg:.0%}) | vol {vol_curr/vol_mean:.1f}x"'
         ]
       },
       'rsi': {
         lines: [
-          'rsi_val = ta.momentum.RSIIndicator(df["close"], window=14).rsi().iloc[-1]',
+          'rsi_val = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]',
           'if rsi_val <= RSI_OVERSOLD:',
           'signals.append(f"📉 RSI={rsi_val:.1f} (sobreventa)")',
           'elif rsi_val >= RSI_OVERBOUGHT:',
@@ -917,37 +921,37 @@ async function saveConfig() {
       },
       'macd': {
         lines: [
-          'macd_ind = ta.trend.MACD(df["close"], window_slow=26, window_fast=12, window_sign=9)',
+          'macd_ind  = ta.trend.MACD(close, window_slow=26, window_fast=12, window_sign=9)',
           'macd_line = macd_ind.macd()',
           'sig_line  = macd_ind.macd_signal()',
           'if macd_line.iloc[-2] < sig_line.iloc[-2] and macd_line.iloc[-1] > sig_line.iloc[-1]:',
-          'signals.append("⚡ MACD bullish crossover")',
+          'signals.append("⚡ MACD crossover alcista")',
           'elif macd_line.iloc[-2] > sig_line.iloc[-2] and macd_line.iloc[-1] < sig_line.iloc[-1]:',
-          'signals.append("⚡ MACD bearish crossover")'
+          'signals.append("⚡ MACD crossover bajista")'
         ]
       },
       'ema': {
         lines: [
-          'ema9  = ta.trend.EMAIndicator(df["close"], window=9).ema_indicator()',
-          'ema21 = ta.trend.EMAIndicator(df["close"], window=21).ema_indicator()',
+          'ema9  = ta.trend.EMAIndicator(close, window=9).ema_indicator()',
+          'ema21 = ta.trend.EMAIndicator(close, window=21).ema_indicator()',
           'if ema9.iloc[-2] < ema21.iloc[-2] and ema9.iloc[-1] > ema21.iloc[-1]:',
-          'signals.append("🔀 EMA 9/21 bullish crossover")',
+          'signals.append("🔀 EMA9 cruzó arriba EMA21 (alcista)")',
           'elif ema9.iloc[-2] > ema21.iloc[-2] and ema9.iloc[-1] < ema21.iloc[-1]:',
-          'signals.append("🔀 EMA 9/21 bearish crossover")'
+          'signals.append("🔀 EMA9 cruzó abajo EMA21 (bajista)")'
         ]
       },
       'bb-breakout': {
         lines: [
-          'if price > hband:',
-          'signals.append("🔥 BB upper breakout")',
-          'elif price < lband:',
-          'signals.append("🔥 BB lower breakout")'
+          'if price > hband.iloc[-1]:',
+          'signals.append(f"🔥 BB breakout arriba (close={price:.4f} > upper={hband.iloc[-1]:.4f})")',
+          'elif price < lband.iloc[-1]:',
+          'signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")'
         ]
       },
       'vol': {
         lines: [
           'if vol_mean > 0 and vol_curr > vol_mean * VOLUME_MULT:',
-          'signals.append(f"📦 VOL x{(vol_curr/vol_mean):.2f}")'
+          'signals.append(f"🚀 Volumen spike {vol_curr/vol_mean:.1f}x promedio")'
         ]
       }
     };
