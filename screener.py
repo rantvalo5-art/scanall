@@ -104,6 +104,9 @@ def analyze(symbol):
     except Exception:
         return symbol, None
 
+    if len(df) < 21:
+        return symbol, None
+
     signals = []
     close  = df["close"]
     open_  = df["open"]
@@ -139,12 +142,17 @@ def analyze(symbol):
     lband  = bb.bollinger_lband()
     mavg   = bb.bollinger_mavg()
 
-    mid_curr  = mavg.iloc[-1]
-    mid_prev  = mavg.iloc[-2]
-    price     = close.iloc[-1]
+    mid_curr = mavg.iloc[-1]
+    mid_prev = mavg.iloc[-2]
+    price    = close.iloc[-1]
 
     width_curr = (hband.iloc[-1] - lband.iloc[-1]) / mid_curr if mid_curr != 0 else 0
     width_prev = (hband.iloc[-2] - lband.iloc[-2]) / mid_prev if mid_prev != 0 else 0
+
+    # ── Volumen base (para combo y standalone) ───────────────────────────────
+    vol_mean  = volume.iloc[-21:-1].mean()
+    vol_curr  = volume.iloc[-1]
+    vol_ratio = vol_curr / vol_mean if vol_mean > 0 else 0
 
     # ── BB breakout ───────────────────────────────────────────────────────────
     # if price > hband.iloc[-1]:
@@ -157,30 +165,27 @@ def analyze(symbol):
         signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
 
     # ── BB Width Expansion + Volume Spike + Price Up (combo) ✅ ACTIVO ───────
-        vol_mean      = volume.iloc[-21:-1].mean()
-        vol_curr      = volume.iloc[-1]
-        vol_ratio     = vol_curr / vol_mean if vol_mean > 0 else 0
-        price_up      = close.iloc[-1] > open_.iloc[-1]
-        width_delta   = width_curr - width_prev
-        width_pct_chg = width_delta / width_prev if width_prev > 0 else 0
-        expansion_ok  = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT
+    price_up      = close.iloc[-1] > open_.iloc[-1]
+    width_delta   = width_curr - width_prev
+    width_pct_chg = width_delta / width_prev if width_prev > 0 else 0
+    expansion_ok  = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT
 
-        if vol_ratio >= EXP_VOL_EXTREMO:
-                exp_vol_label = "🔴 vol extremo"
-        elif vol_ratio >= EXP_VOL_FUERTE:
-                exp_vol_label = "🟡 vol fuerte"
-        elif vol_ratio >= EXP_VOL_NORMAL:
-                exp_vol_label = "🟢 vol normal"
-        else:
-                exp_vol_label = None
+    if vol_ratio >= EXP_VOL_EXTREMO:
+        exp_vol_label = "🔴 vol extremo"
+    elif vol_ratio >= EXP_VOL_FUERTE:
+        exp_vol_label = "🟡 vol fuerte"
+    elif vol_ratio >= EXP_VOL_NORMAL:
+        exp_vol_label = "🟢 vol normal"
+    else:
+        exp_vol_label = None
 
-        if expansion_ok and exp_vol_label and price_up and width_curr < BB_WIDTH_MAX:
-                signals.append(
-                        f"{exp_vol_label} {vol_ratio:.1f}x | BB expansion "
-                        f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
+    if expansion_ok and exp_vol_label and price_up and width_curr < BB_WIDTH_MAX:
+        signals.append(
+            f"{exp_vol_label} {vol_ratio:.1f}x | BB expansion "
+            f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
         )
 
-    # ── Vol Spike standalone (sin requerir BB expansion ni precio) ────────────
+    # ── Vol Spike standalone (sin requerir BB expansion ni precio) ───────────
     if vol_ratio >= VOL_EXTREMO:
         signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
     elif vol_ratio >= VOL_FUERTE:
@@ -189,7 +194,6 @@ def analyze(symbol):
         signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
 
     return symbol, (signals if signals else None)
-
 
 # ── Telegram ──────────────────────────────────────────────────────────────────
 def send_telegram(text):
