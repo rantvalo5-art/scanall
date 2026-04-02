@@ -20,9 +20,7 @@
   --muted: #484f58;
   --muted2: #30363d;
 }
-
 * { margin:0; padding:0; box-sizing:border-box; }
-
 body {
   background: var(--bg);
   color: var(--text);
@@ -31,30 +29,15 @@ body {
   line-height: 1.6;
   min-height: 100vh;
 }
-
-/* scanline effect */
 body::after {
   content: '';
   position: fixed;
   inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0,0,0,0.03) 2px,
-    rgba(0,0,0,0.03) 4px
-  );
+  background: repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
   pointer-events: none;
   z-index: 999;
 }
-
-.layout {
-  display: grid;
-  grid-template-columns: 220px 1fr;
-  min-height: 100vh;
-}
-
-/* sidebar */
+.layout { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
 .sidebar {
   background: var(--surface);
   border-right: 1px solid var(--border);
@@ -66,343 +49,105 @@ body::after {
   display: flex;
   flex-direction: column;
 }
-
-.logo {
-  padding: 0 20px 24px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 16px;
-}
-
-.logo-title {
-  font-family: 'Syne', sans-serif;
-  font-weight: 800;
-  font-size: 18px;
-  letter-spacing: -0.5px;
-  color: #fff;
-  line-height: 1;
-}
-
-.logo-sub {
-  font-size: 10px;
-  color: var(--muted);
-  letter-spacing: 2px;
-  margin-top: 4px;
-}
-
+.logo { padding: 0 20px 24px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+.logo-title { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; letter-spacing: -0.5px; color: #fff; line-height: 1; }
+.logo-sub { font-size: 10px; color: var(--muted); letter-spacing: 2px; margin-top: 4px; }
 .nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 20px;
-  cursor: pointer;
-  color: var(--muted);
-  font-size: 11px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  border-left: 2px solid transparent;
-  transition: all 0.15s;
-  text-decoration: none;
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 20px; cursor: pointer; color: var(--muted);
+  font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+  border-left: 2px solid transparent; transition: all 0.15s; text-decoration: none;
 }
-
 .nav-item:hover { color: var(--text); background: var(--surface2); }
 .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-dim); }
-
 .nav-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
-
-.nav-section-label {
-  padding: 16px 20px 6px;
-  font-size: 10px;
-  color: var(--muted);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-}
-
-.sidebar-footer {
-  margin-top: auto;
-  padding: 16px 20px;
-  border-top: 1px solid var(--border);
-}
-
-/* main */
-.main {
-  padding: 32px 40px 80px;
-  max-width: 800px;
-}
-
-.page-header {
-  margin-bottom: 32px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--border);
-}
-
-.breadcrumb {
-  font-size: 11px;
-  color: var(--muted);
-  letter-spacing: 1px;
-  margin-bottom: 8px;
-}
-
+.nav-section-label { padding: 16px 20px 6px; font-size: 10px; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; }
+.sidebar-footer { margin-top: auto; padding: 16px 20px; border-top: 1px solid var(--border); }
+.main { padding: 32px 40px 80px; max-width: 800px; }
+.page-header { margin-bottom: 32px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+.breadcrumb { font-size: 11px; color: var(--muted); letter-spacing: 1px; margin-bottom: 8px; }
 .breadcrumb span { color: var(--accent); }
-
-h1 {
-  font-family: 'Syne', sans-serif;
-  font-size: 28px;
-  font-weight: 800;
-  color: #fff;
-  letter-spacing: -1px;
-}
-
-/* auth bar */
-.auth-bar {
-  background: var(--surface2);
-  border: 1px solid var(--border);
-  padding: 16px 20px;
-  display: flex;
-  gap: 12px;
-  align-items: flex-end;
-  margin-bottom: 28px;
-}
-
-/* cards */
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  margin-bottom: 16px;
-  animation: slideIn 0.3s ease both;
-}
-
-@keyframes slideIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
-.card:nth-child(2) { animation-delay: 0.04s; }
-.card:nth-child(3) { animation-delay: 0.08s; }
-.card:nth-child(4) { animation-delay: 0.12s; }
-.card:nth-child(5) { animation-delay: 0.16s; }
-.card:nth-child(6) { animation-delay: 0.20s; }
-
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  user-select: none;
-}
-
+h1 { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: #fff; letter-spacing: -1px; }
+.card { background: var(--surface); border: 1px solid var(--border); margin-bottom: 16px; animation: slideIn 0.3s ease both; }
+@keyframes slideIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.card:nth-child(2){animation-delay:.04s} .card:nth-child(3){animation-delay:.08s}
+.card:nth-child(4){animation-delay:.12s} .card:nth-child(5){animation-delay:.16s}
+.card:nth-child(6){animation-delay:.20s} .card:nth-child(7){animation-delay:.24s}
+.card:nth-child(8){animation-delay:.28s} .card:nth-child(9){animation-delay:.32s}
+.card-header { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--border); cursor:pointer; user-select:none; }
 .card-header:hover { background: rgba(255,255,255,0.02); }
-
-.card-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 12px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: #fff;
-}
-
-.pill {
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 2px;
-  letter-spacing: 1px;
-  font-weight: 700;
-}
-
+.card-title { display:flex; align-items:center; gap:10px; font-size:12px; letter-spacing:1px; text-transform:uppercase; color:#fff; }
+.pill { font-size:10px; padding:2px 8px; border-radius:2px; letter-spacing:1px; font-weight:700; }
 .pill-on  { background: var(--accent-dim); color: var(--accent); }
 .pill-off { background: var(--muted2); color: var(--muted); }
 .pill-new { background: rgba(88,166,255,0.15); color: var(--blue); }
-
-.card-body {
-  padding: 20px;
-}
-
+.card-body { padding: 20px; }
 .card-body.hidden { display: none; }
-
-/* fields */
-.field-group {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 12px;
+.field-group { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
+.field-group.cols-3 { grid-template-columns:1fr 1fr 1fr; }
+.field-group.cols-1 { grid-template-columns:1fr; }
+.field { display:flex; flex-direction:column; gap:5px; }
+.field label { font-size:10px; color:var(--muted); letter-spacing:1.5px; text-transform:uppercase; }
+.field label em { font-style:normal; color:var(--muted); font-size:9px; margin-left:6px; }
+input[type=text],input[type=password],input[type=number],select {
+  background: var(--bg); border: 1px solid var(--border); color: var(--text);
+  font-family: 'Space Mono', monospace; font-size: 13px; padding: 8px 12px;
+  outline: none; width: 100%; transition: border-color 0.15s; -webkit-appearance:none;
 }
-
-.field-group.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
-.field-group.cols-1 { grid-template-columns: 1fr; }
-
-.field { display: flex; flex-direction: column; gap: 5px; }
-
-.field label {
-  font-size: 10px;
-  color: var(--muted);
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-}
-
-.field label em {
-  font-style: normal;
-  color: var(--muted);
-  font-size: 9px;
-  margin-left: 6px;
-}
-
-input[type=text], input[type=password], input[type=number], select {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  color: var(--text);
-  font-family: 'Space Mono', monospace;
-  font-size: 13px;
-  padding: 8px 12px;
-  outline: none;
-  width: 100%;
-  transition: border-color 0.15s;
-  -webkit-appearance: none;
-}
-
 input:focus, select:focus { border-color: var(--accent); }
 select option { background: var(--surface2); }
-
-.field-desc {
-  font-size: 10px;
-  color: var(--muted);
-  margin-top: 2px;
-  line-height: 1.4;
-}
-
-/* toggle row */
-.toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--border);
-}
+.field-desc { font-size:10px; color:var(--muted); margin-top:2px; line-height:1.4; }
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--border); }
 .toggle-row:last-child { border-bottom: none; }
-.toggle-label { font-size: 11px; color: var(--text); letter-spacing: 0.5px; }
-.toggle-label small { display: block; color: var(--muted); font-size: 10px; margin-top: 2px; }
-
-.switch { position: relative; width: 36px; height: 20px; flex-shrink: 0; }
-.switch input { display: none; }
-.slider { position: absolute; inset: 0; background: var(--muted2); cursor: pointer; transition: background 0.2s; border-radius: 0; }
-.slider::after { content: ''; position: absolute; left: 3px; top: 3px; width: 14px; height: 14px; background: var(--muted); transition: all 0.2s; }
+.toggle-label { font-size:11px; color:var(--text); letter-spacing:0.5px; }
+.toggle-label small { display:block; color:var(--muted); font-size:10px; margin-top:2px; }
+.switch { position:relative; width:36px; height:20px; flex-shrink:0; }
+.switch input { display:none; }
+.slider { position:absolute; inset:0; background:var(--muted2); cursor:pointer; transition:background 0.2s; border-radius:0; }
+.slider::after { content:''; position:absolute; left:3px; top:3px; width:14px; height:14px; background:var(--muted); transition:all 0.2s; }
 .switch input:checked + .slider { background: rgba(57,211,83,0.2); }
-.switch input:checked + .slider::after { transform: translateX(16px); background: var(--accent); }
-
-.sub-fields { padding-top: 16px; border-top: 1px solid var(--border); margin-top: 12px; }
-.sub-fields.hidden { display: none; }
-
-/* combo highlight */
-.combo-box {
-  background: rgba(88,166,255,0.05);
-  border: 1px solid rgba(88,166,255,0.2);
-  padding: 12px 16px;
-  margin-bottom: 16px;
-  font-size: 11px;
-  color: var(--blue);
-  line-height: 1.6;
-}
-
-.combo-box strong { color: #fff; }
-
-/* example */
-.example {
-  background: var(--bg);
-  border-left: 2px solid var(--muted2);
-  padding: 10px 14px;
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 12px;
-  line-height: 1.7;
-}
-
-.example .hi { color: var(--accent); }
-.example .warn { color: var(--yellow); }
-
-/* divider */
-.divider {
-  height: 1px;
-  background: var(--border);
-  margin: 16px 0;
-}
-
-/* buttons */
-.btn {
-  font-family: 'Space Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  padding: 10px 20px;
-  border: none;
-  cursor: pointer;
-  transition: all 0.15s;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  white-space: nowrap;
-}
-
-.btn-primary { background: var(--accent); color: #0d1117; font-weight: 700; }
-.btn-primary:hover { filter: brightness(1.1); }
-.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; filter: none; }
-
-.btn-ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
-.btn-ghost:hover { border-color: var(--text); color: var(--text); }
-
-.btn-run { background: rgba(247,129,102,0.1); color: var(--orange); border: 1px solid rgba(247,129,102,0.3); }
-.btn-run:hover { background: rgba(247,129,102,0.2); }
-
-.btn-sm { padding: 7px 14px; font-size: 10px; }
-
-/* sticky footer */
-.footer-bar {
-  position: fixed;
-  bottom: 0;
-  left: 220px;
-  right: 0;
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  padding: 14px 40px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  z-index: 100;
-}
-
-#status {
-  flex: 1;
-  font-size: 11px;
-  letter-spacing: 1px;
-  min-height: 16px;
-}
-#status.ok     { color: var(--accent); }
-#status.err    { color: var(--orange); }
-#status.loading { color: var(--blue); }
-
-@media (max-width: 700px) {
-  .layout { grid-template-columns: 1fr; }
-  .sidebar { display: none; }
-  .footer-bar { left: 0; }
-  .main { padding: 20px 16px 80px; }
+.switch input:checked + .slider::after { transform:translateX(16px); background:var(--accent); }
+.sub-fields { padding-top:16px; border-top:1px solid var(--border); margin-top:12px; }
+.sub-fields.hidden { display:none; }
+.combo-box { background:rgba(88,166,255,0.05); border:1px solid rgba(88,166,255,0.2); padding:12px 16px; margin-bottom:16px; font-size:11px; color:var(--blue); line-height:1.6; }
+.combo-box strong { color:#fff; }
+.example { background:var(--bg); border-left:2px solid var(--muted2); padding:10px 14px; font-size:11px; color:var(--muted); margin-top:12px; line-height:1.7; }
+.example .hi { color:var(--accent); }
+.example .warn { color:var(--yellow); }
+.divider { height:1px; background:var(--border); margin:16px 0; }
+.btn { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; padding:10px 20px; border:none; cursor:pointer; transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
+.btn-primary { background:var(--accent); color:#0d1117; font-weight:700; }
+.btn-primary:hover { filter:brightness(1.1); }
+.btn-primary:disabled { opacity:0.4; cursor:not-allowed; filter:none; }
+.btn-ghost { background:transparent; color:var(--muted); border:1px solid var(--border); }
+.btn-ghost:hover { border-color:var(--text); color:var(--text); }
+.btn-run { background:rgba(247,129,102,0.1); color:var(--orange); border:1px solid rgba(247,129,102,0.3); }
+.btn-run:hover { background:rgba(247,129,102,0.2); }
+.btn-sm { padding:7px 14px; font-size:10px; }
+.footer-bar { position:fixed; bottom:0; left:220px; right:0; background:var(--surface); border-top:1px solid var(--border); padding:14px 40px; display:flex; align-items:center; gap:14px; z-index:100; }
+#status { flex:1; font-size:11px; letter-spacing:1px; min-height:16px; }
+#status.ok { color:var(--accent); }
+#status.err { color:var(--orange); }
+#status.loading { color:var(--blue); }
+@media (max-width:700px) {
+  .layout { grid-template-columns:1fr; }
+  .sidebar { display:none; }
+  .footer-bar { left:0; }
+  .main { padding:20px 16px 80px; }
 }
 </style>
 </head>
 <body>
 <div class="layout">
 
-<!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="logo">
     <div class="logo-title">SCREENER</div>
     <div class="logo-sub">// config panel</div>
   </div>
-
   <span class="nav-section-label">Setup</span>
   <a class="nav-item active" href="#auth"><div class="nav-dot"></div> GitHub Auth</a>
   <a class="nav-item" href="#general"><div class="nav-dot"></div> General</a>
-
   <span class="nav-section-label">Indicadores</span>
   <a class="nav-item" href="#bb-squeeze"><div class="nav-dot"></div> BB Squeeze</a>
   <a class="nav-item" href="#expansion"><div class="nav-dot"></div> BB Expansion</a>
@@ -411,15 +156,12 @@ select option { background: var(--surface2); }
   <a class="nav-item" href="#ema"><div class="nav-dot"></div> EMA Cross</a>
   <a class="nav-item" href="#bb-breakout"><div class="nav-dot"></div> BB Breakout</a>
   <a class="nav-item" href="#vol"><div class="nav-dot"></div> Vol Spike</a>
-
   <div class="sidebar-footer">
     <button class="btn btn-run btn-sm" onclick="triggerWorkflow()" style="width:100%">▶ RUN NOW</button>
   </div>
 </aside>
 
-<!-- MAIN -->
 <main class="main">
-
   <div class="page-header">
     <div class="breadcrumb">screener / <span>config</span></div>
     <h1>Control Panel</h1>
@@ -474,10 +216,15 @@ select option { background: var(--surface2); }
           <input type="number" id="MAX_WORKERS" value="20" min="1" max="40">
         </div>
       </div>
-      <div class="field-group cols-1">
+      <div class="field-group">
         <div class="field">
           <label>LIMIT <em>velas por símbolo</em></label>
           <input type="number" id="LIMIT" value="100" min="30" max="500">
+        </div>
+        <div class="field">
+          <label>MIN_QUOTE_VOLUME <em>USD 24h</em></label>
+          <input type="number" id="MIN_QUOTE_VOLUME" value="100000" min="0" step="10000">
+          <div class="field-desc">Excluye pares con menos volumen diario</div>
         </div>
       </div>
     </div>
@@ -487,20 +234,20 @@ select option { background: var(--surface2); }
   <div class="card" id="bb-squeeze">
     <div class="card-header" onclick="toggleCard(this)">
       <div class="card-title"><span>🤏</span> BB Squeeze</div>
-      <span class="pill pill-on" id="badge-bb-squeeze">ON</span>
+      <span class="pill pill-off" id="badge-bb-squeeze">OFF</span>
     </div>
-    <div class="card-body">
+    <div class="card-body hidden">
       <div class="toggle-row">
         <div class="toggle-label">
           Activar BB Squeeze
           <small>Alerta cuando las bandas están muy comprimidas</small>
         </div>
         <label class="switch">
-          <input type="checkbox" id="en-bb-squeeze" checked onchange="onToggle('bb-squeeze')">
+          <input type="checkbox" id="en-bb-squeeze" onchange="onToggle('bb-squeeze')">
           <span class="slider"></span>
         </label>
       </div>
-      <div class="sub-fields" id="sub-bb-squeeze">
+      <div class="sub-fields hidden" id="sub-bb-squeeze">
         <div class="field-group cols-1">
           <div class="field">
             <label>BB_WIDTH_MIN <em>width ≤ este valor dispara alerta</em></label>
@@ -520,17 +267,15 @@ select option { background: var(--surface2); }
   <div class="card" id="expansion">
     <div class="card-header" onclick="toggleCard(this)">
       <div class="card-title"><span>🚀</span> BB Expansion + Vol + Price Up</div>
-      <span class="pill pill-new" id="badge-expansion">NEW</span>
+      <span class="pill pill-new" id="badge-expansion">ON</span>
     </div>
     <div class="card-body">
-
       <div class="combo-box">
         <strong>Combo de 3 condiciones simultáneas:</strong><br>
         1. BB width se expande rápido (delta absoluto <em>o</em> porcentual)<br>
-        2. Volumen actual supera el umbral mínimo (🟢 normal / 🟡 fuerte / 🔴 extremo)<br>
+        2. Volumen actual supera umbral — 🟢 normal / 🟡 fuerte / 🔴 extremo<br>
         3. Vela alcista (close &gt; open)
       </div>
-
       <div class="toggle-row">
         <div class="toggle-label">
           Activar combo BB Expansion
@@ -541,45 +286,44 @@ select option { background: var(--surface2); }
           <span class="slider"></span>
         </label>
       </div>
-
       <div class="sub-fields" id="sub-expansion">
         <div class="divider"></div>
         <div class="field-group">
           <div class="field">
             <label>BB_EXPANSION_MIN <em>delta absoluto mínimo</em></label>
-            <input type="number" id="BB_EXPANSION_MIN" value="0.05" step="0.01" min="0.001" max="1">
-            <div class="field-desc">Si el width sube al menos este valor en 1 vela<br>Ej: de 0.10 → 0.15 (delta = 0.05) ✅</div>
+            <input type="number" id="BB_EXPANSION_MIN" value="0.095" step="0.005" min="0.001" max="1">
+            <div class="field-desc">Si el width sube al menos este valor en 1 vela</div>
           </div>
           <div class="field">
             <label>BB_EXPANSION_PCT <em>o delta % mínimo</em></label>
-            <input type="number" id="BB_EXPANSION_PCT" value="0.30" step="0.05" min="0.01" max="10">
-            <div class="field-desc">Si el width creció al menos X% relativo<br>Ej: de 0.10 → 0.13 (+30%) ✅</div>
+            <input type="number" id="BB_EXPANSION_PCT" value="0.03" step="0.01" min="0.01" max="10">
+            <div class="field-desc">Si el width creció al menos X% relativo al anterior</div>
           </div>
         </div>
+        <div class="field-group cols-1">
+          <div class="field">
+            <label>BB_WIDTH_MAX <em>width máximo permitido</em></label>
+            <input type="number" id="BB_WIDTH_MAX" value="5.0" step="0.5" min="0.1" max="100">
+            <div class="field-desc">Filtra pares con BB anómalas (delisting, colapso de precio)</div>
+          </div>
+        </div>
+        <div class="divider"></div>
         <div class="field-group cols-3">
           <div class="field">
-            <label>VOL_NORMAL <em>🟢 mínimo</em></label>
-            <input type="number" id="VOL_NORMAL" value="2.0" step="0.5" min="1" max="20">
-            <div class="field-desc">Spike normal (ej: 2x–5x)</div>
+            <label>EXP_VOL_NORMAL <em>🟢</em></label>
+            <input type="number" id="EXP_VOL_NORMAL" value="2.0" step="0.5" min="1" max="20">
+            <div class="field-desc">Mínimo para considerar spike (combo)</div>
           </div>
           <div class="field">
-            <label>VOL_FUERTE <em>🟡 medio</em></label>
-            <input type="number" id="VOL_FUERTE" value="5.0" step="0.5" min="1" max="50">
-            <div class="field-desc">Spike fuerte (ej: 5x–10x)</div>
+            <label>EXP_VOL_FUERTE <em>🟡</em></label>
+            <input type="number" id="EXP_VOL_FUERTE" value="5.0" step="0.5" min="1" max="50">
+            <div class="field-desc">Spike significativo (combo)</div>
           </div>
           <div class="field">
-            <label>VOL_EXTREMO <em>🔴 alto</em></label>
-            <input type="number" id="VOL_EXTREMO" value="10.0" step="1" min="1" max="100">
-            <div class="field-desc">Spike extremo (ej: +10x)</div>
+            <label>EXP_VOL_EXTREMO <em>🔴</em></label>
+            <input type="number" id="EXP_VOL_EXTREMO" value="10.0" step="1" min="1" max="100">
+            <div class="field-desc">Spike extremo (combo)</div>
           </div>
-        </div>
-
-        <div class="example">
-          <strong>Ejemplo que dispara alerta:</strong><br>
-          width vela anterior: <span class="warn">0.08</span> → vela actual: <span class="hi">0.14</span> (delta +<span class="hi">0.06</span>, +<span class="hi">75%</span>)<br>
-          volumen: <span class="hi">3.2x</span> promedio | vela: <span class="hi">verde ↑</span><br><br>
-          <strong>Ejemplo que NO dispara:</strong><br>
-          width: <span class="warn">0.01</span> → <span class="warn">0.02</span> (delta 0.01, insuficiente aunque +100%)
         </div>
       </div>
     </div>
@@ -593,23 +337,31 @@ select option { background: var(--surface2); }
     </div>
     <div class="card-body hidden">
       <div class="toggle-row">
-        <div class="toggle-label">Activar RSI</div>
+        <div class="toggle-label">
+          Activar RSI
+          <small>Alerta en zonas de sobrecompra y sobreventa</small>
+        </div>
         <label class="switch">
           <input type="checkbox" id="en-rsi" onchange="onToggle('rsi')">
           <span class="slider"></span>
         </label>
       </div>
       <div class="sub-fields hidden" id="sub-rsi">
-        <div class="field-group">
+        <div class="field-group cols-3">
           <div class="field">
             <label>RSI_OVERSOLD</label>
             <input type="number" id="RSI_OVERSOLD" value="30" min="1" max="49">
-            <div class="field-desc">Alerta bearish si RSI ≤ este valor</div>
+            <div class="field-desc">📉 alerta si RSI ≤ este valor</div>
           </div>
           <div class="field">
             <label>RSI_OVERBOUGHT</label>
             <input type="number" id="RSI_OVERBOUGHT" value="70" min="51" max="99">
-            <div class="field-desc">Alerta bullish si RSI ≥ este valor</div>
+            <div class="field-desc">📈 alerta si RSI ≥ este valor</div>
+          </div>
+          <div class="field">
+            <label>RSI_WINDOW <em>período</em></label>
+            <input type="number" id="RSI_WINDOW" value="14" min="2" max="50">
+            <div class="field-desc">Período del RSI (default 14)</div>
           </div>
         </div>
       </div>
@@ -626,12 +378,31 @@ select option { background: var(--surface2); }
       <div class="toggle-row">
         <div class="toggle-label">
           Activar MACD crossover
-          <small>Detecta cruces alcistas y bajistas (12/26/9)</small>
+          <small>Detecta cruces alcistas y bajistas de la línea MACD</small>
         </div>
         <label class="switch">
           <input type="checkbox" id="en-macd" onchange="onToggle('macd')">
           <span class="slider"></span>
         </label>
+      </div>
+      <div class="sub-fields hidden" id="sub-macd">
+        <div class="field-group cols-3">
+          <div class="field">
+            <label>MACD_FAST</label>
+            <input type="number" id="MACD_FAST" value="12" min="2" max="50">
+            <div class="field-desc">EMA rápida (default 12)</div>
+          </div>
+          <div class="field">
+            <label>MACD_SLOW</label>
+            <input type="number" id="MACD_SLOW" value="26" min="5" max="200">
+            <div class="field-desc">EMA lenta (default 26)</div>
+          </div>
+          <div class="field">
+            <label>MACD_SIGNAL</label>
+            <input type="number" id="MACD_SIGNAL" value="9" min="2" max="50">
+            <div class="field-desc">Señal (default 9)</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -639,19 +410,33 @@ select option { background: var(--surface2); }
   <!-- EMA -->
   <div class="card" id="ema">
     <div class="card-header" onclick="toggleCard(this)">
-      <div class="card-title"><span>🔀</span> EMA 9/21 Crossover</div>
+      <div class="card-title"><span>🔀</span> EMA Crossover</div>
       <span class="pill pill-off" id="badge-ema">OFF</span>
     </div>
     <div class="card-body hidden">
       <div class="toggle-row">
         <div class="toggle-label">
           Activar EMA crossover
-          <small>Detecta cuando EMA9 cruza EMA21 arriba o abajo</small>
+          <small>Detecta cuando la EMA rápida cruza la EMA lenta</small>
         </div>
         <label class="switch">
           <input type="checkbox" id="en-ema" onchange="onToggle('ema')">
           <span class="slider"></span>
         </label>
+      </div>
+      <div class="sub-fields hidden" id="sub-ema">
+        <div class="field-group">
+          <div class="field">
+            <label>EMA_FAST <em>período rápido</em></label>
+            <input type="number" id="EMA_FAST" value="9" min="2" max="50">
+            <div class="field-desc">EMA rápida (default 9)</div>
+          </div>
+          <div class="field">
+            <label>EMA_SLOW <em>período lento</em></label>
+            <input type="number" id="EMA_SLOW" value="21" min="5" max="200">
+            <div class="field-desc">EMA lenta (default 21)</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -666,12 +451,19 @@ select option { background: var(--surface2); }
       <div class="toggle-row">
         <div class="toggle-label">
           Activar BB Breakout
-          <small>Precio rompe la banda superior o inferior</small>
+          <small>Precio cierra fuera de la banda superior o inferior</small>
         </div>
         <label class="switch">
           <input type="checkbox" id="en-bb-breakout" onchange="onToggle('bb-breakout')">
           <span class="slider"></span>
         </label>
+      </div>
+      <div class="sub-fields hidden" id="sub-bb-breakout">
+        <div class="example">
+          Dispara cuando <span class="hi">close &gt; upper band</span> (breakout arriba)<br>
+          o cuando <span class="warn">close &lt; lower band</span> (breakout abajo).<br>
+          No tiene parámetros adicionales — usa las BB estándar (20, 2σ).
+        </div>
       </div>
     </div>
   </div>
@@ -679,14 +471,14 @@ select option { background: var(--surface2); }
   <!-- VOL STANDALONE -->
   <div class="card" id="vol">
     <div class="card-header" onclick="toggleCard(this)">
-      <div class="card-title"><span>📈</span> Volumen Spike (standalone)</div>
+      <div class="card-title"><span>📈</span> Vol Spike Standalone</div>
       <span class="pill pill-off" id="badge-vol">OFF</span>
     </div>
     <div class="card-body hidden">
       <div class="toggle-row">
         <div class="toggle-label">
           Activar volumen spike independiente
-          <small>Sin requerir BB expansion ni precio subiendo — usa los mismos niveles 🟢/🟡/🔴</small>
+          <small>Sin requerir BB expansion ni precio subiendo</small>
         </div>
         <label class="switch">
           <input type="checkbox" id="en-vol" onchange="onToggle('vol')">
@@ -694,20 +486,26 @@ select option { background: var(--surface2); }
         </label>
       </div>
       <div class="sub-fields hidden" id="sub-vol">
-        <div class="example" style="margin-bottom:12px;">
-          Usa los mismos umbrales <strong>VOL_NORMAL / VOL_FUERTE / VOL_EXTREMO</strong> definidos en BB Expansion.<br>
-          Dispara aunque el precio baje o las BB no se expandan.
-        </div>
         <div class="field-group cols-3">
           <div class="field">
-            <div class="field-desc" style="font-size:11px;color:var(--accent);">🟢 vol normal → VOL_NORMAL x</div>
+            <label>VOL_NORMAL <em>🟢 mínimo</em></label>
+            <input type="number" id="VOL_NORMAL" value="2.0" step="0.5" min="1" max="20">
+            <div class="field-desc">Spike leve (ej: 2x promedio)</div>
           </div>
           <div class="field">
-            <div class="field-desc" style="font-size:11px;color:var(--yellow);">🟡 vol fuerte → VOL_FUERTE x</div>
+            <label>VOL_FUERTE <em>🟡 medio</em></label>
+            <input type="number" id="VOL_FUERTE" value="5.0" step="0.5" min="1" max="50">
+            <div class="field-desc">Spike significativo (ej: 5x)</div>
           </div>
           <div class="field">
-            <div class="field-desc" style="font-size:11px;color:var(--orange);">🔴 vol extremo → VOL_EXTREMO x</div>
+            <label>VOL_EXTREMO <em>🔴 alto</em></label>
+            <input type="number" id="VOL_EXTREMO" value="10.0" step="1" min="1" max="100">
+            <div class="field-desc">Spike extremo (ej: 10x+)</div>
           </div>
+        </div>
+        <div class="example">
+          Independiente del BB Expansion — tiene sus propios umbrales.<br>
+          Dispara aunque el precio baje o las BB no se expandan.
         </div>
       </div>
     </div>
@@ -716,17 +514,13 @@ select option { background: var(--surface2); }
 </main>
 </div>
 
-<!-- FOOTER -->
 <div class="footer-bar">
   <span id="status"></span>
   <button class="btn btn-ghost btn-sm" onclick="loadConfig()">↺ RECARGAR</button>
-  <button class="btn btn-primary" id="save-btn" onclick="saveConfig()">
-    ↑ GUARDAR EN GITHUB
-  </button>
+  <button class="btn btn-primary" id="save-btn" onclick="saveConfig()">↑ GUARDAR EN GITHUB</button>
 </div>
 
 <script>
-// ── Persist auth ───────────────────────────────────────────────────────────────
 ['gh-token','gh-repo'].forEach(id => {
   const el = document.getElementById(id);
   const saved = localStorage.getItem(id);
@@ -734,30 +528,26 @@ select option { background: var(--surface2); }
   el.addEventListener('input', () => localStorage.setItem(id, el.value));
 });
 
-// ── Card toggle ────────────────────────────────────────────────────────────────
 function toggleCard(header) {
-  const body = header.nextElementSibling;
-  body.classList.toggle('hidden');
+  header.nextElementSibling.classList.toggle('hidden');
 }
 
-// ── Indicator toggle ───────────────────────────────────────────────────────────
 function onToggle(key) {
-  const on  = document.getElementById('en-' + key).checked;
-  const sub = document.getElementById('sub-' + key);
+  const on    = document.getElementById('en-' + key).checked;
+  const sub   = document.getElementById('sub-' + key);
   const badge = document.getElementById('badge-' + key);
   if (sub) sub.classList.toggle('hidden', !on);
   if (badge) {
     if (key === 'expansion') {
-      badge.className = on ? 'pill pill-new' : 'pill pill-off';
+      badge.className  = on ? 'pill pill-new' : 'pill pill-off';
       badge.textContent = on ? 'ON' : 'OFF';
     } else {
-      badge.className = on ? 'pill pill-on' : 'pill pill-off';
+      badge.className  = on ? 'pill pill-on' : 'pill pill-off';
       badge.textContent = on ? 'ON' : 'OFF';
     }
   }
 }
 
-// ── Status ─────────────────────────────────────────────────────────────────────
 function setStatus(msg, type='') {
   const el = document.getElementById('status');
   el.textContent = msg;
@@ -775,8 +565,8 @@ function headers() {
 
 function repo() { return document.getElementById('gh-repo').value.trim(); }
 
-function decodeBase64Utf8(base64Str) {
-  const binary = atob(base64Str.replace(/\n/g, ''));
+function decodeBase64Utf8(b64) {
+  const binary = atob(b64.replace(/\n/g,''));
   const bytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
   return new TextDecoder('utf-8').decode(bytes);
 }
@@ -788,7 +578,6 @@ function encodeBase64Utf8(str) {
   return btoa(binary);
 }
 
-// ── Load config from GitHub ────────────────────────────────────────────────────
 let _sha = null, _original = '';
 
 async function loadConfig() {
@@ -813,29 +602,34 @@ function parseIntoUI(c) {
     return m ? m[1].replace(/['"]/g,'') : null;
   };
 
-  ['INTERVAL','LIMIT','TOP_N','MAX_WORKERS',
-   'BB_WIDTH_MIN','BB_EXPANSION_MIN','BB_EXPANSION_PCT',
-   'VOL_NORMAL','VOL_FUERTE','VOL_EXTREMO',
-   'RSI_OVERSOLD','RSI_OVERBOUGHT'].forEach(k => {
+  const fields = [
+    'INTERVAL','LIMIT','TOP_N','MAX_WORKERS','MIN_QUOTE_VOLUME',
+    'BB_WIDTH_MIN',
+    'BB_EXPANSION_MIN','BB_EXPANSION_PCT','BB_WIDTH_MAX',
+    'EXP_VOL_NORMAL','EXP_VOL_FUERTE','EXP_VOL_EXTREMO',
+    'RSI_OVERSOLD','RSI_OVERBOUGHT','RSI_WINDOW',
+    'MACD_FAST','MACD_SLOW','MACD_SIGNAL',
+    'EMA_FAST','EMA_SLOW',
+    'VOL_NORMAL','VOL_FUERTE','VOL_EXTREMO'
+  ];
+
+  fields.forEach(k => {
     const el = document.getElementById(k);
     const v  = getVal(k);
     if (el && v !== null) el.value = v;
   });
 
-  const isLiveLine = pattern =>
+  const isLive = pattern =>
     c.split('\n').some(line => pattern.test(line) && !/^\s*#/.test(line));
 
   const states = {
-    'bb-squeeze':  isLiveLine(/if width_curr <= BB_WIDTH_MIN:/) &&
-                   isLiveLine(/signals\.append\(f["']🤏 BB squeeze/),
-    'expansion':   isLiveLine(/if expansion_ok and vol_label and price_up/),
-    'rsi':         isLiveLine(/rsi_val\s*=\s*ta\.momentum\.RSIIndicator\(close,\s*window=14\)/),
-    'macd':        isLiveLine(/macd_ind\s*=\s*ta\.trend\.MACD\(close,/),
-    'ema':         isLiveLine(/ema9\s*=\s*ta\.trend\.EMAIndicator\(close,\s*window=9\)/),
-    'bb-breakout': isLiveLine(/if price > hband\.iloc\[-1\]:/) ||
-                   isLiveLine(/elif price < lband\.iloc\[-1\]:/),
-    'vol':         isLiveLine(/if vol_ratio >= VOL_EXTREMO:/) &&
-                   isLiveLine(/signals\.append\(f["']🔴 vol extremo standalone/)
+    'bb-squeeze':  isLive(/if width_curr <= BB_WIDTH_MIN:/),
+    'expansion':   isLive(/if expansion_ok and exp_vol_label and price_up/),
+    'rsi':         isLive(/rsi_val\s*=\s*ta\.momentum\.RSIIndicator/),
+    'macd':        isLive(/macd_ind\s*=\s*ta\.trend\.MACD\(close,/),
+    'ema':         isLive(/ema_fast\s*=\s*ta\.trend\.EMAIndicator/),
+    'bb-breakout': isLive(/if price > hband\.iloc\[-1\]:/),
+    'vol':         isLive(/if vol_ratio >= VOL_EXTREMO:/)
   };
 
   Object.entries(states).forEach(([key, active]) => {
@@ -846,59 +640,21 @@ function parseIntoUI(c) {
   });
 }
 
-// ── Text helpers ───────────────────────────────────────────────────────────────
-function escapeRegExp(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function splitCommentableLine(line) {
-  const m = line.match(/^(\s*)(#\s?)?(.*)$/);
-  return {
-    indent: m ? m[1] : '',
-    commented: !!(m && m[2]),
-    rest: m ? m[3] : line
-  };
-}
-
-function setLineCommentState(src, needle, active) {
-  return src.split('\n').map(line => {
-    const parts = splitCommentableLine(line);
-    if (!parts.rest.trimStart().startsWith(needle)) return line;
-    return active ? `${parts.indent}${parts.rest}` : `${parts.indent}# ${parts.rest}`;
-  }).join('\n');
-}
-
-function setBlockCommentState(src, startNeedle, endNeedle, active) {
+function setCommentState(src, startNeedle, endNeedle, active) {
   const lines = src.split('\n');
   let inside = false;
-
   for (let i = 0; i < lines.length; i++) {
-    const parts = splitCommentableLine(lines[i]);
-    const live = parts.rest;
-
-    if (!inside && live.trimStart().includes(startNeedle)) inside = true;
-
+    const stripped = lines[i].replace(/^\s*#\s?/, '').trimEnd();
+    const indent   = lines[i].match(/^(\s*)(#\s?)?/)[1];
+    if (!inside && stripped.includes(startNeedle)) inside = true;
     if (inside) {
-      lines[i] = active ? `${parts.indent}${live}` : `${parts.indent}# ${live}`;
-      if (live.trimStart().includes(endNeedle)) inside = false;
+      lines[i] = active ? `${indent}${stripped}` : `${indent}# ${stripped}`;
+      if (stripped.includes(endNeedle)) { inside = false; }
     }
   }
-
   return lines.join('\n');
 }
 
-function applyIndicatorState(src, active, spec) {
-  let out = src;
-  (spec.lines || []).forEach(line => {
-    out = setLineCommentState(out, line, active);
-  });
-  (spec.blocks || []).forEach(block => {
-    out = setBlockCommentState(out, block.start, block.end, active);
-  });
-  return out;
-}
-
-// ── Save config ────────────────────────────────────────────────────────────────
 async function saveConfig() {
   if (!_sha) { setStatus('Cargá la config primero', 'err'); return; }
   const btn = document.getElementById('save-btn');
@@ -908,103 +664,74 @@ async function saveConfig() {
   try {
     let c = _original;
 
-    const updates = [
-      { k: 'INTERVAL',         v: `"${document.getElementById('INTERVAL').value}"` },
-      { k: 'LIMIT',            v: document.getElementById('LIMIT').value },
-      { k: 'TOP_N',            v: document.getElementById('TOP_N').value },
-      { k: 'MAX_WORKERS',      v: document.getElementById('MAX_WORKERS').value },
-      { k: 'BB_WIDTH_MIN',     v: document.getElementById('BB_WIDTH_MIN').value },
-      { k: 'BB_EXPANSION_MIN', v: document.getElementById('BB_EXPANSION_MIN').value },
-      { k: 'BB_EXPANSION_PCT', v: document.getElementById('BB_EXPANSION_PCT').value },
-      { k: 'VOL_NORMAL',       v: document.getElementById('VOL_NORMAL').value },
-      { k: 'VOL_FUERTE',       v: document.getElementById('VOL_FUERTE').value },
-      { k: 'VOL_EXTREMO',      v: document.getElementById('VOL_EXTREMO').value },
-      { k: 'RSI_OVERSOLD',     v: document.getElementById('RSI_OVERSOLD').value },
-      { k: 'RSI_OVERBOUGHT',   v: document.getElementById('RSI_OVERBOUGHT').value },
+    const numericFields = [
+      'LIMIT','TOP_N','MAX_WORKERS','MIN_QUOTE_VOLUME',
+      'BB_WIDTH_MIN',
+      'BB_EXPANSION_MIN','BB_EXPANSION_PCT','BB_WIDTH_MAX',
+      'EXP_VOL_NORMAL','EXP_VOL_FUERTE','EXP_VOL_EXTREMO',
+      'RSI_OVERSOLD','RSI_OVERBOUGHT','RSI_WINDOW',
+      'MACD_FAST','MACD_SLOW','MACD_SIGNAL',
+      'EMA_FAST','EMA_SLOW',
+      'VOL_NORMAL','VOL_FUERTE','VOL_EXTREMO'
     ];
 
-    updates.forEach(({ k, v }) => {
-      c = c.replace(new RegExp(`(^${k}\\s*=\\s*).*`, 'm'), `$1${v}`);
+    numericFields.forEach(k => {
+      const el = document.getElementById(k);
+      if (el) c = c.replace(new RegExp(`(^${k}\\s*=\\s*).*`, 'm'), `$1${el.value}`);
     });
+
+    const iv = document.getElementById('INTERVAL').value;
+    c = c.replace(/^(INTERVAL\s*=\s*).*$/m, `$1"${iv}"`);
 
     const specs = {
       'bb-squeeze': {
-        blocks: [
-          {
-            start: 'if width_curr <= BB_WIDTH_MIN:',
-            end: 'signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")'
-          }
-        ]
+        start: 'if width_curr <= BB_WIDTH_MIN:',
+        end:   'signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")'
       },
       'expansion': {
-        blocks: [
-          {
-            start: 'width_delta   = width_curr - width_prev',
-            end: 'return symbol, (signals if signals else None)'
-          }
-        ]
+        start: 'vol_mean      = volume.iloc[-21:-1].mean()',
+        end:   'f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"'
       },
       'rsi': {
-        blocks: [
-          {
-            start: 'rsi_val = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]',
-            end: 'signals.append(f"📈 RSI={rsi_val:.1f} (sobrecompra)")'
-          }
-        ]
+        start: 'rsi_val = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]',
+        end:   'signals.append(f"📈 RSI={rsi_val:.1f} (sobrecompra)")'
       },
       'macd': {
-        blocks: [
-          {
-            start: 'macd_ind  = ta.trend.MACD(close, window_slow=26, window_fast=12, window_sign=9)',
-            end: 'signals.append("⚡ MACD crossover bajista")'
-          }
-        ]
+        start: 'macd_ind  = ta.trend.MACD(close, window_slow=MACD_SLOW, window_fast=MACD_FAST, window_sign=MACD_SIGNAL)',
+        end:   'signals.append("⚡ MACD crossover bajista")'
       },
       'ema': {
-        blocks: [
-          {
-            start: 'ema9  = ta.trend.EMAIndicator(close, window=9).ema_indicator()',
-            end: 'signals.append("🔀 EMA9 cruzó abajo EMA21 (bajista)")'
-          }
-        ]
+        start: 'ema_fast = ta.trend.EMAIndicator(close, window=EMA_FAST).ema_indicator()',
+        end:   'signals.append(f"🔀 EMA{EMA_FAST} cruzó abajo EMA{EMA_SLOW} (bajista)")'
       },
       'bb-breakout': {
-        blocks: [
-          {
-            start: 'if price > hband.iloc[-1]:',
-            end: 'signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")'
-          }
-        ]
+        start: 'if price > hband.iloc[-1]:',
+        end:   'signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")'
       },
       'vol': {
-        blocks: [
-          {
-            start: 'if vol_ratio >= VOL_EXTREMO:',
-            end: 'signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")'
-          }
-        ]
+        start: 'if vol_ratio >= VOL_EXTREMO:',
+        end:   'signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")'
       }
     };
 
     Object.entries(specs).forEach(([key, spec]) => {
       const active = document.getElementById('en-' + key).checked;
-      c = applyIndicatorState(c, active, spec);
+      c = setCommentState(c, spec.start, spec.end, active);
     });
 
-    const encoded = encodeBase64Utf8(c);
     const res = await fetch(`https://api.github.com/repos/${repo()}/contents/screener.py`, {
       method: 'PUT',
       headers: headers(),
       body: JSON.stringify({
         message: 'config: update screener via control panel',
-        content: encoded,
+        content: encodeBase64Utf8(c),
         sha: _sha
       })
     });
 
     if (!res.ok) {
       const e = await res.json();
-      throw new Error(e.message || `${res.status} ${res.statusText}`);
+      throw new Error(e.message || `${res.status}`);
     }
 
     const data = await res.json();
@@ -1018,7 +745,6 @@ async function saveConfig() {
   }
 }
 
-// ── Trigger workflow ───────────────────────────────────────────────────────────
 async function triggerWorkflow() {
   if (!document.getElementById('gh-token').value.trim()) {
     setStatus('Ingresá el token primero', 'err'); return;
@@ -1026,8 +752,7 @@ async function triggerWorkflow() {
   setStatus('Disparando workflow...', 'loading');
   try {
     const res = await fetch(`https://api.github.com/repos/${repo()}/dispatches`, {
-      method: 'POST',
-      headers: headers(),
+      method: 'POST', headers: headers(),
       body: JSON.stringify({ event_type: 'run-screener' })
     });
     if (res.status === 204) setStatus('✓ Workflow disparado exitosamente', 'ok');
