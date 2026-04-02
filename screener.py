@@ -170,7 +170,7 @@ def analyze(symbol):
             f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
         )
 
-    ── Vol Spike standalone (sin requerir BB expansion ni precio) ────────────
+    #── Vol Spike standalone (sin requerir BB expansion ni precio) ────────────
     if vol_ratio >= VOL_EXTREMO:
         signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
     elif vol_ratio >= VOL_FUERTE:
