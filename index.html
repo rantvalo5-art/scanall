@@ -748,6 +748,19 @@ function headers() {
 
 function repo() { return document.getElementById('gh-repo').value.trim(); }
 
+function decodeBase64Utf8(base64Str) {
+  const binary = atob(base64Str.replace(/\n/g, ''));
+  const bytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
+  return new TextDecoder('utf-8').decode(bytes);
+}
+
+function encodeBase64Utf8(str) {
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  bytes.forEach(b => binary += String.fromCharCode(b));
+  return btoa(binary);
+}
+
 // ── Load config from GitHub ────────────────────────────────────────────────────
 let _sha = null, _original = '';
 
@@ -761,7 +774,7 @@ async function loadConfig() {
     if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
     const data = await res.json();
     _sha = data.sha;
-    _original = atob(data.content.replace(/\n/g,''));
+    _original = decodeBase64Utf8(data.content);
     parseIntoUI(_original);
     setStatus('✓ Config cargada', 'ok');
   } catch(e) { setStatus('✗ ' + e.message, 'err'); }
@@ -781,30 +794,67 @@ function parseIntoUI(c) {
     if (el && v !== null) el.value = v;
   });
 
-  // Detect active indicators by checking if signals.append is uncommented
-  const checks = {
-    'bb-squeeze':  /^\s+signals\.append\(f"🤏/m,
-    'expansion':   /^\s+signals\.append\(\s*\n?\s*f"🚀 BB expansion/m,
-    'rsi':         /^\s+rsi_val = ta\.momentum/m,
-    'macd':        /^\s+macd_ind\s*=/m,
-    'ema':         /^\s+ema9\s*=/m,
-    'bb-breakout': /^\s+if price > hband/m,
-    'vol':         /^\s+# if vol_mean/m,
+  const isLiveLine = pattern =>
+    c.split('\n').some(line => pattern.test(line) && !/^\s*#/.test(line));
+
+  const states = {
+    'bb-squeeze':  isLiveLine(/signals\.append\(f["']🤏/),
+    'expansion':   isLiveLine(/BB expansion/) || isLiveLine(/if expansion_ok and vol_spike and price_up:/),
+    'rsi':         isLiveLine(/rsi_val\s*=/),
+    'macd':        isLiveLine(/macd_ind\s*=/),
+    'ema':         isLiveLine(/ema9\s*=/),
+    'bb-breakout': isLiveLine(/if price > hband/) || isLiveLine(/elif price < lband/),
+    'vol':         isLiveLine(/signals\.append\(f["']📦 VOL x/)
   };
 
-  // For vol standalone: active if the standalone block is uncommented
-  const volStandaloneActive = /^\s+if vol_mean > 0 and vol_curr > vol_mean \* VOLUME_MULT:/m.test(c)
-    && !/^\s+# if vol_mean > 0 and vol_curr > vol_mean \* VOLUME_MULT:/m.test(c);
-
-  Object.entries(checks).forEach(([key, rx]) => {
-    if (key === 'vol') return;
-    const active = rx.test(c);
-    document.getElementById('en-' + key).checked = active;
+  Object.entries(states).forEach(([key, active]) => {
+    const box = document.getElementById('en-' + key);
+    if (!box) return;
+    box.checked = active;
     onToggle(key);
   });
+}
 
-  document.getElementById('en-vol').checked = volStandaloneActive;
-  onToggle('vol');
+// ── Text helpers ───────────────────────────────────────────────────────────────
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function setLineCommentState(src, needle, active) {
+  const rx = new RegExp(`^(\\s*)(#\\s*)?(${escapeRegExp(needle)}.*)$`, 'gm');
+  return src.replace(rx, (_, indent, hash, code) => active ? `${indent}${code}` : `${indent}# ${code}`);
+}
+
+function setBlockCommentState(src, startNeedle, endNeedle, active) {
+  const lines = src.split('\n');
+  let inside = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const live = raw.replace(/^\s*#\s?/, '');
+
+    if (!inside && live.includes(startNeedle)) inside = true;
+
+    if (inside) {
+      const indent = raw.match(/^\s*/)[0];
+      const uncommented = raw.replace(/^(\s*)#\s?/, '$1');
+      lines[i] = active ? uncommented : `${indent}# ${live.trimStart()}`;
+      if (live.includes(endNeedle)) inside = false;
+    }
+  }
+
+  return lines.join('\n');
+}
+
+function applyIndicatorState(src, active, spec) {
+  let out = src;
+  (spec.lines || []).forEach(line => {
+    out = setLineCommentState(out, line, active);
+  });
+  (spec.blocks || []).forEach(block => {
+    out = setBlockCommentState(out, block.start, block.end, active);
+  });
+  return out;
 }
 
 // ── Save config ────────────────────────────────────────────────────────────────
@@ -817,7 +867,6 @@ async function saveConfig() {
   try {
     let c = _original;
 
-    // Update variable values
     const updates = [
       { k: 'INTERVAL',         v: `"${document.getElementById('INTERVAL').value}"` },
       { k: 'LIMIT',            v: document.getElementById('LIMIT').value },
@@ -832,43 +881,83 @@ async function saveConfig() {
     ];
 
     updates.forEach(({ k, v }) => {
-      c = c.replace(new RegExp(`(^(?:#\\s*)?${k}\\s*=\\s*).*`, 'm'), `$1${v}`);
+      c = c.replace(new RegExp(`(^${k}\\s*=\\s*).*`, 'm'), `$1${v}`);
     });
 
-    // Comment/uncomment indicator lines based on toggle state
-    const patterns = {
-      'bb-squeeze':  [/^(\s+)(#?\s*)(if width_curr <= BB_WIDTH_MIN:)/m,
-                      /^(\s+)(#?\s*)(signals\.append\(f"🤏)/m],
-      'expansion':   [/^(\s+)(#?\s*)(expansion_ok\s*=)/m,
-                      /^(\s+)(#?\s*)(if expansion_ok and vol_spike and price_up:)/m,
-                      /^(\s+)(#?\s*)(signals\.append\()/m],
-      'rsi':         [/^(\s+)(#?\s*)(rsi_val = ta\.momentum)/m,
-                      /^(\s+)(#?\s*)(if rsi_val <= RSI_OVERSOLD:)/m,
-                      /^(\s+)(#?\s*)(elif rsi_val >= RSI_OVERBOUGHT:)/m],
-      'macd':        [/^(\s+)(#?\s*)(macd_ind\s*=)/m,
-                      /^(\s+)(#?\s*)(macd_line =)/m,
-                      /^(\s+)(#?\s*)(sig_line\s*=)/m,
-                      /^(\s+)(#?\s*)(if macd_line\.iloc\[-2\] < sig_line)/m,
-                      /^(\s+)(#?\s*)(elif macd_line\.iloc\[-2\] > sig_line)/m],
-      'ema':         [/^(\s+)(#?\s*)(ema9\s*=)/m,
-                      /^(\s+)(#?\s*)(ema21\s*=)/m,
-                      /^(\s+)(#?\s*)(if ema9\.iloc\[-2\] < ema21)/m,
-                      /^(\s+)(#?\s*)(elif ema9\.iloc\[-2\] > ema21)/m],
-      'bb-breakout': [/^(\s+)(#?\s*)(if price > hband)/m,
-                      /^(\s+)(#?\s*)(elif price < lband)/m],
+    const specs = {
+      'bb-squeeze': {
+        lines: [
+          'if width_curr <= BB_WIDTH_MIN:',
+          'signals.append(f"🤏 BB squeeze (width={width_curr:.4f})")'
+        ]
+      },
+      'expansion': {
+        lines: [
+          'expansion_abs = width_curr - width_prev',
+          'expansion_pct = (expansion_abs / width_prev) if width_prev > 0 else 0',
+          'expansion_ok = (expansion_abs >= BB_EXPANSION_MIN) or (expansion_pct >= BB_EXPANSION_PCT)',
+          'vol_mean = df["volume"].iloc[-21:-1].mean()',
+          'vol_curr = df["volume"].iloc[-1]',
+          'vol_spike = vol_mean > 0 and vol_curr > vol_mean * VOLUME_MULT',
+          'price_up = df["close"].iloc[-1] > df["open"].iloc[-1]',
+          'if expansion_ok and vol_spike and price_up:'
+        ],
+        blocks: [
+          { start: 'signals.append(f"🚀 BB expansion', end: '")' }
+        ]
+      },
+      'rsi': {
+        lines: [
+          'rsi_val = ta.momentum.RSIIndicator(df["close"], window=14).rsi().iloc[-1]',
+          'if rsi_val <= RSI_OVERSOLD:',
+          'signals.append(f"📉 RSI={rsi_val:.1f} (sobreventa)")',
+          'elif rsi_val >= RSI_OVERBOUGHT:',
+          'signals.append(f"📈 RSI={rsi_val:.1f} (sobrecompra)")'
+        ]
+      },
+      'macd': {
+        lines: [
+          'macd_ind = ta.trend.MACD(df["close"], window_slow=26, window_fast=12, window_sign=9)',
+          'macd_line = macd_ind.macd()',
+          'sig_line  = macd_ind.macd_signal()',
+          'if macd_line.iloc[-2] < sig_line.iloc[-2] and macd_line.iloc[-1] > sig_line.iloc[-1]:',
+          'signals.append("⚡ MACD bullish crossover")',
+          'elif macd_line.iloc[-2] > sig_line.iloc[-2] and macd_line.iloc[-1] < sig_line.iloc[-1]:',
+          'signals.append("⚡ MACD bearish crossover")'
+        ]
+      },
+      'ema': {
+        lines: [
+          'ema9  = ta.trend.EMAIndicator(df["close"], window=9).ema_indicator()',
+          'ema21 = ta.trend.EMAIndicator(df["close"], window=21).ema_indicator()',
+          'if ema9.iloc[-2] < ema21.iloc[-2] and ema9.iloc[-1] > ema21.iloc[-1]:',
+          'signals.append("🔀 EMA 9/21 bullish crossover")',
+          'elif ema9.iloc[-2] > ema21.iloc[-2] and ema9.iloc[-1] < ema21.iloc[-1]:',
+          'signals.append("🔀 EMA 9/21 bearish crossover")'
+        ]
+      },
+      'bb-breakout': {
+        lines: [
+          'if price > hband:',
+          'signals.append("🔥 BB upper breakout")',
+          'elif price < lband:',
+          'signals.append("🔥 BB lower breakout")'
+        ]
+      },
+      'vol': {
+        lines: [
+          'if vol_mean > 0 and vol_curr > vol_mean * VOLUME_MULT:',
+          'signals.append(f"📦 VOL x{(vol_curr/vol_mean):.2f}")'
+        ]
+      }
     };
 
-    Object.entries(patterns).forEach(([key, rxList]) => {
+    Object.entries(specs).forEach(([key, spec]) => {
       const active = document.getElementById('en-' + key).checked;
-      rxList.forEach(rx => {
-        c = c.replace(rx, (_, indent, hash, code) => {
-          if (active) return `${indent}${code}`;         // remove comment
-          return `${indent}# ${code}`;                   // add comment
-        });
-      });
+      c = applyIndicatorState(c, active, spec);
     });
 
-    const encoded = btoa(unescape(encodeURIComponent(c)));
+    const encoded = encodeBase64Utf8(c);
     const res = await fetch(`https://api.github.com/repos/${repo()}/contents/screener.py`, {
       method: 'PUT',
       headers: headers(),
@@ -879,7 +968,11 @@ async function saveConfig() {
       })
     });
 
-    if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+    if (!res.ok) {
+      const e = await res.json();
+      throw new Error(e.message || `${res.status} ${res.statusText}`);
+    }
+
     const data = await res.json();
     _sha = data.content.sha;
     _original = c;
