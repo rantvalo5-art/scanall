@@ -25,7 +25,7 @@ MAX_WORKERS  = 20
 BB_WIDTH_MIN        = 0.1
 
 # ── BB Width Expansion + Volume + Price (combo) ──────────────────────────────
-BB_EXPANSION_MIN    = 0.1
+BB_EXPANSION_MIN    = 0.095
 BB_EXPANSION_PCT    = 0.03
 VOLUME_MULT         = 2.0
 # (price up se detecta automáticamente: close > open en la vela actual)
@@ -89,17 +89,17 @@ def analyze(symbol):
     # macd_line = macd_ind.macd()
     # sig_line  = macd_ind.macd_signal()
     # if macd_line.iloc[-2] < sig_line.iloc[-2] and macd_line.iloc[-1] > sig_line.iloc[-1]:
-    #     signals.append("⚡ MACD crossover alcista")
+    # signals.append("⚡ MACD crossover alcista")
     # elif macd_line.iloc[-2] > sig_line.iloc[-2] and macd_line.iloc[-1] < sig_line.iloc[-1]:
-    #     signals.append("⚡ MACD crossover bajista")
+    # signals.append("⚡ MACD crossover bajista")
 
     # ── EMA 9/21 crossover ────────────────────────────────────────────────────
     # ema9  = ta.trend.EMAIndicator(close, window=9).ema_indicator()
     # ema21 = ta.trend.EMAIndicator(close, window=21).ema_indicator()
     # if ema9.iloc[-2] < ema21.iloc[-2] and ema9.iloc[-1] > ema21.iloc[-1]:
-    #     signals.append("🔀 EMA9 cruzó arriba EMA21 (alcista)")
+    # signals.append("🔀 EMA9 cruzó arriba EMA21 (alcista)")
     # elif ema9.iloc[-2] > ema21.iloc[-2] and ema9.iloc[-1] < ema21.iloc[-1]:
-    #     signals.append("🔀 EMA9 cruzó abajo EMA21 (bajista)")
+    # signals.append("🔀 EMA9 cruzó abajo EMA21 (bajista)")
 
     # ── Bollinger Bands ───────────────────────────────────────────────────────
     bb     = ta.volatility.BollingerBands(close, window=20, window_dev=2)
@@ -116,13 +116,13 @@ def analyze(symbol):
 
     # ── BB breakout ───────────────────────────────────────────────────────────
     # if price > hband.iloc[-1]:
-    #     signals.append(f"🔥 BB breakout arriba (close={price:.4f} > upper={hband.iloc[-1]:.4f})")
+    # signals.append(f"🔥 BB breakout arriba (close={price:.4f} > upper={hband.iloc[-1]:.4f})")
     # elif price < lband.iloc[-1]:
-    #     signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")
+    # signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")
 
     # ── BB squeeze ✅ ACTIVO ──────────────────────────────────────────────────
     # if width_curr <= BB_WIDTH_MIN:
-       # signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
+       signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
 
     # ── BB Width Expansion + Volume Spike + Price Up (combo) ✅ ACTIVO ───────
     width_delta    = width_curr - width_prev
@@ -143,7 +143,7 @@ def analyze(symbol):
 
     # ── Volumen spike standalone ──────────────────────────────────────────────
     # if vol_mean > 0 and vol_curr > vol_mean * VOLUME_MULT:
-    #     signals.append(f"🚀 Volumen spike {vol_curr/vol_mean:.1f}x promedio")
+    # signals.append(f"🚀 Volumen spike {vol_curr/vol_mean:.1f}x promedio")
 
     return symbol, (signals if signals else None)
 
