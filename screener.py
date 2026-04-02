@@ -120,7 +120,7 @@ def analyze(symbol):
     # elif price < lband.iloc[-1]:
     # signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")
 
-    # ── BB squeeze ✅ ACTIVO ──────────────────────────────────────────────────
+    # ── BB squeeze ──────────────────────────────────────────────────
     # if width_curr <= BB_WIDTH_MIN:
     #   signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
 
