@@ -22,7 +22,7 @@ TOP_N        = 9999
 MAX_WORKERS  = 20
 
 # ── Filtro de liquidez ────────────────────────────────────────────────────────
-MIN_QUOTE_VOLUME = 
+MIN_QUOTE_VOLUME = 100_000
 
 # ── BB Squeeze ────────────────────────────────────────────────────────────────
 BB_WIDTH_MIN     = 0.02
