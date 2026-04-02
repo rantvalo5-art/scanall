@@ -686,12 +686,29 @@ select option { background: var(--surface2); }
       <div class="toggle-row">
         <div class="toggle-label">
           Activar volumen spike independiente
-          <small>Sin requerir BB expansion ni precio subiendo</small>
+          <small>Sin requerir BB expansion ni precio subiendo — usa los mismos niveles 🟢/🟡/🔴</small>
         </div>
         <label class="switch">
           <input type="checkbox" id="en-vol" onchange="onToggle('vol')">
           <span class="slider"></span>
         </label>
+      </div>
+      <div class="sub-fields hidden" id="sub-vol">
+        <div class="example" style="margin-bottom:12px;">
+          Usa los mismos umbrales <strong>VOL_NORMAL / VOL_FUERTE / VOL_EXTREMO</strong> definidos en BB Expansion.<br>
+          Dispara aunque el precio baje o las BB no se expandan.
+        </div>
+        <div class="field-group cols-3">
+          <div class="field">
+            <div class="field-desc" style="font-size:11px;color:var(--accent);">🟢 vol normal → VOL_NORMAL x</div>
+          </div>
+          <div class="field">
+            <div class="field-desc" style="font-size:11px;color:var(--yellow);">🟡 vol fuerte → VOL_FUERTE x</div>
+          </div>
+          <div class="field">
+            <div class="field-desc" style="font-size:11px;color:var(--orange);">🔴 vol extremo → VOL_EXTREMO x</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -817,8 +834,8 @@ function parseIntoUI(c) {
     'ema':         isLiveLine(/ema9\s*=\s*ta\.trend\.EMAIndicator\(close,\s*window=9\)/),
     'bb-breakout': isLiveLine(/if price > hband\.iloc\[-1\]:/) ||
                    isLiveLine(/elif price < lband\.iloc\[-1\]:/),
-    'vol':         isLiveLine(/if vol_mean > 0 and vol_curr > vol_mean \* VOLUME_MULT:/) &&
-                   isLiveLine(/signals\.append\(f["']🚀 Volumen spike/)
+    'vol':         isLiveLine(/if vol_ratio >= VOL_EXTREMO:/) &&
+                   isLiveLine(/signals\.append\(f["']🔴 vol extremo standalone/)
   };
 
   Object.entries(states).forEach(([key, active]) => {
@@ -962,8 +979,8 @@ async function saveConfig() {
       'vol': {
         blocks: [
           {
-            start: 'if vol_mean > 0 and vol_curr > vol_mean * VOLUME_MULT:',
-            end: 'signals.append(f"🚀 Volumen spike {vol_curr/vol_mean:.1f}x promedio")'
+            start: 'if vol_ratio >= VOL_EXTREMO:',
+            end: 'signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")'
           }
         ]
       }
