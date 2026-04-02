@@ -25,22 +25,33 @@ MAX_WORKERS  = 20
 MIN_QUOTE_VOLUME = 100_000   # USD en 24h
 
 # ── BB Squeeze ────────────────────────────────────────────────────────────────
-BB_WIDTH_MIN        = 0.1
+BB_WIDTH_MIN     = 0.1       # width <= este valor dispara alerta
 
-# ── BB Width Expansion + Volume + Price (combo) ──────────────────────────────
-BB_EXPANSION_MIN    = 0.095
-BB_EXPANSION_PCT    = 0.03
-BB_WIDTH_MAX        = 5.0    # filtra pares con width anómalo
-# (price up se detecta automáticamente: close > open en la vela actual)
+# ── BB Width Expansion + Volume + Price Up (combo) ───────────────────────────
+BB_EXPANSION_MIN = 0.095     # delta absoluto mínimo de width
+BB_EXPANSION_PCT = 0.03      # o delta % mínimo relativo al width anterior
+BB_WIDTH_MAX     = 5.0       # filtra pares con width anómalo (delisting)
+EXP_VOL_NORMAL   = 2.0       # 🟢 vol normal (combo)
+EXP_VOL_FUERTE   = 5.0       # 🟡 vol fuerte (combo)
+EXP_VOL_EXTREMO  = 10.0      # 🔴 vol extremo (combo)
 
-# ── Niveles de volumen ────────────────────────────────────────────────────────
-VOL_NORMAL  = 3
-VOL_FUERTE  = 5.0
-VOL_EXTREMO = 10.0
+# ── RSI ───────────────────────────────────────────────────────────────────────
+RSI_OVERSOLD     = 30
+RSI_OVERBOUGHT   = 70
 
-# ── Indicadores comentados ────────────────────────────────────────────────────
-# RSI_OVERSOLD   = 30
-# RSI_OVERBOUGHT = 70
+# ── MACD ─────────────────────────────────────────────────────────────────────
+MACD_FAST        = 12
+MACD_SLOW        = 26
+MACD_SIGNAL      = 9
+
+# ── EMA Crossover ─────────────────────────────────────────────────────────────
+EMA_FAST         = 9
+EMA_SLOW         = 21
+
+# ── Vol Spike standalone ──────────────────────────────────────────────────────
+VOL_NORMAL       = 2.0       # 🟢 vol normal (standalone)
+VOL_FUERTE       = 5.0       # 🟡 vol fuerte (standalone)
+VOL_EXTREMO      = 10.0      # 🔴 vol extremo (standalone)
 
 
 # ── Datos ─────────────────────────────────────────────────────────────────────
@@ -106,7 +117,7 @@ def analyze(symbol):
     #     signals.append(f"📈 RSI={rsi_val:.1f} (sobrecompra)")
 
     # ── MACD crossover ────────────────────────────────────────────────────────
-    # macd_ind  = ta.trend.MACD(close, window_slow=26, window_fast=12, window_sign=9)
+    # macd_ind  = ta.trend.MACD(close, window_slow=MACD_SLOW, window_fast=MACD_FAST, window_sign=MACD_SIGNAL)
     # macd_line = macd_ind.macd()
     # sig_line  = macd_ind.macd_signal()
     # if macd_line.iloc[-2] < sig_line.iloc[-2] and macd_line.iloc[-1] > sig_line.iloc[-1]:
@@ -114,13 +125,13 @@ def analyze(symbol):
     # elif macd_line.iloc[-2] > sig_line.iloc[-2] and macd_line.iloc[-1] < sig_line.iloc[-1]:
     #     signals.append("⚡ MACD crossover bajista")
 
-    # ── EMA 9/21 crossover ────────────────────────────────────────────────────
-    # ema9  = ta.trend.EMAIndicator(close, window=9).ema_indicator()
-    # ema21 = ta.trend.EMAIndicator(close, window=21).ema_indicator()
-    # if ema9.iloc[-2] < ema21.iloc[-2] and ema9.iloc[-1] > ema21.iloc[-1]:
-    #     signals.append("🔀 EMA9 cruzó arriba EMA21 (alcista)")
-    # elif ema9.iloc[-2] > ema21.iloc[-2] and ema9.iloc[-1] < ema21.iloc[-1]:
-    #     signals.append("🔀 EMA9 cruzó abajo EMA21 (bajista)")
+    # ── EMA crossover ─────────────────────────────────────────────────────────
+    # ema_fast = ta.trend.EMAIndicator(close, window=EMA_FAST).ema_indicator()
+    # ema_slow = ta.trend.EMAIndicator(close, window=EMA_SLOW).ema_indicator()
+    # if ema_fast.iloc[-2] < ema_slow.iloc[-2] and ema_fast.iloc[-1] > ema_slow.iloc[-1]:
+    #     signals.append(f"🔀 EMA{EMA_FAST} cruzó arriba EMA{EMA_SLOW} (alcista)")
+    # elif ema_fast.iloc[-2] > ema_slow.iloc[-2] and ema_fast.iloc[-1] < ema_slow.iloc[-1]:
+    #     signals.append(f"🔀 EMA{EMA_FAST} cruzó abajo EMA{EMA_SLOW} (bajista)")
 
     # ── Bollinger Bands ───────────────────────────────────────────────────────
     bb     = ta.volatility.BollingerBands(close, window=20, window_dev=2)
@@ -146,37 +157,36 @@ def analyze(symbol):
     #     signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
 
     # ── BB Width Expansion + Volume Spike + Price Up (combo) ✅ ACTIVO ───────
-    width_delta   = width_curr - width_prev
-    width_pct_chg = width_delta / width_prev if width_prev > 0 else 0
     vol_mean      = volume.iloc[-21:-1].mean()
     vol_curr      = volume.iloc[-1]
     vol_ratio     = vol_curr / vol_mean if vol_mean > 0 else 0
     price_up      = close.iloc[-1] > open_.iloc[-1]
-
+    width_delta   = width_curr - width_prev
+    width_pct_chg = width_delta / width_prev if width_prev > 0 else 0
     expansion_ok  = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT
 
-    # if vol_ratio >= VOL_EXTREMO:
-        # vol_label = "🔴 vol extremo"
-    # elif vol_ratio >= VOL_FUERTE:
-        # vol_label = "🟡 vol fuerte"
-    # elif vol_ratio >= VOL_NORMAL:
-        # vol_label = "🟢 vol normal"
-    # else:
-        # vol_label = None
-# 
-    # if expansion_ok and vol_label and price_up and width_curr < BB_WIDTH_MAX:
-        # signals.append(
-            # f"{vol_label} {vol_ratio:.1f}x | BB expansion "
-            # f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
-        # )
-# 
+    if vol_ratio >= EXP_VOL_EXTREMO:
+        exp_vol_label = "🔴 vol extremo"
+    elif vol_ratio >= EXP_VOL_FUERTE:
+        exp_vol_label = "🟡 vol fuerte"
+    elif vol_ratio >= EXP_VOL_NORMAL:
+        exp_vol_label = "🟢 vol normal"
+    else:
+        exp_vol_label = None
+
+    if expansion_ok and exp_vol_label and price_up and width_curr < BB_WIDTH_MAX:
+        signals.append(
+            f"{exp_vol_label} {vol_ratio:.1f}x | BB expansion "
+            f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
+        )
+
     # ── Vol Spike standalone (sin requerir BB expansion ni precio) ────────────
     # if vol_ratio >= VOL_EXTREMO:
-        # signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
+    #     signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
     # elif vol_ratio >= VOL_FUERTE:
-        # signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
+    #     signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
     # elif vol_ratio >= VOL_NORMAL:
-        # signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
+    #     signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
 
     return symbol, (signals if signals else None)
 
