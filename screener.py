@@ -186,12 +186,12 @@ def analyze(symbol):
         )
 
     # ── Vol Spike standalone (sin requerir BB expansion ni precio) ───────────
-                if vol_ratio >= VOL_EXTREMO:
-                                signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
-                elif vol_ratio >= VOL_FUERTE:
-                                signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
-                elif vol_ratio >= VOL_NORMAL:
-                                signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
+    if vol_ratio >= VOL_EXTREMO:
+                    signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
+    elif vol_ratio >= VOL_FUERTE:
+                    signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
+    elif vol_ratio >= VOL_NORMAL:
+                    signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
 
     return symbol, (signals if signals else None)
 
