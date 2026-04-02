@@ -80,7 +80,7 @@ def analyze(symbol):
     # ââ RSI ââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââââ
     # rsi_val = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]
     # if rsi_val <= RSI_OVERSOLD:
-    signals.append(f"ð RSI={rsi_val:.1f} (sobreventa)")
+    #signals.append(f"ð RSI={rsi_val:.1f} (sobreventa)")
     # elif rsi_val >= RSI_OVERBOUGHT:
     #     signals.append(f"ð RSI={rsi_val:.1f} (sobrecompra)")
 
