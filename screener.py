@@ -22,18 +22,18 @@ TOP_N        = 9999
 MAX_WORKERS  = 20
 
 # ── Filtro de liquidez ────────────────────────────────────────────────────────
-MIN_QUOTE_VOLUME = 100_000   # USD en 24h
+MIN_QUOTE_VOLUME = 
 
 # ── BB Squeeze ────────────────────────────────────────────────────────────────
-BB_WIDTH_MIN     = 0.1       # width <= este valor dispara alerta
+BB_WIDTH_MIN     = 0.6
 
 # ── BB Width Expansion + Volume + Price Up (combo) ───────────────────────────
-BB_EXPANSION_MIN = 0.095     # delta absoluto mínimo de width
-BB_EXPANSION_PCT = 0.03      # o delta % mínimo relativo al width anterior
-BB_WIDTH_MAX     = 5.0       # filtra pares con width anómalo (delisting)
-EXP_VOL_NORMAL   = 2.0       # 🟢 vol normal (combo)
-EXP_VOL_FUERTE   = 5.0       # 🟡 vol fuerte (combo)
-EXP_VOL_EXTREMO  = 10.0      # 🔴 vol extremo (combo)
+BB_EXPANSION_MIN = 0.095
+BB_EXPANSION_PCT = 0.03
+BB_WIDTH_MAX     = 5.0
+EXP_VOL_NORMAL   = 2.0
+EXP_VOL_FUERTE   = 5.0
+EXP_VOL_EXTREMO  = 10.0
 
 # ── RSI ───────────────────────────────────────────────────────────────────────
 RSI_OVERSOLD     = 30
@@ -49,9 +49,9 @@ EMA_FAST         = 9
 EMA_SLOW         = 21
 
 # ── Vol Spike standalone ──────────────────────────────────────────────────────
-VOL_NORMAL       = 2.0       # 🟢 vol normal (standalone)
-VOL_FUERTE       = 5.0       # 🟡 vol fuerte (standalone)
-VOL_EXTREMO      = 10.0      # 🔴 vol extremo (standalone)
+VOL_NORMAL       = 3
+VOL_FUERTE       = 5.0
+VOL_EXTREMO      = 10.0
 
 
 # ── Datos ─────────────────────────────────────────────────────────────────────
@@ -153,40 +153,40 @@ def analyze(symbol):
     #     signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")
 
     # ── BB squeeze ────────────────────────────────────────────────────────────
-    # if width_curr <= BB_WIDTH_MIN:
-    #     signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
+    if width_curr <= BB_WIDTH_MIN:
+        signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
 
     # ── BB Width Expansion + Volume Spike + Price Up (combo) ✅ ACTIVO ───────
-    vol_mean      = volume.iloc[-21:-1].mean()
-    vol_curr      = volume.iloc[-1]
-    vol_ratio     = vol_curr / vol_mean if vol_mean > 0 else 0
-    price_up      = close.iloc[-1] > open_.iloc[-1]
-    width_delta   = width_curr - width_prev
-    width_pct_chg = width_delta / width_prev if width_prev > 0 else 0
-    expansion_ok  = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT
+        vol_mean      = volume.iloc[-21:-1].mean()
+        vol_curr      = volume.iloc[-1]
+        vol_ratio     = vol_curr / vol_mean if vol_mean > 0 else 0
+        price_up      = close.iloc[-1] > open_.iloc[-1]
+        width_delta   = width_curr - width_prev
+        width_pct_chg = width_delta / width_prev if width_prev > 0 else 0
+        expansion_ok  = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT
 
-    if vol_ratio >= EXP_VOL_EXTREMO:
-        exp_vol_label = "🔴 vol extremo"
-    elif vol_ratio >= EXP_VOL_FUERTE:
-        exp_vol_label = "🟡 vol fuerte"
-    elif vol_ratio >= EXP_VOL_NORMAL:
-        exp_vol_label = "🟢 vol normal"
-    else:
-        exp_vol_label = None
+        if vol_ratio >= EXP_VOL_EXTREMO:
+                exp_vol_label = "🔴 vol extremo"
+        elif vol_ratio >= EXP_VOL_FUERTE:
+                exp_vol_label = "🟡 vol fuerte"
+        elif vol_ratio >= EXP_VOL_NORMAL:
+                exp_vol_label = "🟢 vol normal"
+        else:
+                exp_vol_label = None
 
-    if expansion_ok and exp_vol_label and price_up and width_curr < BB_WIDTH_MAX:
-        signals.append(
-            f"{exp_vol_label} {vol_ratio:.1f}x | BB expansion "
-            f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
+        if expansion_ok and exp_vol_label and price_up and width_curr < BB_WIDTH_MAX:
+                signals.append(
+                        f"{exp_vol_label} {vol_ratio:.1f}x | BB expansion "
+                        f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
         )
 
     # ── Vol Spike standalone (sin requerir BB expansion ni precio) ────────────
-    # if vol_ratio >= VOL_EXTREMO:
-    #     signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
-    # elif vol_ratio >= VOL_FUERTE:
-    #     signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
-    # elif vol_ratio >= VOL_NORMAL:
-    #     signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
+    if vol_ratio >= VOL_EXTREMO:
+        signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
+    elif vol_ratio >= VOL_FUERTE:
+        signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
+    elif vol_ratio >= VOL_NORMAL:
+        signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
 
     return symbol, (signals if signals else None)
 
