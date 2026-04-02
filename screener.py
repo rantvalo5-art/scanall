@@ -22,7 +22,7 @@ TOP_N        = 9999
 MAX_WORKERS  = 20
 
 # ── Filtro de liquidez ────────────────────────────────────────────────────────
-MIN_QUOTE_VOLUME = 100_000   # USD en 24h — excluye pares ilíquidos/delisting
+MIN_QUOTE_VOLUME = 100_000   # USD en 24h
 
 # ── BB Squeeze ────────────────────────────────────────────────────────────────
 BB_WIDTH_MIN        = 0.1
@@ -31,7 +31,7 @@ BB_WIDTH_MIN        = 0.1
 BB_EXPANSION_MIN    = 0.095
 BB_EXPANSION_PCT    = 0.03
 VOLUME_MULT         = 2.0
-BB_WIDTH_MAX        = 5.0    # filtra pares con width anómalo (delisting, colapso)
+BB_WIDTH_MAX        = 5.0    # filtra pares con width anómalo
 # (price up se detecta automáticamente: close > open en la vela actual)
 
 # ── Indicadores comentados ────────────────────────────────────────────────────
@@ -40,13 +40,25 @@ BB_WIDTH_MAX        = 5.0    # filtra pares con width anómalo (delisting, colap
 
 
 # ── Datos ─────────────────────────────────────────────────────────────────────
+def get_active_usdt_symbols():
+    """Devuelve el conjunto de símbolos USDT con status TRADING en Binance."""
+    r = requests.get("https://data-api.binance.vision/api/v3/exchangeInfo", timeout=20)
+    r.raise_for_status()
+    return {
+        s["symbol"]
+        for s in r.json()["symbols"]
+        if s["symbol"].endswith("USDT") and s["status"] == "TRADING"
+    }
+
+
 def get_all_usdt_pairs(n=TOP_N):
-    print(f"[DEBUG] Filtro activo: quoteVolume > {MIN_QUOTE_VOLUME:,}")
+    active_symbols = get_active_usdt_symbols()
+
     r = requests.get("https://data-api.binance.vision/api/v3/ticker/24hr", timeout=15)
     r.raise_for_status()
     pairs = [
         x for x in r.json()
-        if x["symbol"].endswith("USDT")
+        if x["symbol"] in active_symbols
         and x["symbol"].encode("ascii", errors="ignore").decode() == x["symbol"]
         and float(x["quoteVolume"]) > MIN_QUOTE_VOLUME
     ]
@@ -145,10 +157,6 @@ def analyze(symbol):
             f"     width {width_prev:.2%} → {width_curr:.2%} "
             f"(+{width_pct_chg:.0%}) | vol {vol_curr/vol_mean:.1f}x"
         )
-
-    #     signals.append(f"🚀 Volumen spike {vol_curr/vol_mean:.1f}x promedio")
-    # if vol_mean > 0 and vol_curr > vol_mean * VOLUME_MULT:
-    #     signals.append(f"🚀 Volumen spike {vol_curr/vol_mean:.1f}x promedio")
 
     return symbol, (signals if signals else None)
 
