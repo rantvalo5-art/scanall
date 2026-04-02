@@ -527,7 +527,7 @@ select option { background: var(--surface2); }
       <div class="combo-box">
         <strong>Combo de 3 condiciones simultáneas:</strong><br>
         1. BB width se expande rápido (delta absoluto <em>o</em> porcentual)<br>
-        2. Volumen actual supera el promedio X veces<br>
+        2. Volumen actual supera el umbral mínimo (🟢 normal / 🟡 fuerte / 🔴 extremo)<br>
         3. Vela alcista (close &gt; open)
       </div>
 
@@ -556,11 +556,21 @@ select option { background: var(--surface2); }
             <div class="field-desc">Si el width creció al menos X% relativo<br>Ej: de 0.10 → 0.13 (+30%) ✅</div>
           </div>
         </div>
-        <div class="field-group cols-1">
+        <div class="field-group cols-3">
           <div class="field">
-            <label>VOLUME_MULT <em>multiplicador de volumen</em></label>
-            <input type="number" id="VOLUME_MULT" value="2.0" step="0.1" min="1" max="20">
-            <div class="field-desc">Volumen de la vela actual > X × promedio últimas 20 velas</div>
+            <label>VOL_NORMAL <em>🟢 mínimo</em></label>
+            <input type="number" id="VOL_NORMAL" value="2.0" step="0.5" min="1" max="20">
+            <div class="field-desc">Spike normal (ej: 2x–5x)</div>
+          </div>
+          <div class="field">
+            <label>VOL_FUERTE <em>🟡 medio</em></label>
+            <input type="number" id="VOL_FUERTE" value="5.0" step="0.5" min="1" max="50">
+            <div class="field-desc">Spike fuerte (ej: 5x–10x)</div>
+          </div>
+          <div class="field">
+            <label>VOL_EXTREMO <em>🔴 alto</em></label>
+            <input type="number" id="VOL_EXTREMO" value="10.0" step="1" min="1" max="100">
+            <div class="field-desc">Spike extremo (ej: +10x)</div>
           </div>
         </div>
 
@@ -787,7 +797,8 @@ function parseIntoUI(c) {
   };
 
   ['INTERVAL','LIMIT','TOP_N','MAX_WORKERS',
-   'BB_WIDTH_MIN','BB_EXPANSION_MIN','BB_EXPANSION_PCT','VOLUME_MULT',
+   'BB_WIDTH_MIN','BB_EXPANSION_MIN','BB_EXPANSION_PCT',
+   'VOL_NORMAL','VOL_FUERTE','VOL_EXTREMO',
    'RSI_OVERSOLD','RSI_OVERBOUGHT'].forEach(k => {
     const el = document.getElementById(k);
     const v  = getVal(k);
@@ -800,7 +811,7 @@ function parseIntoUI(c) {
   const states = {
     'bb-squeeze':  isLiveLine(/if width_curr <= BB_WIDTH_MIN:/) &&
                    isLiveLine(/signals\.append\(f["']🤏 BB squeeze/),
-    'expansion':   isLiveLine(/if expansion_ok and vol_spike and price_up:/),
+    'expansion':   isLiveLine(/if expansion_ok and vol_label and price_up/),
     'rsi':         isLiveLine(/rsi_val\s*=\s*ta\.momentum\.RSIIndicator\(close,\s*window=14\)/),
     'macd':        isLiveLine(/macd_ind\s*=\s*ta\.trend\.MACD\(close,/),
     'ema':         isLiveLine(/ema9\s*=\s*ta\.trend\.EMAIndicator\(close,\s*window=9\)/),
@@ -888,7 +899,9 @@ async function saveConfig() {
       { k: 'BB_WIDTH_MIN',     v: document.getElementById('BB_WIDTH_MIN').value },
       { k: 'BB_EXPANSION_MIN', v: document.getElementById('BB_EXPANSION_MIN').value },
       { k: 'BB_EXPANSION_PCT', v: document.getElementById('BB_EXPANSION_PCT').value },
-      { k: 'VOLUME_MULT',      v: document.getElementById('VOLUME_MULT').value },
+      { k: 'VOL_NORMAL',       v: document.getElementById('VOL_NORMAL').value },
+      { k: 'VOL_FUERTE',       v: document.getElementById('VOL_FUERTE').value },
+      { k: 'VOL_EXTREMO',      v: document.getElementById('VOL_EXTREMO').value },
       { k: 'RSI_OVERSOLD',     v: document.getElementById('RSI_OVERSOLD').value },
       { k: 'RSI_OVERBOUGHT',   v: document.getElementById('RSI_OVERBOUGHT').value },
     ];
@@ -909,8 +922,8 @@ async function saveConfig() {
       'expansion': {
         blocks: [
           {
-            start: 'width_delta    = width_curr - width_prev',
-            end: 'f"(+{width_pct_chg:.0%}) | vol {vol_curr/vol_mean:.1f}x"'
+            start: 'width_delta   = width_curr - width_prev',
+            end: 'return symbol, (signals if signals else None)'
           }
         ]
       },
