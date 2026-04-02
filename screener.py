@@ -21,6 +21,9 @@ LIMIT        = 100
 TOP_N        = 9999
 MAX_WORKERS  = 20
 
+# ── Filtro de liquidez ────────────────────────────────────────────────────────
+MIN_QUOTE_VOLUME = 500_000   # USD en 24h — excluye pares ilíquidos/delisting
+
 # ── BB Squeeze ────────────────────────────────────────────────────────────────
 BB_WIDTH_MIN        = 0.1
 
@@ -28,6 +31,7 @@ BB_WIDTH_MIN        = 0.1
 BB_EXPANSION_MIN    = 0.095
 BB_EXPANSION_PCT    = 0.03
 VOLUME_MULT         = 2.0
+BB_WIDTH_MAX        = 5.0    # filtra pares con width anómalo (delisting, colapso)
 # (price up se detecta automáticamente: close > open en la vela actual)
 
 # ── Indicadores comentados ────────────────────────────────────────────────────
@@ -43,7 +47,7 @@ def get_all_usdt_pairs(n=TOP_N):
         x for x in r.json()
         if x["symbol"].endswith("USDT")
         and x["symbol"].encode("ascii", errors="ignore").decode() == x["symbol"]
-        and float(x["quoteVolume"]) > 0
+        and float(x["quoteVolume"]) > MIN_QUOTE_VOLUME
     ]
     pairs.sort(key=lambda x: float(x["quoteVolume"]), reverse=True)
     return [x["symbol"] for x in pairs[:n]]
@@ -134,7 +138,7 @@ def analyze(symbol):
 
     expansion_ok   = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT
 
-    if expansion_ok and vol_spike and price_up:
+    if expansion_ok and vol_spike and price_up and width_curr < BB_WIDTH_MAX:
         signals.append(
             f"🚀 BB expansion + vol + precio sube\n"
             f"     width {width_prev:.2%} → {width_curr:.2%} "
