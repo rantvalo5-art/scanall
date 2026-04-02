@@ -1,7 +1,7 @@
 """
 Binance Spot USDT Crypto Screener — TODOS los pares, paralelo
-Indicadores activos: BB squeeze (width <= 10%)
-Indicadores comentados: RSI, MACD, EMA crossover, BB breakout, Volumen spike
+Indicadores activos: BB squeeze, BB width expansion + volume spike + price up (combo)
+Indicadores comentados: RSI, MACD, EMA crossover, BB breakout, Volumen spike standalone
 Alertas via Telegram
 """
 
@@ -21,10 +21,18 @@ LIMIT        = 100     # Velas a traer por símbolo
 TOP_N        = 9999    # 9999 = todos los pares USDT
 MAX_WORKERS  = 20      # Requests en paralelo
 
+# ── BB Squeeze ────────────────────────────────────────────────────────────────
+BB_WIDTH_MIN        = 0.10   # Squeeze si width <= X
+
+# ── BB Width Expansion + Volume + Price (combo) ───────────────────────────────
+BB_EXPANSION_MIN    = 0.05   # Expansión mínima absoluta (ej: de 0.10 a 0.15 = delta 0.05)
+BB_EXPANSION_PCT    = 0.30   # O expansión relativa mínima (ej: +30% respecto a vela anterior)
+VOLUME_MULT         = 2.0    # Volumen actual > X veces el promedio de 20 velas
+# (price up se detecta automáticamente: close > open en la vela actual)
+
+# ── Indicadores comentados ────────────────────────────────────────────────────
 # RSI_OVERSOLD   = 30
 # RSI_OVERBOUGHT = 70
-BB_WIDTH_MIN   = 0.02   # Squeeze si width <= 10%
-# VOLUME_MULT    = 2.5
 
 
 # ── Datos ──────────────────────────────────────────────────────────────────────
@@ -66,7 +74,8 @@ def analyze(symbol):
 
     signals = []
     close  = df["close"]
-    # volume = df["volume"]
+    open_  = df["open"]
+    volume = df["volume"]
 
     # ── RSI ──────────────────────────────────────────────────────────────────
     # rsi_val = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]
@@ -93,26 +102,46 @@ def analyze(symbol):
     #     signals.append("🔀 EMA9 cruzó abajo EMA21 (bajista)")
 
     # ── Bollinger Bands ───────────────────────────────────────────────────────
-    bb    = ta.volatility.BollingerBands(close, window=20, window_dev=2)
-    upper = bb.bollinger_hband().iloc[-1]
-    lower = bb.bollinger_lband().iloc[-1]
-    mid   = bb.bollinger_mavg().iloc[-1]
-    # price = close.iloc[-1]
-    width = (upper - lower) / mid if mid != 0 else 0
+    bb     = ta.volatility.BollingerBands(close, window=20, window_dev=2)
+    hband  = bb.bollinger_hband()
+    lband  = bb.bollinger_lband()
+    mavg   = bb.bollinger_mavg()
+
+    mid_curr  = mavg.iloc[-1]
+    mid_prev  = mavg.iloc[-2]
+    price     = close.iloc[-1]
+
+    width_curr = (hband.iloc[-1] - lband.iloc[-1]) / mid_curr if mid_curr != 0 else 0
+    width_prev = (hband.iloc[-2] - lband.iloc[-2]) / mid_prev if mid_prev != 0 else 0
 
     # BB breakout
-    # if price > upper:
-    #     signals.append(f"🔥 BB breakout arriba (close={price:.4f} > upper={upper:.4f})")
-    # elif price < lower:
-    #     signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lower:.4f})")
+    # if price > hband.iloc[-1]:
+    #     signals.append(f"🔥 BB breakout arriba (close={price:.4f} > upper={hband.iloc[-1]:.4f})")
+    # elif price < lband.iloc[-1]:
+    #     signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")
 
     # BB squeeze ✅ ACTIVO
-    if width <= BB_WIDTH_MIN:
-        signals.append(f"🤏 BB squeeze (width={width:.2%}) — movimiento fuerte próximo")
+    if width_curr <= BB_WIDTH_MIN:
+        signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
 
-    # ── Volumen spike ─────────────────────────────────────────────────────────
-    # vol_mean = volume.iloc[-21:-1].mean()
-    # vol_curr = volume.iloc[-1]
+    # ── BB Width Expansion + Volume Spike + Price Up (combo) ✅ ACTIVO ────────
+    width_delta    = width_curr - width_prev
+    width_pct_chg  = width_delta / width_prev if width_prev > 0 else 0
+    vol_mean       = volume.iloc[-21:-1].mean()
+    vol_curr       = volume.iloc[-1]
+    vol_spike      = vol_mean > 0 and vol_curr > vol_mean * VOLUME_MULT
+    price_up       = close.iloc[-1] > open_.iloc[-1]
+
+    expansion_ok   = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT
+
+    if expansion_ok and vol_spike and price_up:
+        signals.append(
+            f"🚀 BB expansion + vol + precio sube\n"
+            f"     width {width_prev:.2%} → {width_curr:.2%} "
+            f"(+{width_pct_chg:.0%}) | vol {vol_curr/vol_mean:.1f}x"
+        )
+
+    # ── Volumen spike standalone ──────────────────────────────────────────────
     # if vol_mean > 0 and vol_curr > vol_mean * VOLUME_MULT:
     #     signals.append(f"🚀 Volumen spike {vol_curr/vol_mean:.1f}x promedio")
 
@@ -144,16 +173,14 @@ def main():
             if sigs:
                 print(f"  ✅ {symbol}: {sigs}")
 
-    # Orden por volumen (top primero)
     all_signals = [(sym, results[sym]) for sym in pairs if results.get(sym)]
-
     print(f"\nTotal señales: {len(all_signals)} / {len(pairs)} pares")
 
     if not all_signals:
         print("Sin señales en este scan.")
         return
 
-    header  = f"🤏 BB Squeeze | {now}\n{len(all_signals)} pares en squeeze ({INTERVAL})\n\n"
+    header  = f"📡 Screener | {now}\n{len(all_signals)} señales en {len(pairs)} pares ({INTERVAL})\n\n"
     current = header
 
     for symbol, sigs in all_signals:
@@ -167,7 +194,7 @@ def main():
     if current.strip():
         send_telegram(current)
 
-    print(f"✅ Mensajes enviados a Telegram.")
+    print("✅ Mensajes enviados a Telegram.")
 
 
 if __name__ == "__main__":
