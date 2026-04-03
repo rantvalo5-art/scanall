@@ -237,19 +237,36 @@ def main():
             if sigs:
                 print(f"  ✅ {symbol} [{interval}]: {sigs}")
 
-    # Enviar resultados agrupados por timeframe, de menor a mayor
-    total_signals = 0
+    # Contar señales totales por TF para el header
+    signals_by_tf = {}
     for tf in intervals_sorted:
-        tf_results = results[tf]
-        all_signals = [(sym, tf_results[sym]) for sym in pairs if tf_results.get(sym)]
-        total_signals += len(all_signals)
+        signals_by_tf[tf] = [(sym, results[tf][sym]) for sym in pairs if results[tf].get(sym)]
+
+    total_signals = sum(len(v) for v in signals_by_tf.values())
+
+    # ── Mensaje separador de inicio de run ───────────────────────────────────
+    bar = "━" * 24
+    tf_counts = "  ".join(f"{tf}: {len(signals_by_tf[tf])}" for tf in intervals_sorted)
+    run_header = (
+        f"{bar}\n"
+        f"🟣  NUEVO SCAN  \u2022  {now}\n"
+        f"     {tf_label}  \u2022  {len(pairs)} pares\n"
+        f"     {tf_counts}\n"
+        f"{bar}"
+    )
+    send_telegram(run_header)
+
+    # ── Enviar resultados agrupados por timeframe, de menor a mayor ──────────
+    for tf in intervals_sorted:
+        all_signals = signals_by_tf[tf]
 
         if not all_signals:
             print(f"Sin señales en {tf}.")
             continue
 
-        header  = f"📡 Screener [{tf}] | {now}\n{len(all_signals)} señales en {len(pairs)} pares\n\n"
-        current = header
+        # Header de sección por TF
+        tf_header = f"📊 [{tf}]  {len(all_signals)} señales\n{'─' * 20}\n\n"
+        current = tf_header
 
         for symbol, sigs in all_signals:
             block = f"▶ {symbol}\n" + "\n".join(f"  {s}" for s in sigs) + "\n\n"
