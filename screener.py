@@ -1,5 +1,5 @@
 """
-Binance Spot USDT Crypto Screener — TODOS los pares, paralelo
+Binance Spot USDT Crypto Screener — TODOS los pares, paralelo, MULTI-TIMEFRAME
 Indicadores activos: BB width expansion + volume spike + price up (combo)
 Indicadores comentados: RSI, MACD, EMA crossover, BB breakout, BB squeeze, Volumen spike standalone
 Alertas vía Telegram
@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 TELEGRAM_TOKEN   = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
-INTERVAL     = "1h"
+INTERVALS    = ["1h", "1m"]
 LIMIT        = 100
 TOP_N        = 9999
 MAX_WORKERS  = 20
@@ -38,6 +38,7 @@ EXP_VOL_EXTREMO  = 10.0
 # ── RSI ───────────────────────────────────────────────────────────────────────
 RSI_OVERSOLD     = 30
 RSI_OVERBOUGHT   = 70
+RSI_WINDOW       = 14
 
 # ── MACD ─────────────────────────────────────────────────────────────────────
 MACD_FAST        = 12
@@ -81,10 +82,10 @@ def get_all_usdt_pairs(n=TOP_N):
     return [x["symbol"] for x in pairs[:n]]
 
 
-def get_klines(symbol):
+def get_klines(symbol, interval):
     r = requests.get(
         "https://data-api.binance.vision/api/v3/klines",
-        params={"symbol": symbol, "interval": INTERVAL, "limit": LIMIT},
+        params={"symbol": symbol, "interval": interval, "limit": LIMIT},
         timeout=10
     )
     r.raise_for_status()
@@ -98,14 +99,14 @@ def get_klines(symbol):
 
 
 # ── Análisis ──────────────────────────────────────────────────────────────────
-def analyze(symbol):
+def analyze(symbol, interval):
     try:
-        df = get_klines(symbol)
+        df = get_klines(symbol, interval)
     except Exception:
-        return symbol, None
+        return symbol, interval, None
 
     if len(df) < 21:
-        return symbol, None
+        return symbol, interval, None
 
     signals = []
     close  = df["close"]
@@ -113,7 +114,7 @@ def analyze(symbol):
     volume = df["volume"]
 
     # ── RSI ───────────────────────────────────────────────────────────────────
-    # rsi_val = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]
+    # rsi_val = ta.momentum.RSIIndicator(close, window=RSI_WINDOW).rsi().iloc[-1]
     # if rsi_val <= RSI_OVERSOLD:
     #     signals.append(f"📉 RSI={rsi_val:.1f} (sobreventa)")
     # elif rsi_val >= RSI_OVERBOUGHT:
@@ -161,8 +162,8 @@ def analyze(symbol):
     #     signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")
 
     # ── BB squeeze ────────────────────────────────────────────────────────────
-    #     if width_curr <= BB_WIDTH_MIN:
-                    #                     signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
+    # if width_curr <= BB_WIDTH_MIN:
+    #     signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")
 
     # ── BB Width Expansion + Volume Spike + Price Up (combo) ✅ ACTIVO ───────
     price_up      = close.iloc[-1] > open_.iloc[-1]
@@ -186,14 +187,15 @@ def analyze(symbol):
         )
 
     # ── Vol Spike standalone (sin requerir BB expansion ni precio) ───────────
-        if vol_ratio >= VOL_EXTREMO:
-                                        signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
-        elif vol_ratio >= VOL_FUERTE:
-                                        signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
-        elif vol_ratio >= VOL_NORMAL:
-                                        signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
+    # if vol_ratio >= VOL_EXTREMO:
+    #     signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
+    # elif vol_ratio >= VOL_FUERTE:
+    #     signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
+    # elif vol_ratio >= VOL_NORMAL:
+    #     signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
 
-    return symbol, (signals if signals else None)
+    return symbol, interval, (signals if signals else None)
+
 
 # ── Telegram ──────────────────────────────────────────────────────────────────
 def send_telegram(text):
@@ -208,39 +210,49 @@ def send_telegram(text):
 def main():
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     pairs = get_all_usdt_pairs()
-    print(f"[{now}] Escaneando {len(pairs)} pares USDT ({INTERVAL}) con {MAX_WORKERS} workers...")
+    tf_label = " + ".join(INTERVALS)
+    print(f"[{now}] Escaneando {len(pairs)} pares USDT ({tf_label}) con {MAX_WORKERS} workers...")
 
-    results = {}
+    # Construir todas las tareas: (símbolo, timeframe)
+    tasks = [(sym, tf) for sym in pairs for tf in INTERVALS]
+
+    # Agrupar resultados por timeframe → símbolo
+    results = {tf: {} for tf in INTERVALS}
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        futures = {executor.submit(analyze, sym): sym for sym in pairs}
+        futures = {executor.submit(analyze, sym, tf): (sym, tf) for sym, tf in tasks}
         for future in as_completed(futures):
-            symbol, sigs = future.result()
-            results[symbol] = sigs
+            symbol, interval, sigs = future.result()
+            results[interval][symbol] = sigs
             if sigs:
-                print(f"  ✅ {symbol}: {sigs}")
+                print(f"  ✅ {symbol} [{interval}]: {sigs}")
 
-    all_signals = [(sym, results[sym]) for sym in pairs if results.get(sym)]
-    print(f"\nTotal señales: {len(all_signals)} / {len(pairs)} pares")
+    # Enviar resultados agrupados por timeframe
+    total_signals = 0
+    for tf in INTERVALS:
+        tf_results = results[tf]
+        all_signals = [(sym, tf_results[sym]) for sym in pairs if tf_results.get(sym)]
+        total_signals += len(all_signals)
 
-    if not all_signals:
-        print("Sin señales en este scan.")
-        return
+        if not all_signals:
+            print(f"Sin señales en {tf}.")
+            continue
 
-    header  = f"📡 Screener | {now}\n{len(all_signals)} señales en {len(pairs)} pares ({INTERVAL})\n\n"
-    current = header
+        header  = f"📡 Screener [{tf}] | {now}\n{len(all_signals)} señales en {len(pairs)} pares\n\n"
+        current = header
 
-    for symbol, sigs in all_signals:
-        block = f"▶ {symbol}\n" + "\n".join(f"  {s}" for s in sigs) + "\n\n"
-        if len(current) + len(block) > 4000:
+        for symbol, sigs in all_signals:
+            block = f"▶ {symbol}\n" + "\n".join(f"  {s}" for s in sigs) + "\n\n"
+            if len(current) + len(block) > 4000:
+                send_telegram(current)
+                current = block
+            else:
+                current += block
+
+        if current.strip():
             send_telegram(current)
-            current = block
-        else:
-            current += block
 
-    if current.strip():
-        send_telegram(current)
-
+    print(f"\nTotal señales: {total_signals} / {len(pairs)} pares × {len(INTERVALS)} timeframes")
     print("✅ Mensajes enviados a Telegram.")
 
 
