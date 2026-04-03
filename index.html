@@ -129,6 +129,62 @@ select option { background: var(--surface2); }
 #status.ok { color:var(--accent); }
 #status.err { color:var(--orange); }
 #status.loading { color:var(--blue); }
+
+/* ── Multi-timeframe selector ─────────────────────────────────── */
+.tf-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tf-chip {
+  position: relative;
+}
+.tf-chip input[type=checkbox] {
+  display: none;
+}
+.tf-chip label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--muted);
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+.tf-chip label:hover {
+  border-color: var(--text);
+  color: var(--text);
+}
+.tf-chip input:checked + label {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+.tf-chip input:checked + label::before {
+  content: '✓';
+  font-size: 10px;
+}
+.tf-preview {
+  margin-top: 12px;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 1px;
+}
+.tf-preview span { color: var(--accent); }
+.tf-warn {
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--yellow);
+  letter-spacing: 0.5px;
+}
+
 @media (max-width:700px) {
   .layout { grid-template-columns:1fr; }
   .sidebar { display:none; }
@@ -195,18 +251,47 @@ select option { background: var(--surface2); }
       <span class="pill pill-on">ACTIVO</span>
     </div>
     <div class="card-body">
-      <div class="field-group cols-3">
-        <div class="field">
-          <label>INTERVAL</label>
-          <select id="INTERVAL">
-            <option value="1m">1m</option>
-            <option value="5m">5m</option>
-            <option value="15m">15m</option>
-            <option value="1h" selected>1h</option>
-            <option value="4h">4h</option>
-            <option value="1d">1d</option>
-          </select>
+
+      <!-- MULTI-TIMEFRAME -->
+      <div class="field" style="margin-bottom:16px;">
+        <label>INTERVALS <em>seleccioná uno o más</em></label>
+        <div class="tf-grid" style="margin-top:8px;">
+          <div class="tf-chip">
+            <input type="checkbox" id="tf-1m" value="1m" onchange="updateTfPreview()">
+            <label for="tf-1m">1m</label>
+          </div>
+          <div class="tf-chip">
+            <input type="checkbox" id="tf-5m" value="5m" onchange="updateTfPreview()">
+            <label for="tf-5m">5m</label>
+          </div>
+          <div class="tf-chip">
+            <input type="checkbox" id="tf-15m" value="15m" onchange="updateTfPreview()">
+            <label for="tf-15m">15m</label>
+          </div>
+          <div class="tf-chip">
+            <input type="checkbox" id="tf-1h" value="1h" onchange="updateTfPreview()" checked>
+            <label for="tf-1h">1h</label>
+          </div>
+          <div class="tf-chip">
+            <input type="checkbox" id="tf-4h" value="4h" onchange="updateTfPreview()">
+            <label for="tf-4h">4h</label>
+          </div>
+          <div class="tf-chip">
+            <input type="checkbox" id="tf-1d" value="1d" onchange="updateTfPreview()">
+            <label for="tf-1d">1d</label>
+          </div>
         </div>
+        <div class="tf-preview" id="tf-preview">
+          → INTERVALS = <span id="tf-preview-val">["1h"]</span>
+        </div>
+        <div class="tf-warn" id="tf-warn" style="display:none">
+          ⚠ Múltiples TF multiplican las llamadas API — monitoreá los rate limits
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="field-group cols-3">
         <div class="field">
           <label>TOP_N <em>pares</em></label>
           <input type="number" id="TOP_N" value="9999" min="1" max="9999">
@@ -215,12 +300,12 @@ select option { background: var(--surface2); }
           <label>MAX_WORKERS</label>
           <input type="number" id="MAX_WORKERS" value="20" min="1" max="40">
         </div>
-      </div>
-      <div class="field-group">
         <div class="field">
-          <label>LIMIT <em>velas por símbolo</em></label>
+          <label>LIMIT <em>velas/símbolo</em></label>
           <input type="number" id="LIMIT" value="100" min="30" max="500">
         </div>
+      </div>
+      <div class="field-group cols-1">
         <div class="field">
           <label>MIN_QUOTE_VOLUME <em>USD 24h</em></label>
           <input type="number" id="MIN_QUOTE_VOLUME" value="100000" min="0" step="10000">
@@ -521,12 +606,34 @@ select option { background: var(--surface2); }
 </div>
 
 <script>
+const ALL_TF = ['1m','5m','15m','1h','4h','1d'];
+
 ['gh-token','gh-repo'].forEach(id => {
   const el = document.getElementById(id);
   const saved = localStorage.getItem(id);
   if (saved) el.value = saved;
   el.addEventListener('input', () => localStorage.setItem(id, el.value));
 });
+
+function getSelectedTf() {
+  return ALL_TF.filter(tf => document.getElementById('tf-' + tf).checked);
+}
+
+function updateTfPreview() {
+  const selected = getSelectedTf();
+  const previewEl = document.getElementById('tf-preview-val');
+  const warnEl    = document.getElementById('tf-warn');
+  if (selected.length === 0) {
+    previewEl.textContent = '[] ← seleccioná al menos uno';
+    previewEl.style.color = 'var(--orange)';
+  } else {
+    previewEl.textContent = JSON.stringify(selected);
+    previewEl.style.color = 'var(--accent)';
+  }
+  warnEl.style.display = selected.length > 1 ? 'block' : 'none';
+}
+
+updateTfPreview();
 
 function toggleCard(header) {
   header.nextElementSibling.classList.toggle('hidden');
@@ -597,13 +704,25 @@ async function loadConfig() {
 }
 
 function parseIntoUI(c) {
+  // Parse INTERVALS list e.g. INTERVALS = ["1h", "1m"]  or  ["1h"]
+  const mIntervals = c.match(/^INTERVALS\s*=\s*\[([^\]]*)\]/m);
+  if (mIntervals) {
+    const parsed = mIntervals[1].match(/["']([^"']+)["']/g) || [];
+    const tfs    = parsed.map(x => x.replace(/["']/g,''));
+    ALL_TF.forEach(tf => {
+      const el = document.getElementById('tf-' + tf);
+      if (el) el.checked = tfs.includes(tf);
+    });
+    updateTfPreview();
+  }
+
   const getVal = key => {
     const m = c.match(new RegExp(`^${key}\\s*=\\s*([^\\s#\\n]+)`, 'm'));
     return m ? m[1].replace(/['"]/g,'') : null;
   };
 
   const fields = [
-    'INTERVAL','LIMIT','TOP_N','MAX_WORKERS','MIN_QUOTE_VOLUME',
+    'LIMIT','TOP_N','MAX_WORKERS','MIN_QUOTE_VOLUME',
     'BB_WIDTH_MIN',
     'BB_EXPANSION_MIN','BB_EXPANSION_PCT','BB_WIDTH_MAX',
     'EXP_VOL_NORMAL','EXP_VOL_FUERTE','EXP_VOL_EXTREMO',
@@ -657,12 +776,19 @@ function setCommentState(src, startNeedle, endNeedle, active) {
 
 async function saveConfig() {
   if (!_sha) { setStatus('Cargá la config primero', 'err'); return; }
+  const selected = getSelectedTf();
+  if (selected.length === 0) { setStatus('Seleccioná al menos un timeframe', 'err'); return; }
+
   const btn = document.getElementById('save-btn');
   btn.disabled = true;
   setStatus('Guardando...', 'loading');
 
   try {
     let c = _original;
+
+    // Reemplazar INTERVALS (lista multi-TF)
+    const tfList = selected.map(tf => `"${tf}"`).join(', ');
+    c = c.replace(/^(INTERVALS\s*=\s*)\[.*?\]/m, `$1[${tfList}]`);
 
     const numericFields = [
       'LIMIT','TOP_N','MAX_WORKERS','MIN_QUOTE_VOLUME',
@@ -680,9 +806,6 @@ async function saveConfig() {
       if (el) c = c.replace(new RegExp(`(^${k}\\s*=\\s*).*`, 'm'), `$1${el.value}`);
     });
 
-    const iv = document.getElementById('INTERVAL').value;
-    c = c.replace(/^(INTERVAL\s*=\s*).*$/m, `$1"${iv}"`);
-
     const specs = {
       'bb-squeeze': {
         start: 'if width_curr <= BB_WIDTH_MIN:',
@@ -693,7 +816,7 @@ async function saveConfig() {
         end:   'f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"'
       },
       'rsi': {
-        start: 'rsi_val = ta.momentum.RSIIndicator(close, window=14).rsi().iloc[-1]',
+        start: 'rsi_val = ta.momentum.RSIIndicator(close, window=RSI_WINDOW).rsi().iloc[-1]',
         end:   'signals.append(f"📈 RSI={rsi_val:.1f} (sobrecompra)")'
       },
       'macd': {
@@ -723,7 +846,7 @@ async function saveConfig() {
       method: 'PUT',
       headers: headers(),
       body: JSON.stringify({
-        message: 'config: update screener via control panel',
+        message: `config: intervals=[${selected.join(',')}] via control panel`,
         content: encodeBase64Utf8(c),
         sha: _sha
       })
@@ -737,7 +860,7 @@ async function saveConfig() {
     const data = await res.json();
     _sha = data.content.sha;
     _original = c;
-    setStatus('✓ Guardado correctamente en GitHub', 'ok');
+    setStatus(`✓ Guardado — TFs activos: ${selected.join(', ')}`, 'ok');
   } catch(e) {
     setStatus('✗ Error: ' + e.message, 'err');
   } finally {
