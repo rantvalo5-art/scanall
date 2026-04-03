@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 TELEGRAM_TOKEN   = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
-INTERVALS    = ["1h", "1m"]
+INTERVALS    = ["1m", "1h"]
 LIMIT        = 100
 TOP_N        = 9999
 MAX_WORKERS  = 20
@@ -187,12 +187,12 @@ def analyze(symbol, interval):
         )
 
     # ── Vol Spike standalone (sin requerir BB expansion ni precio) ───────────
-    # if vol_ratio >= VOL_EXTREMO:
-    #     signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
-    # elif vol_ratio >= VOL_FUERTE:
-    #     signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
-    # elif vol_ratio >= VOL_NORMAL:
-    #     signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
+    if vol_ratio >= VOL_EXTREMO:
+        signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
+    elif vol_ratio >= VOL_FUERTE:
+        signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
+    elif vol_ratio >= VOL_NORMAL:
+        signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
 
     return symbol, interval, (signals if signals else None)
 
