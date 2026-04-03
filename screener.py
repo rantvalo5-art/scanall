@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 TELEGRAM_TOKEN   = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
-INTERVALS    = ["1m", "1h"]
+INTERVALS    = ["1h", "1m"]
 LIMIT        = 100
 TOP_N        = 9999
 MAX_WORKERS  = 20
@@ -187,12 +187,12 @@ def analyze(symbol, interval):
         )
 
     # ── Vol Spike standalone (sin requerir BB expansion ni precio) ───────────
-    if vol_ratio >= VOL_EXTREMO:
-        signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
-    elif vol_ratio >= VOL_FUERTE:
-        signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
-    elif vol_ratio >= VOL_NORMAL:
-        signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
+    # if vol_ratio >= VOL_EXTREMO:
+    #     signals.append(f"🔴 vol extremo standalone {vol_ratio:.1f}x promedio")
+    # elif vol_ratio >= VOL_FUERTE:
+    #     signals.append(f"🟡 vol fuerte standalone {vol_ratio:.1f}x promedio")
+    # elif vol_ratio >= VOL_NORMAL:
+    #     signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")
 
     return symbol, interval, (signals if signals else None)
 
@@ -206,18 +206,28 @@ def send_telegram(text):
     ).raise_for_status()
 
 
+# ── Ordenar timeframes de menor a mayor (siempre) ────────────────────────────
+_TF_ORDER = {"1m": 0, "3m": 1, "5m": 2, "15m": 3, "30m": 4, "1h": 5, "2h": 6, "4h": 7, "6h": 8, "8h": 9, "12h": 10, "1d": 11, "3d": 12, "1w": 13}
+
+def sort_intervals(intervals):
+    return sorted(intervals, key=lambda tf: _TF_ORDER.get(tf, 99))
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     pairs = get_all_usdt_pairs()
-    tf_label = " + ".join(INTERVALS)
+
+    # Ordenar siempre de menor a mayor timeframe
+    intervals_sorted = sort_intervals(INTERVALS)
+    tf_label = " + ".join(intervals_sorted)
     print(f"[{now}] Escaneando {len(pairs)} pares USDT ({tf_label}) con {MAX_WORKERS} workers...")
 
     # Construir todas las tareas: (símbolo, timeframe)
-    tasks = [(sym, tf) for sym in pairs for tf in INTERVALS]
+    tasks = [(sym, tf) for sym in pairs for tf in intervals_sorted]
 
     # Agrupar resultados por timeframe → símbolo
-    results = {tf: {} for tf in INTERVALS}
+    results = {tf: {} for tf in intervals_sorted}
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {executor.submit(analyze, sym, tf): (sym, tf) for sym, tf in tasks}
@@ -227,9 +237,9 @@ def main():
             if sigs:
                 print(f"  ✅ {symbol} [{interval}]: {sigs}")
 
-    # Enviar resultados agrupados por timeframe
+    # Enviar resultados agrupados por timeframe, de menor a mayor
     total_signals = 0
-    for tf in INTERVALS:
+    for tf in intervals_sorted:
         tf_results = results[tf]
         all_signals = [(sym, tf_results[sym]) for sym in pairs if tf_results.get(sym)]
         total_signals += len(all_signals)
@@ -252,7 +262,7 @@ def main():
         if current.strip():
             send_telegram(current)
 
-    print(f"\nTotal señales: {total_signals} / {len(pairs)} pares × {len(INTERVALS)} timeframes")
+    print(f"\nTotal señales: {total_signals} / {len(pairs)} pares × {len(intervals_sorted)} timeframes ({tf_label})")
     print("✅ Mensajes enviados a Telegram.")
 
 
