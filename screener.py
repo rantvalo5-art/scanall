@@ -16,13 +16,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 TELEGRAM_TOKEN   = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
-INTERVALS    = ["1h", "1m"]
+INTERVALS    = ["1m", "1h"]
 LIMIT        = 100
 TOP_N        = 9999
 MAX_WORKERS  = 20
 
 # ── Filtro de liquidez ────────────────────────────────────────────────────────
-MIN_QUOTE_VOLUME = 100000
+MIN_QUOTE_VOLUME = 10000000
 
 # ── BB Squeeze ────────────────────────────────────────────────────────────────
 BB_WIDTH_MIN     = 0.02
