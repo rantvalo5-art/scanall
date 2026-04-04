@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 TELEGRAM_TOKEN   = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
-INTERVALS    = ["1h", "1m"]
+INTERVALS    = ["1m", "1h"]
 LIMIT        = 100
 TOP_N        = 9999
 MAX_WORKERS  = 20
@@ -31,8 +31,8 @@ BB_WIDTH_MIN     = 0.02
 BB_EXPANSION_MIN = 0.095
 BB_EXPANSION_PCT = 0.03
 BB_WIDTH_MAX     = 5.0
-EXP_VOL_NORMAL   = 2.0
-EXP_VOL_FUERTE   = 5.0
+EXP_VOL_NORMAL   = 10
+EXP_VOL_FUERTE   = 10
 EXP_VOL_EXTREMO  = 10.0
 
 # ── RSI ───────────────────────────────────────────────────────────────────────
