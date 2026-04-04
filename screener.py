@@ -16,7 +16,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 TELEGRAM_TOKEN   = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 
-INTERVALS    = ["1m", "1h"]
+INTERVALS    = ["1h", "1m"]
 LIMIT        = 100
 TOP_N        = 9999
 MAX_WORKERS  = 20
@@ -201,9 +201,16 @@ def analyze(symbol, interval):
 def send_telegram(text):
     requests.post(
         f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-        json={"chat_id": TELEGRAM_CHAT_ID, "text": text},
+        json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"},
         timeout=10
     ).raise_for_status()
+
+
+def binance_link(symbol):
+    """Convierte DASHUSDT → enlace Markdown a Binance spot."""
+    pair = symbol[:-4] + "_USDT"  # DASHUSDT → DASH_USDT
+    url  = f"https://www.binance.com/en/trade/{pair}?type=spot"
+    return f"[🔗]({url})"
 
 
 # ── Ordenar timeframes de menor a mayor (siempre) ────────────────────────────
@@ -276,7 +283,7 @@ def main():
         current = tf_header
 
         for symbol, sigs in all_signals:
-            block = f"▶ {symbol}\n" + "\n".join(f"  {s}" for s in sigs) + "\n\n"
+            block = f"▶ {symbol} {binance_link(symbol)}\n" + "\n".join(f"  {s}" for s in sigs) + "\n\n"
             if len(current) + len(block) > 4000:
                 send_telegram(current)
                 current = block
