@@ -50,16 +50,20 @@ def fetch_history():
         return {}
 
 def insert_history(signals_by_tf):
-    """Inserta una fila por cada señal disparada en este run."""
-    now = datetime.now(timezone.utc).isoformat()
+    """Inserta una fila por cada señal disparada en este run y limpia registros viejos."""
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    since = (now - timedelta(hours=HISTORY_HOURS)).isoformat()
+
     rows = [
-        {"symbol": sym, "timeframe": tf, "alerted_at": now}
+        {"symbol": sym, "timeframe": tf, "alerted_at": now_iso}
         for tf, sigs in signals_by_tf.items()
         for sym, _ in sigs
     ]
     if not rows:
         return
     try:
+        # Insertar nuevas señales
         r = requests.post(
             f"{SUPABASE_URL}/rest/v1/screener_history",
             headers=_sb_headers(),
@@ -68,6 +72,16 @@ def insert_history(signals_by_tf):
         )
         r.raise_for_status()
         print(f"✓ Supabase: {len(rows)} filas insertadas")
+
+        # Limpiar registros fuera de la ventana de 8h
+        r2 = requests.delete(
+            f"{SUPABASE_URL}/rest/v1/screener_history",
+            headers=_sb_headers(),
+            params={"alerted_at": f"lt.{since}"},
+            timeout=10
+        )
+        r2.raise_for_status()
+        print("✓ Supabase: registros viejos eliminados")
     except Exception as e:
         print(f"⚠ Supabase insert_history error: {e}")
 
