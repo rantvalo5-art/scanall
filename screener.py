@@ -9,12 +9,67 @@ import os
 import requests
 import pandas as pd
 import ta
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # ── Configuración ──────────────────────────────────────────────────────────────
 TELEGRAM_TOKEN   = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+
+# ── Supabase ──────────────────────────────────────────────────────────────────
+SUPABASE_URL  = "https://ecgdswroygkfckkaguxp.supabase.co"
+SUPABASE_KEY  = os.environ["SUPABASE_KEY"]
+HISTORY_HOURS = 8
+
+def _sb_headers():
+    return {
+        "apikey":        SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type":  "application/json",
+        "Prefer":        "return=minimal",
+    }
+
+def fetch_history():
+    """Devuelve dict {(symbol, timeframe): count} de las últimas HISTORY_HOURS."""
+    since = (datetime.now(timezone.utc) - timedelta(hours=HISTORY_HOURS)).isoformat()
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/screener_history",
+            headers={**_sb_headers(), "Prefer": ""},
+            params={"select": "symbol,timeframe", "alerted_at": f"gte.{since}"},
+            timeout=10
+        )
+        r.raise_for_status()
+        counts = {}
+        for row in r.json():
+            key = (row["symbol"], row["timeframe"])
+            counts[key] = counts.get(key, 0) + 1
+        return counts
+    except Exception as e:
+        print(f"⚠ Supabase fetch_history error: {e}")
+        return {}
+
+def insert_history(signals_by_tf):
+    """Inserta una fila por cada señal disparada en este run."""
+    now = datetime.now(timezone.utc).isoformat()
+    rows = [
+        {"symbol": sym, "timeframe": tf, "alerted_at": now}
+        for tf, sigs in signals_by_tf.items()
+        for sym, _ in sigs
+    ]
+    if not rows:
+        return
+    try:
+        r = requests.post(
+            f"{SUPABASE_URL}/rest/v1/screener_history",
+            headers=_sb_headers(),
+            json=rows,
+            timeout=10
+        )
+        r.raise_for_status()
+        print(f"✓ Supabase: {len(rows)} filas insertadas")
+    except Exception as e:
+        print(f"⚠ Supabase insert_history error: {e}")
 
 INTERVALS    = ["1m", "15m", "1h"]
 LIMIT        = 100
@@ -222,13 +277,16 @@ def sort_intervals(intervals):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
-    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     pairs = get_all_usdt_pairs()
 
     # Ordenar siempre de menor a mayor timeframe
     intervals_sorted = sort_intervals(INTERVALS)
     tf_label = " + ".join(intervals_sorted)
     print(f"[{now}] Escaneando {len(pairs)} pares USDT ({tf_label}) con {MAX_WORKERS} workers...")
+
+    # Historial últimas 8h (antes de escanear)
+    history = fetch_history()
 
     # Construir todas las tareas: (símbolo, timeframe)
     tasks = [(sym, tf) for sym in pairs for tf in intervals_sorted]
@@ -248,7 +306,6 @@ def main():
     signals_by_tf = {}
     for tf in intervals_sorted:
         raw = [(sym, results[tf][sym]) for sym in pairs if results[tf].get(sym) and results[tf][sym][0]]
-        # Ordenar de mayor a menor vol_ratio
         raw.sort(key=lambda x: x[1][1], reverse=True)
         signals_by_tf[tf] = [(sym, sigs) for sym, (sigs, _) in raw]
 
@@ -257,6 +314,9 @@ def main():
     if total_signals == 0:
         print("Sin señales en este scan. No se envía nada a Telegram.")
         return
+
+    # Insertar historial en Supabase
+    insert_history(signals_by_tf)
 
     # ── Mensaje separador de inicio de run ───────────────────────────────────
     bar = "━" * 24
@@ -278,12 +338,14 @@ def main():
             print(f"Sin señales en {tf}.")
             continue
 
-        # Header de sección por TF
         tf_header = f"📊 [{tf}]  {len(all_signals)} señales\n{'─' * 20}\n\n"
         current = tf_header
 
         for symbol, sigs in all_signals:
-            block = f"▶ {symbol} {binance_link(symbol)}\n" + "\n".join(f"  {s}" for s in sigs) + "\n\n"
+            # Conteo histórico: cuántas veces alertó en las últimas 8h
+            prev = history.get((symbol, tf), 0)
+            hist_tag = f"  _(+{prev} en 8h)_" if prev > 0 else ""
+            block = f"▶ {symbol} {binance_link(symbol)}{hist_tag}\n" + "\n".join(f"  {s}" for s in sigs) + "\n\n"
             if len(current) + len(block) > 4000:
                 send_telegram(current)
                 current = block
