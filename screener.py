@@ -1,12 +1,10 @@
 """
 Binance Spot USDT Crypto Screener — TODOS los pares, paralelo, MULTI-TIMEFRAME
-Indicadores activos:
-- BB squeeze filtrado (EARLY)
-- BB width expansion + volume spike (EARLY)
-- BB width expansion + volume spike + price up (CONFIRMED)
-- Volumen spike standalone (EARLY)
-Etiquetas: EARLY / CONFIRMED / LATE
-Alertas vía Telegram + resumen final
+Lógica principal:
+- 1m = radar temprano (EARLY)
+- 5m = confirmación (CONFIRMED)
+- 15m = filtro de tendencia
+- LATE = símbolo/timeframe que ya alertó en la ventana histórica
 """
 
 import os
@@ -24,6 +22,8 @@ TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 SUPABASE_URL  = "https://ecgdswroygkfckkaguxp.supabase.co"
 SUPABASE_KEY  = os.environ["SUPABASE_KEY"]
 HISTORY_HOURS = 8
+LATE_REPEAT_COUNT = 1  # si ya hubo >=1 alerta en 8h, etiquetar como LATE
+
 
 def _sb_headers():
     return {
@@ -32,6 +32,7 @@ def _sb_headers():
         "Content-Type":  "application/json",
         "Prefer":        "return=minimal",
     }
+
 
 def fetch_history():
     """Devuelve dict {(symbol, timeframe): count} de las últimas HISTORY_HOURS."""
@@ -53,20 +54,19 @@ def fetch_history():
         print(f"⚠ Supabase fetch_history error: {e}")
         return {}
 
-def insert_history(signals_by_tf):
-    """Inserta una fila por cada alerta disparada en este run y limpia registros viejos."""
+
+def insert_history(alert_rows):
+    """Inserta historial real de alertas enviadas y limpia registros viejos."""
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
     since = (now - timedelta(hours=HISTORY_HOURS)).isoformat()
 
     rows = [
-        {"symbol": item["symbol"], "timeframe": tf, "alerted_at": now_iso}
-        for tf, items in signals_by_tf.items()
-        for item in items
+        {"symbol": row["symbol"], "timeframe": row["timeframe"], "alerted_at": now_iso}
+        for row in alert_rows
     ]
     if not rows:
         return
-
     try:
         r = requests.post(
             f"{SUPABASE_URL}/rest/v1/screener_history",
@@ -88,7 +88,7 @@ def insert_history(signals_by_tf):
     except Exception as e:
         print(f"⚠ Supabase insert_history error: {e}")
 
-# ── Timeframes ────────────────────────────────────────────────────────────────
+
 INTERVALS    = ["1m", "5m", "15m"]
 LIMIT        = 100
 TOP_N        = 9999
@@ -97,12 +97,10 @@ MAX_WORKERS  = 20
 # ── Filtro de liquidez ────────────────────────────────────────────────────────
 MIN_QUOTE_VOLUME = 100000
 
-# ── BB Squeeze filtrado (para que no spamee) ─────────────────────────────────
-BB_WIDTH_MIN            = 0.02
-SQUEEZE_LOOKBACK        = 3
-SQUEEZE_MAX_PREV_WIDTH  = 0.03
-SQUEEZE_MIN_VOL_RATIO   = 1.8
-SQUEEZE_ONLY_IF_TIGHTEN = True
+# ── BB Squeeze filtrado ───────────────────────────────────────────────────────
+BB_WIDTH_MIN         = 0.020
+SQUEEZE_MAX_PREV_WIDTH = 0.028
+SQUEEZE_MIN_VOL_RATIO  = 1.8
 
 # ── BB Width Expansion + Volume ───────────────────────────────────────────────
 BB_EXPANSION_MIN = 0.095
@@ -112,19 +110,19 @@ EXP_VOL_NORMAL   = 2.0
 EXP_VOL_FUERTE   = 5.0
 EXP_VOL_EXTREMO  = 10.0
 
+# ── Tendencia 15m ─────────────────────────────────────────────────────────────
+EMA_FAST         = 9
+EMA_SLOW         = 21
+TREND_MIN_SLOPE  = 0.0
+
 # ── Vol Spike standalone ──────────────────────────────────────────────────────
 VOL_NORMAL       = 3.0
 VOL_FUERTE       = 5.0
 VOL_EXTREMO      = 10.0
 
-# ── Etiquetas / urgencia ──────────────────────────────────────────────────────
-LATE_REPEAT_COUNT      = 2      # si ya alertó 2+ veces en 8h, nueva alerta = LATE
-IMMEDIATE_ALERT_TAGS   = {"EARLY", "CONFIRMED"}  # LATE queda solo para resumen
-MAX_IMMEDIATE_PER_RUN  = 200
 
 # ── Datos ─────────────────────────────────────────────────────────────────────
 def get_active_usdt_symbols():
-    """Devuelve el conjunto de símbolos USDT con status TRADING en Binance."""
     r = requests.get("https://data-api.binance.vision/api/v3/exchangeInfo", timeout=20)
     r.raise_for_status()
     return {
@@ -132,6 +130,7 @@ def get_active_usdt_symbols():
         for s in r.json()["symbols"]
         if s["symbol"].endswith("USDT") and s["status"] == "TRADING"
     }
+
 
 def get_all_usdt_pairs(n=TOP_N):
     active_symbols = get_active_usdt_symbols()
@@ -146,6 +145,7 @@ def get_all_usdt_pairs(n=TOP_N):
     ]
     pairs.sort(key=lambda x: float(x["quoteVolume"]), reverse=True)
     return [x["symbol"] for x in pairs[:n]]
+
 
 def get_klines(symbol, interval):
     r = requests.get(
@@ -162,60 +162,21 @@ def get_klines(symbol, interval):
         df[col] = df[col].astype(float)
     return df
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-def severity_rank(tag):
-    order = {"EARLY": 1, "CONFIRMED": 2, "LATE": 3}
-    return order.get(tag, 0)
-
-def vol_label(ratio, normal, fuerte, extremo):
-    if ratio >= extremo:
-        return "🔴 vol extremo"
-    if ratio >= fuerte:
-        return "🟡 vol fuerte"
-    if ratio >= normal:
-        return "🟢 vol normal"
-    return None
-
-def classify_alert(messages, prev_alerts_8h):
-    """
-    Regla simple:
-    - Si ya alertó varias veces en 8h => LATE
-    - Si tiene señal de confirmación => CONFIRMED
-    - Si no => EARLY
-    """
-    if prev_alerts_8h >= LATE_REPEAT_COUNT:
-        return "LATE"
-    if any("[CONFIRMED]" in msg for msg in messages):
-        return "CONFIRMED"
-    return "EARLY"
-
-def format_signal_lines(messages, final_tag):
-    lines = []
-    for msg in messages:
-        cleaned = (
-            msg.replace("[EARLY] ", "")
-               .replace("[CONFIRMED] ", "")
-               .replace("[LATE] ", "")
-        )
-        lines.append(f"{final_tag} {cleaned}")
-    return lines
 
 # ── Análisis ──────────────────────────────────────────────────────────────────
 def analyze(symbol, interval):
     try:
         df = get_klines(symbol, interval)
     except Exception:
-        return symbol, interval, None, 0
+        return symbol, interval, None
 
-    if len(df) < 25:
-        return symbol, interval, None, 0
+    if len(df) < 30:
+        return symbol, interval, None
 
-    signals = []
-    close   = df["close"]
-    open_   = df["open"]
-    volume  = df["volume"]
+    close  = df["close"]
+    open_  = df["open"]
+    volume = df["volume"]
 
-    # ── Bollinger Bands ───────────────────────────────────────────────────────
     bb     = ta.volatility.BollingerBands(close, window=20, window_dev=2)
     hband  = bb.bollinger_hband()
     lband  = bb.bollinger_lband()
@@ -223,120 +184,151 @@ def analyze(symbol, interval):
 
     mid_curr = mavg.iloc[-1]
     mid_prev = mavg.iloc[-2]
-    price    = close.iloc[-1]
-
-    width_curr = (hband.iloc[-1] - lband.iloc[-1]) / mid_curr if mid_curr != 0 else 0
-    width_prev = (hband.iloc[-2] - lband.iloc[-2]) / mid_prev if mid_prev != 0 else 0
-
-    width_hist = []
-    for i in range(1, SQUEEZE_LOOKBACK + 1):
-        mid_i = mavg.iloc[-i]
-        if mid_i == 0:
-            width_hist.append(999)
-        else:
-            width_hist.append((hband.iloc[-i] - lband.iloc[-i]) / mid_i)
-
-    # ── Volumen base ──────────────────────────────────────────────────────────
-    vol_mean  = volume.iloc[-21:-1].mean()
-    vol_curr  = volume.iloc[-1]
-    vol_ratio = vol_curr / vol_mean if vol_mean > 0 else 0
-
-    # ── Contexto expansión / precio ───────────────────────────────────────────
-    price_up      = close.iloc[-1] > open_.iloc[-1]
+    width_curr = (hband.iloc[-1] - lband.iloc[-1]) / mid_curr if mid_curr else 0
+    width_prev = (hband.iloc[-2] - lband.iloc[-2]) / mid_prev if mid_prev else 0
     width_delta   = width_curr - width_prev
     width_pct_chg = width_delta / width_prev if width_prev > 0 else 0
     expansion_ok  = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT
 
-    # ── BB squeeze filtrado (EARLY) ───────────────────────────────────────────
-    recent_min_width = min(width_hist)
-    squeeze_basic    = width_curr <= BB_WIDTH_MIN
-    squeeze_recent   = recent_min_width <= BB_WIDTH_MIN
-    squeeze_tight    = max(width_hist) <= SQUEEZE_MAX_PREV_WIDTH
-    squeeze_vol_ok   = vol_ratio >= SQUEEZE_MIN_VOL_RATIO
-    squeeze_tighten  = (width_curr <= width_prev) if SQUEEZE_ONLY_IF_TIGHTEN else True
+    vol_mean  = volume.iloc[-21:-1].mean()
+    vol_curr  = volume.iloc[-1]
+    vol_ratio = vol_curr / vol_mean if vol_mean > 0 else 0
 
-    if squeeze_recent and squeeze_tight and squeeze_vol_ok and squeeze_tighten:
-        signals.append(
-            "[EARLY] 🤏 BB squeeze filtrado "
-            f"(width={width_curr:.2%}, min{SQUEEZE_LOOKBACK}={recent_min_width:.2%}, vol={vol_ratio:.1f}x)"
+    price = close.iloc[-1]
+    price_up = close.iloc[-1] > open_.iloc[-1]
+
+    ema_fast = ta.trend.EMAIndicator(close, window=EMA_FAST).ema_indicator()
+    ema_slow = ta.trend.EMAIndicator(close, window=EMA_SLOW).ema_indicator()
+    trend_up = (
+        ema_fast.iloc[-1] > ema_slow.iloc[-1]
+        and price > ema_slow.iloc[-1]
+        and (ema_slow.iloc[-1] - ema_slow.iloc[-3]) >= TREND_MIN_SLOPE
+    )
+
+    if vol_ratio >= EXP_VOL_EXTREMO:
+        exp_vol_label = "🔴 vol extremo"
+    elif vol_ratio >= EXP_VOL_FUERTE:
+        exp_vol_label = "🟡 vol fuerte"
+    elif vol_ratio >= EXP_VOL_NORMAL:
+        exp_vol_label = "🟢 vol normal"
+    else:
+        exp_vol_label = None
+
+    if vol_ratio >= VOL_EXTREMO:
+        vol_label = "🔴 vol extremo standalone"
+    elif vol_ratio >= VOL_FUERTE:
+        vol_label = "🟡 vol fuerte standalone"
+    elif vol_ratio >= VOL_NORMAL:
+        vol_label = "🟢 vol normal standalone"
+    else:
+        vol_label = None
+
+    squeeze_recent = width_curr <= BB_WIDTH_MIN and width_prev <= SQUEEZE_MAX_PREV_WIDTH
+    squeeze_tightening = width_curr <= width_prev * 1.08
+    squeeze_ok = squeeze_recent and squeeze_tightening and vol_ratio >= SQUEEZE_MIN_VOL_RATIO
+
+    expansion_early_ok = expansion_ok and exp_vol_label and width_curr < BB_WIDTH_MAX
+    expansion_confirmed_ok = expansion_early_ok and price_up
+
+    early_reasons = []
+    if squeeze_ok:
+        early_reasons.append(
+            f"🤏 BB squeeze filtrado {width_prev:.2%} → {width_curr:.2%} | vol {vol_ratio:.1f}x"
         )
-    elif squeeze_basic and squeeze_tight and vol_ratio >= max(SQUEEZE_MIN_VOL_RATIO, VOL_FUERTE):
-        # backup: si está súper apretado y además volumen fuerte, igual avisar
-        signals.append(
-            "[EARLY] 🤏 BB squeeze fuerte "
-            f"(width={width_curr:.2%}, vol={vol_ratio:.1f}x)"
+    if expansion_early_ok and not price_up:
+        early_reasons.append(
+            f"{exp_vol_label} {vol_ratio:.1f}x | BB expansion temprana {width_prev:.2%} → {width_curr:.2%}"
+        )
+    if vol_label and not expansion_confirmed_ok:
+        early_reasons.append(f"{vol_label} {vol_ratio:.1f}x promedio")
+
+    confirmed_reasons = []
+    if expansion_confirmed_ok:
+        confirmed_reasons.append(
+            f"{exp_vol_label} {vol_ratio:.1f}x | BB expansion confirmada {width_prev:.2%} → {width_curr:.2%}"
         )
 
-    # ── BB expansion + volumen, sin price_up (EARLY) ─────────────────────────
-    exp_vol_label = vol_label(vol_ratio, EXP_VOL_NORMAL, EXP_VOL_FUERTE, EXP_VOL_EXTREMO)
+    return symbol, interval, {
+        "vol_ratio": vol_ratio,
+        "trend_up": trend_up,
+        "price": price,
+        "early_reasons": early_reasons,
+        "confirmed_reasons": confirmed_reasons,
+    }
 
-    if expansion_ok and exp_vol_label and width_curr < BB_WIDTH_MAX:
-        signals.append(
-            "[EARLY] "
-            f"{exp_vol_label} {vol_ratio:.1f}x | BB expansion "
-            f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
-        )
-
-    # ── BB expansion + volumen + vela verde (CONFIRMED) ──────────────────────
-    if expansion_ok and exp_vol_label and price_up and width_curr < BB_WIDTH_MAX:
-        signals.append(
-            "[CONFIRMED] "
-            f"{exp_vol_label} {vol_ratio:.1f}x | BB expansion + vela verde "
-            f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"
-        )
-
-    # ── Vol Spike standalone (EARLY) ──────────────────────────────────────────
-    standalone_vol_label = vol_label(vol_ratio, VOL_NORMAL, VOL_FUERTE, VOL_EXTREMO)
-    if standalone_vol_label:
-        signals.append(
-            "[EARLY] "
-            f"{standalone_vol_label} standalone {vol_ratio:.1f}x promedio"
-        )
-
-    # Deduplicación liviana: si no hay nada, salir
-    if not signals:
-        return symbol, interval, None, vol_ratio
-
-    return symbol, interval, signals, vol_ratio
 
 # ── Telegram ──────────────────────────────────────────────────────────────────
 def send_telegram(text):
     requests.post(
         f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-        json={
-            "chat_id": TELEGRAM_CHAT_ID,
-            "text": text,
-            "parse_mode": "Markdown",
-            "disable_web_page_preview": True
-        },
+        json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown", "disable_web_page_preview": True},
         timeout=10
     ).raise_for_status()
 
+
 def binance_link(symbol):
-    """Convierte DASHUSDT → enlace Markdown a Binance spot."""
     pair = symbol[:-4] + "_USDT"
     url  = f"https://www.binance.com/en/trade/{pair}?type=spot"
     return f"[🔗]({url})"
 
-def build_block(symbol, interval, lines, prev_alerts_8h, tag):
-    hist_tag = f"  _(+{prev_alerts_8h} en 8h)_" if prev_alerts_8h > 0 else ""
-    return (
-        f"▶ {symbol} [{interval}] {binance_link(symbol)}{hist_tag}\n"
-        + "\n".join(f"  {line}" for line in lines)
-        + "\n\n"
-    )
 
-# ── Ordenar timeframes de menor a mayor ──────────────────────────────────────
 _TF_ORDER = {"1m": 0, "3m": 1, "5m": 2, "15m": 3, "30m": 4, "1h": 5, "2h": 6, "4h": 7, "6h": 8, "8h": 9, "12h": 10, "1d": 11, "3d": 12, "1w": 13}
 
 def sort_intervals(intervals):
     return sorted(intervals, key=lambda tf: _TF_ORDER.get(tf, 99))
 
+
+def classify_symbol(symbol, tf_map, history):
+    tf1 = tf_map.get("1m") or {}
+    tf5 = tf_map.get("5m") or {}
+    tf15 = tf_map.get("15m") or {}
+
+    trend_ok = tf15.get("trend_up", False)
+    if not trend_ok:
+        return None
+
+    prev_1m  = history.get((symbol, "1m"), 0)
+    prev_5m  = history.get((symbol, "5m"), 0)
+
+    if tf5.get("confirmed_reasons"):
+        label = "LATE" if prev_5m >= LATE_REPEAT_COUNT else "CONFIRMED"
+        return {
+            "symbol": symbol,
+            "timeframe": "5m",
+            "label": label,
+            "priority": 2,
+            "vol_ratio": tf5.get("vol_ratio", 0),
+            "reasons": tf5["confirmed_reasons"] + ["🧭 15m tendencia a favor"]
+        }
+
+    if tf1.get("early_reasons"):
+        label = "LATE" if prev_1m >= LATE_REPEAT_COUNT else "EARLY"
+        return {
+            "symbol": symbol,
+            "timeframe": "1m",
+            "label": label,
+            "priority": 1,
+            "vol_ratio": tf1.get("vol_ratio", 0),
+            "reasons": tf1["early_reasons"] + ["🧭 15m tendencia a favor"]
+        }
+
+    return None
+
+
+def format_alert(alert, history):
+    symbol = alert["symbol"]
+    tf = alert["timeframe"]
+    prev = history.get((symbol, tf), 0)
+    hist_tag = f"  _(+{prev} en {HISTORY_HOURS}h)_" if prev > 0 else ""
+    header = f"[{alert['label']}] {symbol} [{tf}] {binance_link(symbol)}{hist_tag}"
+    body = "\n".join(f"  {r}" for r in alert["reasons"])
+    return f"{header}\n{body}"
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     pairs = get_all_usdt_pairs()
-
     intervals_sorted = sort_intervals(INTERVALS)
     tf_label = " + ".join(intervals_sorted)
     print(f"[{now}] Escaneando {len(pairs)} pares USDT ({tf_label}) con {MAX_WORKERS} workers...")
@@ -344,98 +336,70 @@ def main():
     history = fetch_history()
     tasks = [(sym, tf) for sym in pairs for tf in intervals_sorted]
 
-    results = {tf: {} for tf in intervals_sorted}
-    immediate_sent = 0
+    per_symbol = {sym: {} for sym in pairs}
+    alerts = []
+    sent_now = set()
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {executor.submit(analyze, sym, tf): (sym, tf) for sym, tf in tasks}
         for future in as_completed(futures):
-            symbol, interval, raw_sigs, vol_ratio = future.result()
-            prev = history.get((symbol, interval), 0)
+            symbol, interval, data = future.result()
+            per_symbol[symbol][interval] = data or {}
 
-            if raw_sigs:
-                final_tag = classify_alert(raw_sigs, prev)
-                formatted_lines = format_signal_lines(raw_sigs, final_tag)
+            ready = all(tf in per_symbol[symbol] for tf in intervals_sorted)
+            if not ready or symbol in sent_now:
+                continue
 
-                item = {
-                    "symbol": symbol,
-                    "interval": interval,
-                    "tag": final_tag,
-                    "signals": formatted_lines,
-                    "vol_ratio": vol_ratio,
-                    "prev": prev,
-                }
-                results[interval][symbol] = item
+            alert = classify_symbol(symbol, per_symbol[symbol], history)
+            if not alert:
+                sent_now.add(symbol)
+                continue
 
-                print(f"  ✅ {symbol} [{interval}] {final_tag} vol={vol_ratio:.1f}x: {formatted_lines}")
+            alerts.append(alert)
+            if alert["label"] in {"EARLY", "CONFIRMED"}:
+                try:
+                    send_telegram("🚨 ALERTA INMEDIATA\n" + format_alert(alert, history))
+                except Exception as e:
+                    print(f"⚠ Error enviando alerta inmediata {symbol}: {e}")
+            sent_now.add(symbol)
+            print(f"  ✅ {symbol} -> {alert['label']} [{alert['timeframe']}] {alert['reasons']}")
 
-                if final_tag in IMMEDIATE_ALERT_TAGS and immediate_sent < MAX_IMMEDIATE_PER_RUN:
-                    try:
-                        send_telegram(
-                            f"🚨 *{final_tag}* inmediata\n"
-                            f"{build_block(symbol, interval, formatted_lines, prev, final_tag)}"
-                        )
-                        immediate_sent += 1
-                    except Exception as e:
-                        print(f"⚠ Telegram immediate error {symbol} [{interval}]: {e}")
-            else:
-                results[interval][symbol] = None
-
-    signals_by_tf = {}
-    for tf in intervals_sorted:
-        raw = [item for sym, item in results[tf].items() if item]
-        raw.sort(key=lambda x: (severity_rank(x["tag"]), x["vol_ratio"]), reverse=True)
-        signals_by_tf[tf] = raw
-
-    total_signals = sum(len(v) for v in signals_by_tf.values())
-
-    if total_signals == 0:
-        print("Sin señales en este scan. No se envía nada a Telegram.")
+    if not alerts:
+        print("Sin señales filtradas en este scan. No se envía nada a Telegram.")
         return
 
-    insert_history(signals_by_tf)
+    alerts.sort(key=lambda x: (x["priority"], x["vol_ratio"]), reverse=True)
+    insert_history(alerts)
 
     bar = "━" * 24
-    tf_counts = "  ".join(f"{tf}: {len(signals_by_tf[tf])}" for tf in intervals_sorted)
+    counts = {
+        "EARLY": sum(1 for a in alerts if a["label"] == "EARLY"),
+        "CONFIRMED": sum(1 for a in alerts if a["label"] == "CONFIRMED"),
+        "LATE": sum(1 for a in alerts if a["label"] == "LATE"),
+    }
     run_header = (
         f"{bar}\n"
-        f"🟣  NUEVO SCAN  •  {now}\n"
-        f"     {tf_label}  •  {len(pairs)} pares\n"
-        f"     {tf_counts}\n"
-        f"     inmediatas: {immediate_sent}\n"
+        f"🟣 NUEVO SCAN • {now}\n"
+        f"   {tf_label} • {len(pairs)} pares\n"
+        f"   EARLY: {counts['EARLY']}  CONFIRMED: {counts['CONFIRMED']}  LATE: {counts['LATE']}\n"
         f"{bar}"
     )
     send_telegram(run_header)
 
-    for tf in intervals_sorted:
-        all_items = signals_by_tf[tf]
-
-        if not all_items:
-            print(f"Sin señales en {tf}.")
-            continue
-
-        tf_header = f"📊 [{tf}]  {len(all_items)} alertas\n{'─' * 20}\n\n"
-        current = tf_header
-
-        for item in all_items:
-            block = build_block(
-                item["symbol"],
-                tf,
-                item["signals"],
-                item["prev"],
-                item["tag"],
-            )
-            if len(current) + len(block) > 4000:
-                send_telegram(current)
-                current = block
-            else:
-                current += block
-
-        if current.strip():
+    current = "📊 Resumen filtrado\n" + "─" * 20 + "\n\n"
+    for alert in alerts:
+        block = format_alert(alert, history) + "\n\n"
+        if len(current) + len(block) > 4000:
             send_telegram(current)
+            current = block
+        else:
+            current += block
+    if current.strip():
+        send_telegram(current)
 
-    print(f"\nTotal alertas: {total_signals} / {len(pairs)} pares × {len(intervals_sorted)} timeframes ({tf_label})")
+    print(f"\nTotal alertas: {len(alerts)} / {len(pairs)} pares")
     print("✅ Mensajes enviados a Telegram.")
+
 
 if __name__ == "__main__":
     main()
