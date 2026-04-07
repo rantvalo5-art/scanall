@@ -742,13 +742,13 @@ function parseIntoUI(c) {
     c.split('\n').some(line => pattern.test(line) && !/^\s*#/.test(line));
 
   const states = {
-    'bb-squeeze':  isLive(/if width_curr <= BB_WIDTH_MIN:/),
-    'expansion':   isLive(/if expansion_ok and exp_vol_label and price_up/),
+    'bb-squeeze':  isLive(/BB squeeze filtrado/),
+    'expansion':   isLive(/BB expansion \+ volumen, sin price_up/),
     'rsi':         isLive(/rsi_val\s*=\s*ta\.momentum\.RSIIndicator/),
     'macd':        isLive(/macd_ind\s*=\s*ta\.trend\.MACD\(close,/),
     'ema':         isLive(/ema_fast\s*=\s*ta\.trend\.EMAIndicator/),
     'bb-breakout': isLive(/if price > hband\.iloc\[-1\]:/),
-    'vol':         isLive(/if vol_ratio >= VOL_EXTREMO:/)
+    'vol':         isLive(/Vol Spike standalone \(EARLY\)/)
   };
 
   Object.entries(states).forEach(([key, active]) => {
@@ -808,8 +808,8 @@ async function saveConfig() {
 
     const specs = {
       'bb-squeeze': {
-        start: 'if width_curr <= BB_WIDTH_MIN:',
-        end:   'signals.append(f"🤏 BB squeeze (width={width_curr:.2%}) — movimiento fuerte próximo")'
+        start: '# ── BB squeeze filtrado (EARLY)',
+        end:   'signals.append('
       },
       'expansion': {
         start: 'vol_mean      = volume.iloc[-21:-1].mean()',
@@ -832,8 +832,8 @@ async function saveConfig() {
         end:   'signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")'
       },
       'vol': {
-        start: 'if vol_ratio >= VOL_EXTREMO:',
-        end:   'signals.append(f"🟢 vol normal standalone {vol_ratio:.1f}x promedio")'
+        start: '# ── Vol Spike standalone (EARLY)',
+        end:   'signals.append('
       }
     };
 
