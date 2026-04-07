@@ -1,10 +1,14 @@
 """
-Binance Spot USDT Crypto Screener — TODOS los pares, paralelo, MULTI-TIMEFRAME
+Binance Spot USDT Crypto Screener — enfoque intradía hacia 1h
 Lógica principal:
-- 1m = radar temprano (EARLY)
-- 5m = confirmación (CONFIRMED)
-- 15m = filtro de tendencia
+- 15m = setup temprano (EARLY)
+- 30m = confirmación intermedia (CONFIRMED)
+- 1h = filtro de tendencia / resistencia / continuidad
 - LATE = símbolo/timeframe que ya alertó en la ventana histórica
+
+Objetivo:
+Priorizar menos trades, pero con más chances de sostener un movimiento serio
+(tipo 8-10%+) en vez de muchas alertas cortas de 3-5%.
 """
 
 import os
@@ -89,36 +93,42 @@ def insert_history(alert_rows):
         print(f"⚠ Supabase insert_history error: {e}")
 
 
-INTERVALS    = ["1m", "5m", "15m"]
-LIMIT        = 100
+INTERVALS    = ["15m", "30m", "1h"]
+LIMIT        = 120
 TOP_N        = 9999
 MAX_WORKERS  = 20
 
 # ── Filtro de liquidez ────────────────────────────────────────────────────────
-MIN_QUOTE_VOLUME = 100000
+MIN_QUOTE_VOLUME = 150000
 
-# ── BB Squeeze filtrado ───────────────────────────────────────────────────────
-BB_WIDTH_MIN         = 0.020
-SQUEEZE_MAX_PREV_WIDTH = 0.028
-SQUEEZE_MIN_VOL_RATIO  = 1.8
+# ── Bollinger / expansión ─────────────────────────────────────────────────────
+BB_WIDTH_MIN            = 0.022
+SQUEEZE_MAX_PREV_WIDTH  = 0.030
+SQUEEZE_MIN_VOL_RATIO   = 1.4
+BB_EXPANSION_MIN        = 0.010
+BB_EXPANSION_PCT        = 0.15
+BB_WIDTH_MAX            = 0.22
+EXP_VOL_NORMAL          = 1.8
+EXP_VOL_FUERTE          = 2.5
+EXP_VOL_EXTREMO         = 4.0
 
-# ── BB Width Expansion + Volume ───────────────────────────────────────────────
-BB_EXPANSION_MIN = 0.095
-BB_EXPANSION_PCT = 0.03
-BB_WIDTH_MAX     = 5.0
-EXP_VOL_NORMAL   = 2.0
-EXP_VOL_FUERTE   = 5.0
-EXP_VOL_EXTREMO  = 10.0
-
-# ── Tendencia 15m ─────────────────────────────────────────────────────────────
-EMA_FAST         = 9
-EMA_SLOW         = 21
-TREND_MIN_SLOPE  = 0.0
+# ── Tendencia / estructura ────────────────────────────────────────────────────
+EMA_FAST                = 9
+EMA_SLOW                = 21
+EMA_TREND_MIN_PCT       = 0.0015
+RECENT_LOOKBACK         = 12   # velas para swing/resistencia intermedia
+BREAKOUT_BUFFER         = 0.001
+MIN_BREAKOUT_DISTANCE   = 0.006
+VOLUME_GROWTH_MIN       = 1.10
+RECENT_GREEN_MIN        = 2     # cuántas de las últimas 3 velas cerraron verdes
+HOLD_CANDLES_MIN        = 2     # cuántos closes sosteniendo arriba de EMA21 / mitad de banda
+ONE_H_RESIST_BUFFER     = 0.015 # evitar entrar justo debajo de resistencia 1h
+ONE_H_BREAK_LOOKBACK    = 24
 
 # ── Vol Spike standalone ──────────────────────────────────────────────────────
-VOL_NORMAL       = 3.0
-VOL_FUERTE       = 5.0
-VOL_EXTREMO      = 10.0
+VOL_NORMAL              = 2.2
+VOL_FUERTE              = 3.5
+VOL_EXTREMO             = 5.0
 
 
 # ── Datos ─────────────────────────────────────────────────────────────────────
@@ -170,11 +180,12 @@ def analyze(symbol, interval):
     except Exception:
         return symbol, interval, None
 
-    if len(df) < 30:
+    if len(df) < 60:
         return symbol, interval, None
 
     close  = df["close"]
     open_  = df["open"]
+    high   = df["high"]
     volume = df["volume"]
 
     bb     = ta.volatility.BollingerBands(close, window=20, window_dev=2)
@@ -190,20 +201,42 @@ def analyze(symbol, interval):
     width_pct_chg = width_delta / width_prev if width_prev > 0 else 0
     expansion_ok  = width_delta >= BB_EXPANSION_MIN or width_pct_chg >= BB_EXPANSION_PCT
 
-    vol_mean  = volume.iloc[-21:-1].mean()
-    vol_curr  = volume.iloc[-1]
-    vol_ratio = vol_curr / vol_mean if vol_mean > 0 else 0
+    vol_mean   = volume.iloc[-21:-1].mean()
+    vol_curr   = volume.iloc[-1]
+    vol_ratio  = vol_curr / vol_mean if vol_mean > 0 else 0
+    vol_short  = volume.iloc[-3:].mean()
+    vol_prior  = volume.iloc[-6:-3].mean()
+    vol_growth = vol_short / vol_prior if vol_prior > 0 else 0
+    volume_growing = vol_growth >= VOLUME_GROWTH_MIN
 
-    price = close.iloc[-1]
+    price    = close.iloc[-1]
     price_up = close.iloc[-1] > open_.iloc[-1]
 
     ema_fast = ta.trend.EMAIndicator(close, window=EMA_FAST).ema_indicator()
     ema_slow = ta.trend.EMAIndicator(close, window=EMA_SLOW).ema_indicator()
+    ema_slow_slope_pct = (ema_slow.iloc[-1] - ema_slow.iloc[-4]) / ema_slow.iloc[-4] if ema_slow.iloc[-4] else 0
     trend_up = (
         ema_fast.iloc[-1] > ema_slow.iloc[-1]
         and price > ema_slow.iloc[-1]
-        and (ema_slow.iloc[-1] - ema_slow.iloc[-3]) >= TREND_MIN_SLOPE
+        and ema_slow_slope_pct >= EMA_TREND_MIN_PCT
     )
+
+    breakout_ref = high.iloc[-(RECENT_LOOKBACK + 2):-2].max()
+    structure_break = price > breakout_ref * (1 + BREAKOUT_BUFFER)
+    breakout_distance = (price / breakout_ref - 1) if breakout_ref > 0 else 0
+    meaningful_break = structure_break and breakout_distance >= MIN_BREAKOUT_DISTANCE
+
+    recent_green = int((close.iloc[-3:] > open_.iloc[-3:]).sum())
+    sustained_green = recent_green >= RECENT_GREEN_MIN
+
+    hold_line = max(ema_slow.iloc[-1], mavg.iloc[-1])
+    hold_count = int((close.iloc[-3:] > hold_line).sum())
+    holding_above = hold_count >= HOLD_CANDLES_MIN
+
+    resistance_ref = high.iloc[-(ONE_H_BREAK_LOOKBACK + 2):-2].max()
+    dist_to_res = (resistance_ref - price) / price if price > 0 else 0
+    breakout_1h = price > resistance_ref * (1 + BREAKOUT_BUFFER) if resistance_ref > 0 else False
+    not_near_resistance = dist_to_res > ONE_H_RESIST_BUFFER or breakout_1h
 
     if vol_ratio >= EXP_VOL_EXTREMO:
         exp_vol_label = "🔴 vol extremo"
@@ -219,39 +252,56 @@ def analyze(symbol, interval):
     elif vol_ratio >= VOL_FUERTE:
         vol_label = "🟡 vol fuerte standalone"
     elif vol_ratio >= VOL_NORMAL:
-        vol_label = "🟢 vol normal standalone"
+        vol_label = "🟢 vol fuerte standalone"
     else:
         vol_label = None
 
     squeeze_recent = width_curr <= BB_WIDTH_MIN and width_prev <= SQUEEZE_MAX_PREV_WIDTH
     squeeze_tightening = width_curr <= width_prev * 1.08
-    squeeze_ok = squeeze_recent and squeeze_tightening and vol_ratio >= SQUEEZE_MIN_VOL_RATIO
+    squeeze_ok = squeeze_recent and squeeze_tightening and vol_ratio >= SQUEEZE_MIN_VOL_RATIO and volume_growing
 
-    expansion_early_ok = expansion_ok and exp_vol_label and width_curr < BB_WIDTH_MAX
-    expansion_confirmed_ok = expansion_early_ok and price_up
+    expansion_early_ok = expansion_ok and exp_vol_label and width_curr < BB_WIDTH_MAX and volume_growing
+    expansion_confirmed_ok = expansion_early_ok and price_up and sustained_green and holding_above
 
     early_reasons = []
     if squeeze_ok:
         early_reasons.append(
-            f"🤏 BB squeeze filtrado {width_prev:.2%} → {width_curr:.2%} | vol {vol_ratio:.1f}x"
+            f"🤏 squeeze 15m/30m filtrado {width_prev:.2%} → {width_curr:.2%} | vol {vol_ratio:.1f}x"
         )
-    if expansion_early_ok and not price_up:
+    if expansion_early_ok:
         early_reasons.append(
-            f"{exp_vol_label} {vol_ratio:.1f}x | BB expansion temprana {width_prev:.2%} → {width_curr:.2%}"
+            f"{exp_vol_label} {vol_ratio:.1f}x | BB expansion {width_prev:.2%} → {width_curr:.2%}"
         )
-    if vol_label and not expansion_confirmed_ok:
-        early_reasons.append(f"{vol_label} {vol_ratio:.1f}x promedio")
+    if vol_label and volume_growing and sustained_green:
+        early_reasons.append(f"{vol_label} {vol_ratio:.1f}x | volumen creciendo {vol_growth:.2f}x")
+    if meaningful_break:
+        early_reasons.append(f"📈 ruptura de estructura +{breakout_distance:.2%}")
 
     confirmed_reasons = []
     if expansion_confirmed_ok:
         confirmed_reasons.append(
-            f"{exp_vol_label} {vol_ratio:.1f}x | BB expansion confirmada {width_prev:.2%} → {width_curr:.2%}"
+            f"✅ expansión confirmada | {exp_vol_label} {vol_ratio:.1f}x | sostén {hold_count}/3 velas"
+        )
+    if meaningful_break and sustained_green and holding_above and volume_growing:
+        confirmed_reasons.append(
+            f"✅ breakout sostenido +{breakout_distance:.2%} | {recent_green}/3 velas verdes | vol creciendo {vol_growth:.2f}x"
         )
 
     return symbol, interval, {
-        "vol_ratio": vol_ratio,
-        "trend_up": trend_up,
         "price": price,
+        "vol_ratio": vol_ratio,
+        "vol_growth": vol_growth,
+        "trend_up": trend_up,
+        "structure_break": structure_break,
+        "meaningful_break": meaningful_break,
+        "breakout_distance": breakout_distance,
+        "holding_above": holding_above,
+        "hold_count": hold_count,
+        "sustained_green": sustained_green,
+        "recent_green": recent_green,
+        "not_near_resistance": not_near_resistance,
+        "dist_to_res": dist_to_res,
+        "breakout_1h": breakout_1h,
         "early_reasons": early_reasons,
         "confirmed_reasons": confirmed_reasons,
     }
@@ -279,37 +329,52 @@ def sort_intervals(intervals):
 
 
 def classify_symbol(symbol, tf_map, history):
-    tf1 = tf_map.get("1m") or {}
-    tf5 = tf_map.get("5m") or {}
     tf15 = tf_map.get("15m") or {}
+    tf30 = tf_map.get("30m") or {}
+    tf1h = tf_map.get("1h") or {}
 
-    trend_ok = tf15.get("trend_up", False)
-    if not trend_ok:
+    # Filtro 1h: queremos contexto real a favor, no movernos debajo de resistencia dura.
+    trend_ok = tf1h.get("trend_up", False)
+    resistance_ok = tf1h.get("not_near_resistance", False)
+    continuity_ok = tf1h.get("holding_above", False) or tf1h.get("sustained_green", False)
+    if not (trend_ok and resistance_ok and continuity_ok):
         return None
 
-    prev_1m  = history.get((symbol, "1m"), 0)
-    prev_5m  = history.get((symbol, "5m"), 0)
+    prev_15m = history.get((symbol, "15m"), 0)
+    prev_30m = history.get((symbol, "30m"), 0)
 
-    if tf5.get("confirmed_reasons"):
-        label = "LATE" if prev_5m >= LATE_REPEAT_COUNT else "CONFIRMED"
+    # Confirmación de mejor calidad: 30m confirma y 15m ya venía construyendo.
+    thirty_confirms = bool(tf30.get("confirmed_reasons"))
+    fifteen_constructive = bool(tf15.get("early_reasons")) or tf15.get("meaningful_break", False)
+    one_hour_bonus = []
+    if tf1h.get("breakout_1h"):
+        one_hour_bonus.append("🧱 1h rompiendo resistencia")
+    else:
+        one_hour_bonus.append(f"🧱 1h lejos de resistencia ({tf1h.get('dist_to_res', 0):.2%})")
+    one_hour_bonus.append(f"📌 1h sostén {tf1h.get('hold_count', 0)}/3 velas arriba")
+
+    if thirty_confirms and fifteen_constructive:
+        label = "LATE" if prev_30m >= LATE_REPEAT_COUNT else "CONFIRMED"
         return {
             "symbol": symbol,
-            "timeframe": "5m",
+            "timeframe": "30m",
             "label": label,
             "priority": 2,
-            "vol_ratio": tf5.get("vol_ratio", 0),
-            "reasons": tf5["confirmed_reasons"] + ["🧭 15m tendencia a favor"]
+            "vol_ratio": tf30.get("vol_ratio", 0),
+            "reasons": tf30.get("confirmed_reasons", []) + one_hour_bonus
         }
 
-    if tf1.get("early_reasons"):
-        label = "LATE" if prev_1m >= LATE_REPEAT_COUNT else "EARLY"
+    # EARLY: 15m detecta setup y 30m no niega la idea.
+    thirty_not_bad = tf30.get("trend_up", False) or tf30.get("holding_above", False) or tf30.get("sustained_green", False)
+    if tf15.get("early_reasons") and thirty_not_bad:
+        label = "LATE" if prev_15m >= LATE_REPEAT_COUNT else "EARLY"
         return {
             "symbol": symbol,
-            "timeframe": "1m",
+            "timeframe": "15m",
             "label": label,
             "priority": 1,
-            "vol_ratio": tf1.get("vol_ratio", 0),
-            "reasons": tf1["early_reasons"] + ["🧭 15m tendencia a favor"]
+            "vol_ratio": tf15.get("vol_ratio", 0),
+            "reasons": tf15.get("early_reasons", []) + ["🧭 30m todavía constructivo"] + one_hour_bonus
         }
 
     return None
@@ -386,7 +451,7 @@ def main():
     )
     send_telegram(run_header)
 
-    current = "📊 Resumen filtrado\n" + "─" * 20 + "\n\n"
+    current = "📊 Resumen filtrado 1h\n" + "─" * 20 + "\n\n"
     for alert in alerts:
         block = format_alert(alert, history) + "\n\n"
         if len(current) + len(block) > 4000:
