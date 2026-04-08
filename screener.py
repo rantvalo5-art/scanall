@@ -24,7 +24,7 @@ TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 HISTORY_HOURS = 8
-EARLY_COOLDOWN_MINUTES = 45
+EARLY_COOLDOWN_MINUTES = 1
 LATE_REPEAT_COUNT = 5
 
 # ── Escaneo / universo ────────────────────────────────────────────────────────
