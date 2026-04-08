@@ -25,7 +25,7 @@ SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 HISTORY_HOURS = 8
 EARLY_COOLDOWN_MINUTES = 45
-LATE_REPEAT_COUNT = 1
+LATE_REPEAT_COUNT = 5
 
 # ── Escaneo / universo ────────────────────────────────────────────────────────
 INTERVALS = ["15m", "30m", "1h"]
@@ -59,7 +59,7 @@ ONE_H_RESIST_BUFFER = 0.015
 ONE_H_BREAK_LOOKBACK = 24
 CLOSE_TOP_PORTION_MIN = 0.70   # cierre en el 30% superior del rango
 EARLY_MIN_SCORE = 6
-TOP_EARLY_COUNT = 3
+TOP_EARLY_COUNT = 10
 
 
 def _sb_headers():
