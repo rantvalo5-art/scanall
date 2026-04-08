@@ -25,7 +25,7 @@ SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 HISTORY_HOURS = 8
 EARLY_COOLDOWN_MINUTES = 1
-LATE_REPEAT_COUNT = 5
+LATE_REPEAT_COUNT = 1
 
 # ── Escaneo / universo ────────────────────────────────────────────────────────
 INTERVALS = ["15m", "30m", "1h"]
