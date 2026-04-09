@@ -36,7 +36,7 @@ TOP_ALERT_COUNT = 5
 
 # ── Historial / spam control ──────────────────────────────────────────────────
 HISTORY_HOURS = 8
-STATE_COOLDOWN_MINUTES = 0
+STATE_COOLDOWN_MINUTES = 15
 LATE_REPEAT_COUNT = 1
 
 # ── Indicadores base ───────────────────────────────────────────────────────────
