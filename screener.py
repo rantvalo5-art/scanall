@@ -1,67 +1,86 @@
 """
-Binance Spot USDT Crypto Screener — enfoque intradía hacia 1h
-Versión enfocada en EARLY premium:
-- Menos ruido, más calidad
-- Solo TOP 3 EARLY por run a Telegram
-- Vol spike standalone NO va a Telegram
-- Score por símbolo
-- Cooldown para no repetir EARLY seguido
-- 15m detecta, 30m acompaña, 1h filtra contexto
+Binance Spot USDT Crypto Screener — breakout / continuation
+Arquitectura pedida:
+- 5m = PRE-BREAK (radar temprano)
+- 15m = BREAKOUT (ruptura real)
+- 30m / 1h = filtros de contexto
+- Telegram inmediato solo para PRE-BREAK fuerte y BREAKOUT
+
+Notas:
+- mantiene la cantidad de monedas escaneadas (TOP_N no se reduce)
+- evita esperar al resumen final para avisos tempranos clave
+- resumen final excluye lo ya enviado de inmediato para no duplicar spam
 """
 
 import os
-import requests
-import pandas as pd
-import ta
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+import pandas as pd
+import requests
+import ta
 
 # ── Configuración ──────────────────────────────────────────────────────────────
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
-
-# ── Supabase ──────────────────────────────────────────────────────────────────
-SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
-HISTORY_HOURS = 8
-EARLY_COOLDOWN_MINUTES = 1
-LATE_REPEAT_COUNT = 8
+SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
 
-# ── Escaneo / universo ────────────────────────────────────────────────────────
-INTERVALS = ["15m", "30m", "1h"]
-LIMIT = 120
+# ── Universo / run ─────────────────────────────────────────────────────────────
+INTERVALS = ["5m", "15m", "30m", "1h"]
+LIMIT = 180
 TOP_N = 9999
 MAX_WORKERS = 20
-MIN_QUOTE_VOLUME = 300000  # subir liquidez para reducir ruido
+MIN_QUOTE_VOLUME = 300000
+TOP_ALERT_COUNT = 5
 
-# ── Bollinger / expansión ─────────────────────────────────────────────────────
-BB_WIDTH_MIN = 0.022
-SQUEEZE_MAX_PREV_WIDTH = 0.030
-SQUEEZE_MIN_VOL_RATIO = 1.5
-BB_EXPANSION_MIN = 0.010
-BB_EXPANSION_PCT = 0.15
-BB_WIDTH_MAX = 0.22
-EXP_VOL_NORMAL = 2.0
-EXP_VOL_FUERTE = 2.8
-EXP_VOL_EXTREMO = 4.2
+# ── Historial / spam control ──────────────────────────────────────────────────
+HISTORY_HOURS = 8
+STATE_COOLDOWN_MINUTES = 60
+LATE_REPEAT_COUNT = 1
 
-# ── Tendencia / estructura ────────────────────────────────────────────────────
+# ── Indicadores base ───────────────────────────────────────────────────────────
 EMA_FAST = 9
 EMA_SLOW = 21
-EMA_TREND_MIN_PCT = 0.0015
+BB_WIDTH_MIN = 0.022
+SQUEEZE_MAX_PREV_WIDTH = 0.030
+SQUEEZE_MIN_VOL_RATIO = 1.30
+BB_EXPANSION_MIN = 0.010
+BB_EXPANSION_PCT = 0.15
+EXP_VOL_NORMAL = 2.0
+VOLUME_GROWTH_MIN = 1.10
 RECENT_LOOKBACK = 12
 BREAKOUT_BUFFER = 0.001
 MIN_BREAKOUT_DISTANCE = 0.006
-VOLUME_GROWTH_MIN = 1.12
-RECENT_GREEN_MIN = 2
-HOLD_CANDLES_MIN = 2
+CLOSE_TOP_PORTION_MIN = 0.70
 ONE_H_RESIST_BUFFER = 0.015
 ONE_H_BREAK_LOOKBACK = 24
-CLOSE_TOP_PORTION_MIN = 0.70   # cierre en el 30% superior del rango
-EARLY_MIN_SCORE = 6
-TOP_EARLY_COUNT = 10
+
+# ── PRE-BREAK 5m ──────────────────────────────────────────────────────────────
+PREBREAK_SCORE_MIN = 4
+PREBREAK_IMMEDIATE_SCORE = 6
+PREBREAK_TOP_N = 2
+PREBREAK_NEAR_BREAK_MAX = 0.018
+PREBREAK_TIGHT_RANGE_MAX = 0.028
+PREBREAK_RISING_CANDLES_MIN = 1
+
+# ── BREAKOUT 15m ───────────────────────────────────────────────────────────────
+BREAKOUT_SCORE_MIN = 6
+BREAKOUT_IMMEDIATE_SCORE = 7
+BREAKOUT_TOP_N = 2
+BREAKOUT_NOT_OVEREXTENDED_MAX = 0.035
+
+# ── HOLD / RETEST 15m filtrado por 30m / 1h ──────────────────────────────────
+HOLD_SCORE_MIN = 7
+HOLD_TOP_N = 2
+HOLD_LOOKBACK_BARS = 8
+HOLD_RECENT_BREAK_MAX_BARS = 6
+HOLD_PULLBACK_MAX = 0.025
+HOLD_ZONE_BUFFER = 0.003
+HOLD_STRONG_CLOSES_MIN = 2
 
 
+# ── Supabase ───────────────────────────────────────────────────────────────────
 def _sb_headers():
     return {
         "apikey": SUPABASE_KEY,
@@ -72,7 +91,6 @@ def _sb_headers():
 
 
 def fetch_history():
-    """Devuelve dict con recuento 8h y último aviso por (symbol,timeframe)."""
     since = (datetime.now(timezone.utc) - timedelta(hours=HISTORY_HOURS)).isoformat()
     try:
         r = requests.get(
@@ -100,7 +118,7 @@ def insert_history(alert_rows):
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
     since = (now - timedelta(hours=HISTORY_HOURS)).isoformat()
-    rows = [{"symbol": row["symbol"], "timeframe": row["timeframe"], "alerted_at": now_iso} for row in alert_rows]
+    rows = [{"symbol": row["symbol"], "timeframe": row["history_tf"], "alerted_at": now_iso} for row in alert_rows]
     if not rows:
         return
     try:
@@ -118,7 +136,7 @@ def insert_history(alert_rows):
         print(f"⚠ Supabase insert_history error: {e}")
 
 
-# ── Datos ─────────────────────────────────────────────────────────────────────
+# ── Datos Binance ──────────────────────────────────────────────────────────────
 def get_active_usdt_symbols():
     r = requests.get("https://data-api.binance.vision/api/v3/exchangeInfo", timeout=20)
     r.raise_for_status()
@@ -159,14 +177,29 @@ def get_klines(symbol, interval):
     return df
 
 
-# ── Análisis ──────────────────────────────────────────────────────────────────
+# ── Helpers ────────────────────────────────────────────────────────────────────
+def last_n_strong_closes(close_series, high_series, low_series, n=3):
+    count = 0
+    for i in range(1, n + 1):
+        rng = max(high_series.iloc[-i] - low_series.iloc[-i], 1e-12)
+        close_pos = (close_series.iloc[-i] - low_series.iloc[-i]) / rng
+        if close_pos >= CLOSE_TOP_PORTION_MIN:
+            count += 1
+    return count
+
+
+def safe_pct(a, b):
+    return (a / b - 1) if b else 0.0
+
+
+# ── Análisis por timeframe ─────────────────────────────────────────────────────
 def analyze(symbol, interval):
     try:
         df = get_klines(symbol, interval)
     except Exception:
         return symbol, interval, None
 
-    if len(df) < 60:
+    if len(df) < 80:
         return symbol, interval, None
 
     close = df["close"]
@@ -174,6 +207,7 @@ def analyze(symbol, interval):
     high = df["high"]
     low = df["low"]
     volume = df["volume"]
+    price = close.iloc[-1]
 
     bb = ta.volatility.BollingerBands(close, window=20, window_dev=2)
     hband = bb.bollinger_hband()
@@ -196,68 +230,105 @@ def analyze(symbol, interval):
     vol_growth = vol_short / vol_prior if vol_prior > 0 else 0
     volume_growing = vol_growth >= VOLUME_GROWTH_MIN
 
-    price = close.iloc[-1]
-    price_up = close.iloc[-1] > open_.iloc[-1]
+    ema_fast = ta.trend.EMAIndicator(close, window=EMA_FAST).ema_indicator()
+    ema_slow = ta.trend.EMAIndicator(close, window=EMA_SLOW).ema_indicator()
+    ema_slow_slope_pct = safe_pct(ema_slow.iloc[-1], ema_slow.iloc[-4]) if ema_slow.iloc[-4] else 0
+    trend_up = (
+        ema_fast.iloc[-1] > ema_slow.iloc[-1]
+        and price > ema_slow.iloc[-1]
+        and ema_slow_slope_pct >= 0.001
+    )
 
     candle_range = max(high.iloc[-1] - low.iloc[-1], 1e-12)
     close_position = (price - low.iloc[-1]) / candle_range
     closes_strong = close_position >= CLOSE_TOP_PORTION_MIN
-
-    ema_fast = ta.trend.EMAIndicator(close, window=EMA_FAST).ema_indicator()
-    ema_slow = ta.trend.EMAIndicator(close, window=EMA_SLOW).ema_indicator()
-    ema_slow_slope_pct = (ema_slow.iloc[-1] - ema_slow.iloc[-4]) / ema_slow.iloc[-4] if ema_slow.iloc[-4] else 0
-    trend_up = (
-        ema_fast.iloc[-1] > ema_slow.iloc[-1]
-        and price > ema_slow.iloc[-1]
-        and ema_slow_slope_pct >= EMA_TREND_MIN_PCT
-    )
+    strong_closes_3 = last_n_strong_closes(close, high, low, 3)
+    rising_candles_3 = int((close.iloc[-3:] > open_.iloc[-3:]).sum())
 
     breakout_ref = high.iloc[-(RECENT_LOOKBACK + 2):-2].max()
     structure_break = price > breakout_ref * (1 + BREAKOUT_BUFFER)
-    breakout_distance = (price / breakout_ref - 1) if breakout_ref > 0 else 0
+    breakout_distance = safe_pct(price, breakout_ref)
     meaningful_break = structure_break and breakout_distance >= MIN_BREAKOUT_DISTANCE
-
-    recent_green = int((close.iloc[-3:] > open_.iloc[-3:]).sum())
-    sustained_green = recent_green >= RECENT_GREEN_MIN
+    near_break = breakout_ref > 0 and 0 <= (breakout_ref - price) / breakout_ref <= PREBREAK_NEAR_BREAK_MAX
 
     hold_line = max(ema_slow.iloc[-1], mavg.iloc[-1])
     hold_count = int((close.iloc[-3:] > hold_line).sum())
-    holding_above = hold_count >= HOLD_CANDLES_MIN
+    holding_above = hold_count >= 2
 
     resistance_ref = high.iloc[-(ONE_H_BREAK_LOOKBACK + 2):-2].max()
     dist_to_res = (resistance_ref - price) / price if price > 0 else 0
-    breakout_1h = price > resistance_ref * (1 + BREAKOUT_BUFFER) if resistance_ref > 0 else False
-    not_near_resistance = dist_to_res > ONE_H_RESIST_BUFFER or breakout_1h
+    breakout_tf = price > resistance_ref * (1 + BREAKOUT_BUFFER) if resistance_ref > 0 else False
+    not_near_resistance = dist_to_res > ONE_H_RESIST_BUFFER or breakout_tf
 
     squeeze_recent = width_curr <= BB_WIDTH_MIN and width_prev <= SQUEEZE_MAX_PREV_WIDTH
     squeeze_tightening = width_curr <= width_prev * 1.08
     squeeze_ok = squeeze_recent and squeeze_tightening and vol_ratio >= SQUEEZE_MIN_VOL_RATIO and volume_growing
 
-    exp_vol_ok = vol_ratio >= EXP_VOL_NORMAL
-    expansion_early_ok = expansion_ok and exp_vol_ok and width_curr < BB_WIDTH_MAX and volume_growing
-    expansion_confirmed_ok = expansion_early_ok and price_up and sustained_green and holding_above and closes_strong
+    recent_width_min = ((hband.iloc[-5:] - lband.iloc[-5:]) / mavg.iloc[-5:]).min()
+    tight_range = recent_width_min <= PREBREAK_TIGHT_RANGE_MAX
+
+    # Detectar ruptura reciente para HOLD/RETEST en 15m
+    recent_break_idx = None
+    recent_break_ref = None
+    recent_break_close = None
+    start = max(25, len(df) - HOLD_LOOKBACK_BARS - 2)
+    for idx in range(start, len(df) - 1):
+        ref_slice = high.iloc[max(0, idx - RECENT_LOOKBACK):idx]
+        if len(ref_slice) < RECENT_LOOKBACK:
+            continue
+        ref = ref_slice.max()
+        if close.iloc[idx] > ref * (1 + BREAKOUT_BUFFER):
+            recent_break_idx = idx
+            recent_break_ref = ref
+            recent_break_close = close.iloc[idx]
+
+    hold_recent_break = False
+    hold_kept_zone = False
+    hold_pullback_ok = False
+    hold_after_break_closes = 0
+    bars_since_break = None
+    if recent_break_idx is not None and recent_break_ref:
+        bars_since_break = len(df) - 1 - recent_break_idx
+        if 1 <= bars_since_break <= HOLD_RECENT_BREAK_MAX_BARS:
+            post = df.iloc[recent_break_idx + 1:]
+            if len(post) >= 2:
+                min_post_close = post["close"].min()
+                min_post_low = post["low"].min()
+                hold_kept_zone = min_post_low >= recent_break_ref * (1 - HOLD_ZONE_BUFFER)
+                hold_pullback = (recent_break_close - min_post_close) / recent_break_close if recent_break_close else 0
+                hold_pullback_ok = hold_pullback <= HOLD_PULLBACK_MAX
+                hold_after_break_closes = last_n_strong_closes(post["close"], post["high"], post["low"], min(3, len(post)))
+                hold_recent_break = True
 
     return symbol, interval, {
         "price": price,
         "vol_ratio": vol_ratio,
         "vol_growth": vol_growth,
+        "volume_growing": volume_growing,
         "trend_up": trend_up,
+        "width_curr": width_curr,
+        "expansion_ok": expansion_ok,
+        "close_position": close_position,
+        "closes_strong": closes_strong,
+        "strong_closes_3": strong_closes_3,
+        "rising_candles_3": rising_candles_3,
+        "breakout_ref": breakout_ref,
         "structure_break": structure_break,
         "meaningful_break": meaningful_break,
         "breakout_distance": breakout_distance,
+        "near_break": near_break,
+        "tight_range": tight_range,
+        "squeeze_ok": squeeze_ok,
         "holding_above": holding_above,
         "hold_count": hold_count,
-        "sustained_green": sustained_green,
-        "recent_green": recent_green,
         "not_near_resistance": not_near_resistance,
         "dist_to_res": dist_to_res,
-        "breakout_1h": breakout_1h,
-        "squeeze_ok": squeeze_ok,
-        "expansion_early_ok": expansion_early_ok,
-        "expansion_confirmed_ok": expansion_confirmed_ok,
-        "closes_strong": closes_strong,
-        "close_position": close_position,
-        "volume_growing": volume_growing,
+        "breakout_tf": breakout_tf,
+        "hold_recent_break": hold_recent_break,
+        "hold_kept_zone": hold_kept_zone,
+        "hold_pullback_ok": hold_pullback_ok,
+        "hold_after_break_closes": hold_after_break_closes,
+        "bars_since_break": bars_since_break,
     }
 
 
@@ -276,103 +347,245 @@ def binance_link(symbol):
     return f"[🔗]({url})"
 
 
-def early_in_cooldown(symbol, last_seen):
-    ts = last_seen.get((symbol, "15m"))
+def in_cooldown(symbol, history_tf, last_seen):
+    ts = last_seen.get((symbol, history_tf))
     if not ts:
         return False
-    return datetime.now(timezone.utc) - ts < timedelta(minutes=EARLY_COOLDOWN_MINUTES)
+    return datetime.now(timezone.utc) - ts < timedelta(minutes=STATE_COOLDOWN_MINUTES)
 
 
-def score_early(tf15, tf30, tf1h):
+# ── Scoring / clasificación ───────────────────────────────────────────────────
+def score_prebreak(tf5, tf30, tf1h):
     score = 0
     reasons = []
-
-    if tf15.get("meaningful_break"):
+    if tf5.get("squeeze_ok"):
         score += 2
-        reasons.append(f"📈 ruptura 15m +{tf15.get('breakout_distance', 0):.2%}")
-    if tf15.get("volume_growing"):
+        reasons.append("🤏 compresión filtrada 5m")
+    elif tf5.get("tight_range"):
         score += 1
-        reasons.append(f"📊 volumen creciendo {tf15.get('vol_growth', 0):.2f}x")
-
-    if tf15.get("expansion_early_ok"):
+        reasons.append("📦 rango aún comprimido 5m")
+    if tf5.get("near_break"):
         score += 2
-        reasons.append(f"🌀 expansión 15m con vol {tf15.get('vol_ratio', 0):.1f}x")
-    if tf15.get("squeeze_ok"):
+        reasons.append("🧱 muy cerca de romper máximo reciente 5m")
+    if tf5.get("volume_growing"):
         score += 1
-        reasons.append("🤏 squeeze filtrado")
-    if tf15.get("closes_strong"):
+        reasons.append(f"📊 volumen creciendo {tf5.get('vol_growth', 0):.2f}x")
+    elif tf5.get("vol_ratio", 0) >= 1.15:
         score += 1
-        reasons.append(f"🕯 cierre fuerte 15m ({tf15.get('close_position', 0):.0%} rango)")
-
-    if tf30.get("trend_up") or tf30.get("holding_above") or tf30.get("sustained_green"):
+        reasons.append(f"📊 volumen ya encima de lo normal ({tf5.get('vol_ratio', 0):.1f}x)")
+    if tf5.get("closes_strong"):
         score += 1
-        reasons.append("🧭 30m constructivo")
-    if tf30.get("meaningful_break"):
+        reasons.append(f"🕯 cierre fuerte 5m ({tf5.get('close_position', 0):.0%} rango)")
+    if tf5.get("rising_candles_3", 0) >= PREBREAK_RISING_CANDLES_MIN:
         score += 1
-        reasons.append(f"📈 30m acompaña +{tf30.get('breakout_distance', 0):.2%}")
-
+        reasons.append("↗ presión compradora 5m")
+    if tf30.get("trend_up") or tf30.get("holding_above"):
+        score += 1
+        reasons.append("🧭 30m acompaña")
     if tf1h.get("trend_up"):
-        score += 2
-        reasons.append("🟣 1h tendencia alcista")
+        score += 1
+        reasons.append("🟣 1h a favor")
     if tf1h.get("not_near_resistance"):
         score += 1
-        if tf1h.get("breakout_1h"):
-            reasons.append("🧱 1h rompiendo resistencia")
-        else:
-            reasons.append(f"🧱 1h con espacio ({tf1h.get('dist_to_res', 0):.2%})")
-    if tf1h.get("holding_above") or tf1h.get("sustained_green"):
-        score += 1
-        reasons.append(f"📌 1h sostén {tf1h.get('hold_count', 0)}/3 velas")
+        reasons.append("🧱 1h con espacio")
+    return score, reasons
 
+
+def score_breakout(tf15, tf30, tf1h):
+    score = 0
+    reasons = []
+    if tf15.get("meaningful_break"):
+        score += 3
+        reasons.append(f"📈 ruptura 15m +{tf15.get('breakout_distance', 0):.2%}")
+    if tf15.get("expansion_ok") and tf15.get("vol_ratio", 0) >= EXP_VOL_NORMAL:
+        score += 2
+        reasons.append(f"🌀 expansión 15m con vol {tf15.get('vol_ratio', 0):.1f}x")
+    if tf15.get("closes_strong"):
+        score += 1
+        reasons.append(f"🕯 cierre fuerte ({tf15.get('close_position', 0):.0%} rango)")
+    if tf15.get("breakout_distance", 0) <= BREAKOUT_NOT_OVEREXTENDED_MAX:
+        score += 1
+        reasons.append("📏 aún no muy extendida")
+    if tf30.get("trend_up") or tf30.get("meaningful_break"):
+        score += 1
+        reasons.append("🧭 30m acompaña")
+    if tf1h.get("trend_up"):
+        score += 1
+        reasons.append("🟣 1h alcista")
+    if tf1h.get("not_near_resistance"):
+        score += 1
+        reasons.append("🧱 1h con espacio / rompiendo")
+    return score, reasons
+
+
+def score_hold(tf15, tf30, tf1h):
+    score = 0
+    reasons = []
+    if tf15.get("hold_recent_break"):
+        score += 2
+        reasons.append(f"📍 ruptura reciente hace {tf15.get('bars_since_break', 0)} velas")
+    if tf15.get("hold_kept_zone"):
+        score += 2
+        reasons.append("🛡 no perdió la zona rota")
+    if tf15.get("hold_pullback_ok"):
+        score += 1
+        reasons.append("↘ retroceso sano")
+    if tf15.get("hold_after_break_closes", 0) >= HOLD_STRONG_CLOSES_MIN:
+        score += 2
+        reasons.append("🕯 sostiene con cierres firmes")
+    if tf30.get("holding_above") or tf30.get("trend_up"):
+        score += 1
+        reasons.append("🧭 30m sigue constructivo")
+    if tf1h.get("trend_up"):
+        score += 1
+        reasons.append("🟣 1h sigue a favor")
+    if tf1h.get("not_near_resistance"):
+        score += 1
+        reasons.append("🧱 1h aún con espacio")
     return score, reasons
 
 
 def classify_symbol(symbol, tf_map, counts_history, last_seen):
+    tf5 = tf_map.get("5m") or {}
     tf15 = tf_map.get("15m") or {}
     tf30 = tf_map.get("30m") or {}
     tf1h = tf_map.get("1h") or {}
-
-    if not tf15 or not tf30 or not tf1h:
+    if not tf5 or not tf15 or not tf30 or not tf1h:
         return None
 
-    trend_ok = tf1h.get("trend_up", False)
-    resistance_ok = tf1h.get("not_near_resistance", False)
-    continuity_ok = tf1h.get("holding_above", False) or tf1h.get("sustained_green", False)
-    if not (trend_ok and resistance_ok and continuity_ok):
+    # filtro macro: 30m y 1h deben estar al menos constructivos
+    macro_ok = (
+        (tf30.get("trend_up") or tf30.get("holding_above"))
+        and tf1h.get("trend_up")
+        and tf1h.get("not_near_resistance")
+    )
+    if not macro_ok:
         return None
 
-    # Queremos focus total en EARLY premium; CONFIRMED y LATE quedan fuera de Telegram.
-    score, reasons = score_early(tf15, tf30, tf1h)
-    if score < EARLY_MIN_SCORE:
+    candidates = []
+
+    pre_score, pre_reasons = score_prebreak(tf5, tf30, tf1h)
+    if (
+        tf5.get("near_break")
+        and (tf5.get("squeeze_ok") or tf5.get("tight_range"))
+        and (tf5.get("volume_growing") or tf5.get("vol_ratio", 0) >= 1.15)
+        and (tf5.get("closes_strong") or tf5.get("rising_candles_3", 0) >= PREBREAK_RISING_CANDLES_MIN)
+        and pre_score >= PREBREAK_SCORE_MIN
+        and not in_cooldown(symbol, "PREBREAK", last_seen)
+    ):
+        prev = counts_history.get((symbol, "PREBREAK"), 0)
+        candidates.append({
+            "symbol": symbol,
+            "label": "PRE-BREAK",
+            "history_tf": "PREBREAK",
+            "score": pre_score,
+            "priority": 1,
+            "vol_ratio": tf5.get("vol_ratio", 0),
+            "reasons": pre_reasons,
+            "late": prev >= LATE_REPEAT_COUNT,
+            "timeframe": "5m",
+            "immediate": pre_score >= PREBREAK_IMMEDIATE_SCORE and prev < LATE_REPEAT_COUNT,
+        })
+
+    breakout_score, breakout_reasons = score_breakout(tf15, tf30, tf1h)
+    if (
+        tf15.get("meaningful_break")
+        and tf15.get("expansion_ok")
+        and tf15.get("vol_ratio", 0) >= EXP_VOL_NORMAL
+        and tf15.get("breakout_distance", 0) <= BREAKOUT_NOT_OVEREXTENDED_MAX
+        and breakout_score >= BREAKOUT_SCORE_MIN
+        and not in_cooldown(symbol, "BREAKOUT", last_seen)
+    ):
+        prev = counts_history.get((symbol, "BREAKOUT"), 0)
+        candidates.append({
+            "symbol": symbol,
+            "label": "BREAKOUT",
+            "history_tf": "BREAKOUT",
+            "score": breakout_score,
+            "priority": 2,
+            "vol_ratio": tf15.get("vol_ratio", 0),
+            "reasons": breakout_reasons,
+            "late": prev >= LATE_REPEAT_COUNT,
+            "timeframe": "15m",
+            "immediate": breakout_score >= BREAKOUT_IMMEDIATE_SCORE and prev < LATE_REPEAT_COUNT,
+        })
+
+    hold_score, hold_reasons = score_hold(tf15, tf30, tf1h)
+    if (
+        tf15.get("hold_recent_break")
+        and tf15.get("hold_kept_zone")
+        and tf15.get("hold_pullback_ok")
+        and tf15.get("hold_after_break_closes", 0) >= HOLD_STRONG_CLOSES_MIN
+        and hold_score >= HOLD_SCORE_MIN
+        and not in_cooldown(symbol, "HOLD", last_seen)
+    ):
+        prev = counts_history.get((symbol, "HOLD"), 0)
+        candidates.append({
+            "symbol": symbol,
+            "label": "HOLD/RETEST",
+            "history_tf": "HOLD",
+            "score": hold_score,
+            "priority": 3,
+            "vol_ratio": tf15.get("vol_ratio", 0),
+            "reasons": hold_reasons,
+            "late": prev >= LATE_REPEAT_COUNT,
+            "timeframe": "15m",
+            "immediate": False,
+        })
+
+    if not candidates:
         return None
 
-    if early_in_cooldown(symbol, last_seen):
-        return None
-
-    prev_15m = counts_history.get((symbol, "15m"), 0)
-    label = "LATE" if prev_15m >= LATE_REPEAT_COUNT else "EARLY"
-
-    return {
-        "symbol": symbol,
-        "timeframe": "15m",
-        "label": label,
-        "priority": 1,
-        "score": score,
-        "vol_ratio": tf15.get("vol_ratio", 0),
-        "reasons": reasons,
-    }
+    # priorizamos HOLD > BREAKOUT > PRE-BREAK; luego score y vol
+    candidates.sort(key=lambda x: (x["priority"], x["score"], x["vol_ratio"]), reverse=True)
+    return candidates[0]
 
 
+# ── Formato ───────────────────────────────────────────────────────────────────
 def format_alert(alert, counts_history):
-    symbol = alert["symbol"]
-    tf = alert["timeframe"]
-    prev = counts_history.get((symbol, tf), 0)
+    prev = counts_history.get((alert["symbol"], alert["history_tf"]), 0)
+    late_tag = " [LATE]" if alert.get("late") else ""
     hist_tag = f"  _(+{prev} en {HISTORY_HOURS}h)_" if prev > 0 else ""
-    header = f"[{alert['label']}] {symbol} [{tf}] score={alert['score']} {binance_link(symbol)}{hist_tag}"
+    header = f"[{alert['label']}{late_tag}] {alert['symbol']} {alert['timeframe']} score={alert['score']} {binance_link(alert['symbol'])}{hist_tag}"
     body = "\n".join(f"  {r}" for r in alert["reasons"])
     return f"{header}\n{body}"
 
 
+def dedupe_and_rank(alerts):
+    best = {}
+    for alert in alerts:
+        cur = best.get(alert["symbol"])
+        if cur is None or (alert["priority"], alert["score"], alert["vol_ratio"]) > (cur["priority"], cur["score"], cur["vol_ratio"]):
+            best[alert["symbol"]] = alert
+
+    ranked = list(best.values())
+    ranked.sort(key=lambda x: (x["priority"], x["score"], x["vol_ratio"]), reverse=True)
+
+    final = []
+    caps = {"PRE-BREAK": PREBREAK_TOP_N, "BREAKOUT": BREAKOUT_TOP_N, "HOLD/RETEST": HOLD_TOP_N}
+    used = {k: 0 for k in caps}
+    for alert in ranked:
+        label = alert["label"]
+        if used[label] >= caps[label]:
+            continue
+        final.append(alert)
+        used[label] += 1
+        if len(final) >= TOP_ALERT_COUNT:
+            break
+    return final
+
+
+def send_immediate(alert, counts_history):
+    prefix = "⚡ PRE-BREAK FUERTE" if alert["label"] == "PRE-BREAK" else "🚀 BREAKOUT"
+    text = (
+        f"{prefix}\n"
+        f"{format_alert(alert, counts_history)}\n"
+        f"  filtros: 30m+1h OK"
+    )
+    send_telegram(text)
+
+
+# ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     pairs = get_all_usdt_pairs()
@@ -383,6 +596,7 @@ def main():
     per_symbol = {sym: {} for sym in pairs}
     candidates = []
     processed = set()
+    immediate_sent_keys = set()
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {executor.submit(analyze, sym, tf): (sym, tf) for sym, tf in tasks}
@@ -396,37 +610,54 @@ def main():
 
             alert = classify_symbol(symbol, per_symbol[symbol], counts_history, last_seen)
             processed.add(symbol)
-            if alert:
-                candidates.append(alert)
-                print(f"  ✅ {symbol} -> {alert['label']} score={alert['score']} {alert['reasons']}")
+            if not alert:
+                continue
+
+            candidates.append(alert)
+            print(f"  ✅ {symbol} -> {alert['label']} {alert['timeframe']} score={alert['score']} late={alert['late']}")
+
+            key = (alert["symbol"], alert["history_tf"])
+            if alert.get("immediate") and key not in immediate_sent_keys:
+                try:
+                    send_immediate(alert, counts_history)
+                    immediate_sent_keys.add(key)
+                    print(f"  ⚡ inmediato enviado: {symbol} {alert['label']}")
+                except Exception as e:
+                    print(f"  ⚠ error envío inmediato {symbol}: {e}")
 
     if not candidates:
-        print("Sin EARLY premium en este scan. No se envía nada a Telegram.")
+        print("Sin setups PRE-BREAK / BREAKOUT / HOLD-RETEST en este run.")
         return
 
-    # Focus total en EARLY y limpieza: descartamos LATE del Telegram.
-    early_candidates = [a for a in candidates if a["label"] == "EARLY"]
-    if not early_candidates:
-        print("Solo hubo repetidas/LATE; no se envía Telegram para evitar ruido.")
+    selected = dedupe_and_rank(candidates)
+    if not selected:
+        print("No hubo setups seleccionados tras dedupe/ranking.")
         return
 
-    early_candidates.sort(key=lambda x: (x["score"], x["vol_ratio"]), reverse=True)
-    top_early = early_candidates[:TOP_EARLY_COUNT]
-    insert_history(top_early)
+    insert_history(selected)
 
-    bar = "━" * 24
-    header = (
-        f"{bar}\n"
-        f"🟡 TOP {len(top_early)} EARLY • {now}\n"
-        f"   15m + 30m + 1h • {len(pairs)} pares\n"
-        f"   cooldown {EARLY_COOLDOWN_MINUTES}m • min score {EARLY_MIN_SCORE}\n"
-        f"{bar}"
-    )
-    body = "\n\n".join(format_alert(alert, counts_history) for alert in top_early)
-    send_telegram(header + "\n" + body)
+    # Excluir del resumen lo ya enviado de inmediato para evitar duplicados
+    summary_alerts = [a for a in selected if (a["symbol"], a["history_tf"]) not in immediate_sent_keys]
+    if summary_alerts:
+        bar = "━" * 24
+        counts_by_label = {}
+        for a in summary_alerts:
+            counts_by_label[a["label"]] = counts_by_label.get(a["label"], 0) + 1
+        summary = " • ".join(f"{k}:{v}" for k, v in counts_by_label.items())
+        header = (
+            f"{bar}\n"
+            f"🎯 RESUMEN SETUPS • {now}\n"
+            f"   {summary} • 5m + 15m + 30m + 1h\n"
+            f"   5m PRE-BREAK • 15m BREAKOUT • filtros 30m/1h\n"
+            f"   cooldown {STATE_COOLDOWN_MINUTES}m • {len(pairs)} pares\n"
+            f"{bar}"
+        )
+        body = "\n\n".join(format_alert(alert, counts_history) for alert in summary_alerts)
+        send_telegram(header + "\n" + body)
 
-    print(f"\nTotal candidatos EARLY: {len(candidates)}")
-    print(f"✅ Telegram: enviados solo TOP {len(top_early)} EARLY")
+    print(f"\nTotal candidatos: {len(candidates)}")
+    print(f"⚡ inmediatos: {len(immediate_sent_keys)}")
+    print(f"✅ resumen final: {len(summary_alerts)}")
 
 
 if __name__ == "__main__":
