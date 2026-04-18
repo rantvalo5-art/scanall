@@ -1,13 +1,15 @@
 """
-Screener simplificado con 3 reglas claras:
-- PRE-BREAK: compresión previa + muy cerca del máximo reciente + volumen subiendo
-- BREAKOUT: cierre por encima del máximo reciente + volumen suficiente + no demasiado extendida
-- HOLD: breakout reciente + sigue arriba de la resistencia rota + retroceso chico
+Screener simplificado con prioridad real:
+- PRE-BREAK: 5m cerca de romper, volumen creciendo, BB comprimida
+- BREAKOUT: 15m rompe máximo reciente con volumen y expansión
+- HOLD: 15m rompe y sostiene la zona
 
-Arquitectura:
-- 5m  = PRE-BREAK
-- 15m = BREAKOUT / HOLD
-- 1h  = filtro simple de contexto
+Además:
+- calcula un score por símbolo
+- elige el mejor setup por moneda
+- rankea las mejores oportunidades
+- clasifica en BEST / STRONG / WATCH
+- manda solo pocas alertas, ordenadas por prioridad
 """
 
 import os
@@ -29,7 +31,7 @@ LIMIT = 180
 TOP_N = 9999
 MAX_WORKERS = 20
 MIN_QUOTE_VOLUME = 300000
-TOP_ALERT_COUNT = 6
+TOP_ALERT_COUNT = 3
 
 # Historial / spam
 HISTORY_HOURS = 8
@@ -56,6 +58,11 @@ HOLD_PULLBACK_MAX = 0.030          # pullback máximo 3%
 STRONG_CLOSE_MIN = 0.65            # cierre en 65% superior del rango
 ONE_H_RESIST_LOOKBACK = 24
 ONE_H_RESIST_BUFFER = 0.015
+
+# Ranking final
+BEST_MIN_SCORE = 8
+STRONG_MIN_SCORE = 6
+IMMEDIATE_MIN_SCORE = 7
 
 
 # ── Supabase ───────────────────────────────────────────────────────────────────
@@ -185,6 +192,14 @@ def binance_link(symbol):
     return f"[🔗]({url})"
 
 
+def final_bucket(score):
+    if score >= BEST_MIN_SCORE:
+        return "BEST"
+    if score >= STRONG_MIN_SCORE:
+        return "STRONG"
+    return "WATCH"
+
+
 # ── Análisis por timeframe ─────────────────────────────────────────────────────
 def analyze(symbol, interval):
     try:
@@ -196,7 +211,6 @@ def analyze(symbol, interval):
         return symbol, interval, None
 
     close = df["close"]
-    open_ = df["open"]
     high = df["high"]
     low = df["low"]
     volume = df["volume"]
@@ -295,7 +309,6 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     if not tf5 or not tf15 or not tf1h:
         return None
 
-    # filtro simple de 1h
     if not (tf1h.get("ema_trend_up") and tf1h.get("not_near_resistance")):
         return None
 
@@ -309,23 +322,49 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     )
     if pre_ok and not in_cooldown(symbol, "PREBREAK", last_seen):
         prev = counts_history.get((symbol, "PREBREAK"), 0)
-        reasons = [
-            f"5m a {((tf5['recent_max'] - tf5['price']) / tf5['recent_max']):.2%} del máximo reciente",
-            f"volumen 5m {tf5['vol_ratio']:.1f}x del promedio",
-            f"crecimiento de volumen {tf5['vol_growth']:.2f}x",
-            f"BB aún comprimida (width {tf5['width_curr']:.2%})",
-            "1h alcista y con espacio",
-        ]
+        score = 3
+        reasons = []
+        near_pct = ((tf5['recent_max'] - tf5['price']) / tf5['recent_max']) if tf5['recent_max'] else 0.0
+        reasons.append(f"5m a {near_pct:.2%} del máximo reciente")
+        if tf5['vol_ratio'] >= 1.6:
+            score += 2
+            reasons.append(f"volumen 5m fuerte ({tf5['vol_ratio']:.1f}x)")
+        else:
+            score += 1
+            reasons.append(f"volumen 5m arriba de lo normal ({tf5['vol_ratio']:.1f}x)")
+        if tf5['vol_growth'] >= 1.3:
+            score += 2
+            reasons.append(f"volumen creciendo bien ({tf5['vol_growth']:.2f}x)")
+        else:
+            score += 1
+            reasons.append(f"volumen creciendo ({tf5['vol_growth']:.2f}x)")
+        if tf5['strong_close']:
+            score += 1
+            reasons.append("última vela 5m cerró fuerte")
+        if tf5['width_curr'] <= 0.025:
+            score += 1
+            reasons.append(f"BB 5m bien comprimida ({tf5['width_curr']:.2%})")
+        else:
+            reasons.append(f"BB 5m todavía comprimida ({tf5['width_curr']:.2%})")
+        if tf1h['dist_to_res'] > 0.04:
+            score += 2
+            reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
+        else:
+            score += 1
+            reasons.append("1h alcista y con espacio")
+        if prev >= LATE_REPEAT_COUNT:
+            score -= 1
         candidates.append({
             "symbol": symbol,
             "label": "PRE-BREAK",
             "history_tf": "PREBREAK",
-            "score": 1,
+            "score": score,
             "priority": 1,
+            "bucket": final_bucket(score),
             "reasons": reasons,
             "late": prev >= LATE_REPEAT_COUNT,
             "timeframe": "5m",
-            "immediate": prev < LATE_REPEAT_COUNT,
+            "immediate": prev < LATE_REPEAT_COUNT and score >= IMMEDIATE_MIN_SCORE,
         })
 
     breakout_ok = (
@@ -336,23 +375,45 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     )
     if breakout_ok and not in_cooldown(symbol, "BREAKOUT", last_seen):
         prev = counts_history.get((symbol, "BREAKOUT"), 0)
-        reasons = [
-            f"15m cerró arriba del máximo reciente (+{tf15['breakout_distance']:.2%})",
-            f"volumen 15m {tf15['vol_ratio']:.1f}x",
-            f"expansión BB {tf15['width_expansion']:.0%} vs vela previa",
-            "no está demasiado extendida",
-            "1h alcista y con espacio",
-        ]
+        score = 4
+        reasons = [f"15m rompió el máximo reciente (+{tf15['breakout_distance']:.2%})"]
+        if tf15['vol_ratio'] >= 2.5:
+            score += 2
+            reasons.append(f"volumen 15m muy fuerte ({tf15['vol_ratio']:.1f}x)")
+        else:
+            score += 1
+            reasons.append(f"volumen 15m fuerte ({tf15['vol_ratio']:.1f}x)")
+        if tf15['width_expansion'] >= 0.25:
+            score += 2
+            reasons.append(f"expansión BB marcada ({tf15['width_expansion']:.0%})")
+        else:
+            score += 1
+            reasons.append(f"expansión BB válida ({tf15['width_expansion']:.0%})")
+        if tf15['strong_close']:
+            score += 1
+            reasons.append("cierre 15m fuerte")
+        if tf15['breakout_distance'] <= 0.02:
+            score += 1
+            reasons.append("todavía no está muy extendida")
+        if tf1h['dist_to_res'] > 0.04:
+            score += 2
+            reasons.append(f"1h con espacio real ({tf1h['dist_to_res']:.2%})")
+        else:
+            score += 1
+            reasons.append("1h alcista y con espacio")
+        if prev >= LATE_REPEAT_COUNT:
+            score -= 1
         candidates.append({
             "symbol": symbol,
             "label": "BREAKOUT",
             "history_tf": "BREAKOUT",
-            "score": 2,
+            "score": score,
             "priority": 2,
+            "bucket": final_bucket(score),
             "reasons": reasons,
             "late": prev >= LATE_REPEAT_COUNT,
             "timeframe": "15m",
-            "immediate": prev < LATE_REPEAT_COUNT,
+            "immediate": prev < LATE_REPEAT_COUNT and score >= IMMEDIATE_MIN_SCORE,
         })
 
     hold_ok = (
@@ -363,19 +424,29 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     )
     if hold_ok and not in_cooldown(symbol, "HOLD", last_seen):
         prev = counts_history.get((symbol, "HOLD"), 0)
-        reasons = [
-            f"ruptura reciente en 15m hace {tf15['bars_since_break']} velas",
-            "sigue arriba de la resistencia rota",
-            "pullback pequeño / sano",
-            "última vela post-break cierra fuerte",
-            "1h alcista y con espacio",
-        ]
+        score = 5
+        reasons = [f"ruptura reciente en 15m hace {tf15['bars_since_break']} velas"]
+        score += 2
+        reasons.append("sigue arriba de la resistencia rota")
+        score += 1
+        reasons.append("pullback sano")
+        score += 1
+        reasons.append("última vela post-break cierra fuerte")
+        if tf1h['dist_to_res'] > 0.04:
+            score += 2
+            reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
+        else:
+            score += 1
+            reasons.append("1h acompaña")
+        if prev >= LATE_REPEAT_COUNT:
+            score -= 1
         candidates.append({
             "symbol": symbol,
             "label": "HOLD",
             "history_tf": "HOLD",
-            "score": 3,
+            "score": score,
             "priority": 3,
+            "bucket": final_bucket(score),
             "reasons": reasons,
             "late": prev >= LATE_REPEAT_COUNT,
             "timeframe": "15m",
@@ -385,17 +456,22 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     if not candidates:
         return None
 
-    candidates.sort(key=lambda x: (x["priority"], x["score"]), reverse=True)
+    candidates.sort(key=lambda x: (x["score"], x["priority"]), reverse=True)
     return candidates[0]
 
 
 # ── Formato ───────────────────────────────────────────────────────────────────
-def format_alert(alert, counts_history):
+def format_alert(alert, counts_history, with_reasons=True):
     prev = counts_history.get((alert["symbol"], alert["history_tf"]), 0)
     late_tag = " [LATE]" if alert.get("late") else ""
     hist_tag = f"  _(+{prev} en {HISTORY_HOURS}h)_" if prev > 0 else ""
-    header = f"[{alert['label']}{late_tag}] {alert['symbol']} {alert['timeframe']} {binance_link(alert['symbol'])}{hist_tag}"
-    body = "\n".join(f"  - {r}" for r in alert["reasons"])
+    header = (
+        f"[{alert['bucket']}] [{alert['label']}{late_tag}] {alert['symbol']} "
+        f"score {alert['score']} • {alert['timeframe']} {binance_link(alert['symbol'])}{hist_tag}"
+    )
+    if not with_reasons:
+        return header
+    body = "\n".join(f"  - {r}" for r in alert["reasons"][:3])
     return f"{header}\n{body}"
 
 
@@ -403,16 +479,15 @@ def dedupe_and_rank(alerts):
     best = {}
     for alert in alerts:
         cur = best.get(alert["symbol"])
-        if cur is None or (alert["priority"], alert["score"]) > (cur["priority"], cur["score"]):
+        if cur is None or (alert["score"], alert["priority"]) > (cur["score"], cur["priority"]):
             best[alert["symbol"]] = alert
     ranked = list(best.values())
-    ranked.sort(key=lambda x: (x["priority"], x["score"]), reverse=True)
+    ranked.sort(key=lambda x: (x["score"], x["priority"]), reverse=True)
     return ranked[:TOP_ALERT_COUNT]
 
 
 def send_immediate(alert, counts_history):
-    prefix = "⚡ PRE-BREAK" if alert["label"] == "PRE-BREAK" else "🚀 BREAKOUT"
-    send_telegram(f"{prefix}\n{format_alert(alert, counts_history)}")
+    send_telegram(f"🔥 PRIORITY NOW\n{format_alert(alert, counts_history)}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -443,7 +518,7 @@ def main():
                 continue
 
             candidates.append(alert)
-            print(f"  ✅ {symbol} -> {alert['label']} {alert['timeframe']} late={alert['late']}")
+            print(f"  ✅ {symbol} -> {alert['bucket']} {alert['label']} score={alert['score']} late={alert['late']}")
 
             key = (alert["symbol"], alert["history_tf"])
             if alert.get("immediate") and key not in immediate_sent_keys:
@@ -460,20 +535,23 @@ def main():
     selected = dedupe_and_rank(candidates)
     insert_history(selected)
 
-    summary_alerts = [a for a in selected if (a["symbol"], a["history_tf"]) not in immediate_sent_keys]
-    if summary_alerts:
-        body = "\n\n".join(format_alert(alert, counts_history) for alert in summary_alerts)
-        header = (
-            f"🎯 RESUMEN SIMPLE • {now}\n"
-            f"reglas: PRE-BREAK / BREAKOUT / HOLD\n"
-            f"5m cerca de romper • 15m rompe o sostiene • 1h filtro\n"
-            f"cooldown {STATE_COOLDOWN_MINUTES}m • {len(pairs)} pares\n"
-        )
-        send_telegram(header + "\n" + body)
+    summary_lines = []
+    for idx, alert in enumerate(selected, start=1):
+        prefix = "👑 BEST" if idx == 1 else ("💪 STRONG" if idx == 2 else "👀 WATCH")
+        summary_lines.append(f"{prefix} #{idx}\n{format_alert(alert, counts_history)}")
+
+    body = "\n\n".join(summary_lines)
+    header = (
+        f"🎯 TOP SETUPS • {now}\n"
+        f"solo top {TOP_ALERT_COUNT} ordenadas por prioridad real\n"
+        f"1) score  2) estructura  3) espacio 1h\n"
+        f"cooldown {STATE_COOLDOWN_MINUTES}m • {len(pairs)} pares\n"
+    )
+    send_telegram(header + "\n" + body)
 
     print(f"Total candidatos: {len(candidates)}")
     print(f"Inmediatos: {len(immediate_sent_keys)}")
-    print(f"Resumen final: {len(summary_alerts)}")
+    print(f"Top final: {len(selected)}")
 
 
 if __name__ == "__main__":
