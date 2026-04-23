@@ -31,7 +31,7 @@ LIMIT = 180
 TOP_N = 9999
 MAX_WORKERS = 20
 MIN_QUOTE_VOLUME = 300000
-TOP_ALERT_COUNT = 3
+TOP_ALERT_COUNT = 2
 
 # Historial / spam
 HISTORY_HOURS = 8
@@ -60,9 +60,16 @@ ONE_H_RESIST_LOOKBACK = 24
 ONE_H_RESIST_BUFFER = 0.015
 
 # Ranking final
-BEST_MIN_SCORE = 8
-STRONG_MIN_SCORE = 6
-IMMEDIATE_MIN_SCORE = 7
+BEST_MIN_SCORE = 10
+STRONG_MIN_SCORE = 8
+IMMEDIATE_MIN_SCORE = 9
+
+# Confluencia multi-TF para BREAKOUT
+# El 5m debe mostrar momentum activo antes de confirmar el 15m
+BREAKOUT_5M_MIN_VOL_RATIO = 1.50   # volumen 5m > 1.5x promedio
+BREAKOUT_5M_STRONG_CLOSE = True    # última vela 5m cierra en 65%+ del rango
+# Estructura de la vela de breakout en 15m
+BREAKOUT_MIN_BODY_PCT = 0.60       # cuerpo ocupa al menos 60% del rango HL
 
 
 # ── Supabase ───────────────────────────────────────────────────────────────────
@@ -236,6 +243,10 @@ def analyze(symbol, interval):
     close_pos = close_position(price, high.iloc[-1], low.iloc[-1])
     strong_close = close_pos >= STRONG_CLOSE_MIN
 
+    # Tamaño del cuerpo de la última vela como % del rango HL
+    candle_range = max(high.iloc[-1] - low.iloc[-1], 1e-12)
+    candle_body_pct = abs(close.iloc[-1] - df["open"].iloc[-1]) / candle_range
+
     recent_max = high.iloc[-(RECENT_LOOKBACK + 2):-2].max()
     near_recent_max = recent_max > 0 and 0 <= (recent_max - price) / recent_max <= PREBREAK_NEAR_MAX
     breakout = recent_max > 0 and price > recent_max * (1 + BREAKOUT_BUFFER)
@@ -287,6 +298,7 @@ def analyze(symbol, interval):
         "vol_ratio": vol_ratio,
         "vol_growth": vol_growth,
         "strong_close": strong_close,
+        "candle_body_pct": candle_body_pct,
         "recent_max": recent_max,
         "near_recent_max": near_recent_max,
         "breakout": breakout,
@@ -372,17 +384,33 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         and tf15.get("vol_ratio", 0) >= BREAKOUT_MIN_VOL_RATIO
         and tf15.get("breakout_distance", 9) <= BREAKOUT_MAX_EXTENDED
         and tf15.get("width_expansion", -9) >= BREAKOUT_BB_EXPANSION_MIN
+        # Filtro de estructura: la vela de breakout en 15m debe tener cuerpo sólido
+        # y cierre en la parte alta del rango
+        and tf15.get("strong_close", False)
+        and tf15.get("candle_body_pct", 0) >= BREAKOUT_MIN_BODY_PCT
+        # Confluencia multi-TF: el 5m debe mostrar momentum activo ahora mismo
+        and tf5.get("vol_ratio", 0) >= BREAKOUT_5M_MIN_VOL_RATIO
+        and tf5.get("strong_close", False)
     )
     if breakout_ok and not in_cooldown(symbol, "BREAKOUT", last_seen):
         prev = counts_history.get((symbol, "BREAKOUT"), 0)
         score = 4
         reasons = [f"15m rompió el máximo reciente (+{tf15['breakout_distance']:.2%})"]
-        if tf15['vol_ratio'] >= 2.5:
+        # Estructura de la vela de breakout
+        body_pct = tf15.get("candle_body_pct", 0)
+        if body_pct >= 0.75:
             score += 2
-            reasons.append(f"volumen 15m muy fuerte ({tf15['vol_ratio']:.1f}x)")
+            reasons.append(f"vela 15m muy sólida (cuerpo {body_pct:.0%} del rango)")
         else:
             score += 1
-            reasons.append(f"volumen 15m fuerte ({tf15['vol_ratio']:.1f}x)")
+            reasons.append(f"vela 15m sólida (cuerpo {body_pct:.0%} del rango)")
+        # Confluencia 5m
+        if tf5['vol_ratio'] >= 2.5:
+            score += 2
+            reasons.append(f"5m confirmando con volumen muy fuerte ({tf5['vol_ratio']:.1f}x)")
+        else:
+            score += 1
+            reasons.append(f"5m confirmando con volumen ({tf5['vol_ratio']:.1f}x)")
         if tf15['width_expansion'] >= 0.25:
             score += 2
             reasons.append(f"expansión BB marcada ({tf15['width_expansion']:.0%})")
