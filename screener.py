@@ -2,6 +2,8 @@
 Screener simplificado con prioridad real:
 - PRE-BREAK: 5m cerca de romper, volumen creciendo, BB comprimida
 - BREAKOUT: 15m rompe máximo reciente con volumen y expansión
+- RIDING: breakout que sigue subiendo y sosteniendo — se repite cada run
+- FADING: precio devolviendo después de un breakout — avisa una vez para salir
 - HOLD: 15m rompe y sostiene la zona
 
 Además:
@@ -10,6 +12,7 @@ Además:
 - rankea las mejores oportunidades
 - clasifica en BEST / STRONG / WATCH
 - manda solo pocas alertas, ordenadas por prioridad
+- RIDING no tiene penalización por repetición — se repite mientras sea válido
 """
 
 import os
@@ -35,8 +38,17 @@ TOP_ALERT_COUNT = 2
 
 # Historial / spam
 HISTORY_HOURS = 8
-STATE_COOLDOWN_MINUTES = 60
 LATE_REPEAT_COUNT = 1
+
+# Cooldown por tipo de estado (minutos)
+# RIDING y FADING tienen cooldown corto — queremos que se repitan
+COOLDOWN_BY_STATE = {
+    "PREBREAK": 60,
+    "BREAKOUT": 30,
+    "RIDING":   15,   # repite cada ~15min mientras siga subiendo
+    "FADING":  120,   # avisa una vez, después silencia
+    "HOLD":     45,
+}
 
 # Indicadores simples
 EMA_SLOW = 21
@@ -49,27 +61,36 @@ PREBREAK_BB_WIDTH_MAX = 0.035
 BREAKOUT_BUFFER = 0.001            # 0.1% arriba del máximo reciente
 BREAKOUT_MIN_VOL_RATIO = 1.80
 BREAKOUT_MAX_EXTENDED = 0.040      # no > 4% arriba del breakout
-BREAKOUT_BB_EXPANSION_MIN = 0.12   # 12% más ancho que vela previa
+BREAKOUT_BB_EXPANSION_MIN = 0.12   # 12% mas ancho que vela previa
+
+# Confluencia multi-TF para BREAKOUT
+BREAKOUT_5M_MIN_VOL_RATIO = 1.50   # volumen 5m > 1.5x promedio
+BREAKOUT_MIN_BODY_PCT = 0.60       # cuerpo ocupa al menos 60% del rango HL
 
 HOLD_LOOKBACK_BARS = 8
 HOLD_RECENT_BREAK_MAX_BARS = 5
 HOLD_ZONE_BUFFER = 0.003           # puede perforar 0.3%
-HOLD_PULLBACK_MAX = 0.030          # pullback máximo 3%
+HOLD_PULLBACK_MAX = 0.030          # pullback maximo 3%
 STRONG_CLOSE_MIN = 0.65            # cierre en 65% superior del rango
 ONE_H_RESIST_LOOKBACK = 24
 ONE_H_RESIST_BUFFER = 0.015
+
+# RIDING: el breakout sigue activo y subiendo
+RIDING_LOOKBACK_BARS = 20          # cuantas velas atras buscar el breakout original
+RIDING_MIN_GAIN = 0.005            # subio al menos 0.5% desde el breakout
+RIDING_MAX_GAIN = 0.15             # no mas de 15% (ya muy extendido)
+RIDING_ZONE_BUFFER = 0.012         # puede estar hasta 1.2% bajo la zona rota
+RIDING_MIN_VOL_RATIO = 1.20        # volumen sostenido (no colapso de vol)
+RIDING_EMA_MUST_TREND = True       # EMA 1h sigue alcista
+
+# FADING: precio devolviendo despues de un breakout
+FADING_REVERSAL_MIN = 0.015        # devolvio al menos 1.5% desde el maximo post-break
+FADING_BELOW_ZONE = 0.008          # perforo 0.8% bajo la zona rota
 
 # Ranking final
 BEST_MIN_SCORE = 10
 STRONG_MIN_SCORE = 8
 IMMEDIATE_MIN_SCORE = 9
-
-# Confluencia multi-TF para BREAKOUT
-# El 5m debe mostrar momentum activo antes de confirmar el 15m
-BREAKOUT_5M_MIN_VOL_RATIO = 1.50   # volumen 5m > 1.5x promedio
-BREAKOUT_5M_STRONG_CLOSE = True    # última vela 5m cierra en 65%+ del rango
-# Estructura de la vela de breakout en 15m
-BREAKOUT_MIN_BODY_PCT = 0.60       # cuerpo ocupa al menos 60% del rango HL
 
 
 # ── Supabase ───────────────────────────────────────────────────────────────────
@@ -102,7 +123,7 @@ def fetch_history():
                 last_seen[key] = ts
         return counts, last_seen
     except Exception as e:
-        print(f"⚠ Supabase fetch_history error: {e}")
+        print(f"Supabase fetch_history error: {e}")
         return {}, {}
 
 
@@ -124,7 +145,7 @@ def insert_history(alert_rows):
         )
         r2.raise_for_status()
     except Exception as e:
-        print(f"⚠ Supabase insert_history error: {e}")
+        print(f"Supabase insert_history error: {e}")
 
 
 # ── Datos Binance ──────────────────────────────────────────────────────────────
@@ -182,7 +203,8 @@ def in_cooldown(symbol, history_tf, last_seen):
     ts = last_seen.get((symbol, history_tf))
     if not ts:
         return False
-    return datetime.now(timezone.utc) - ts < timedelta(minutes=STATE_COOLDOWN_MINUTES)
+    cooldown_minutes = COOLDOWN_BY_STATE.get(history_tf, 60)
+    return datetime.now(timezone.utc) - ts < timedelta(minutes=cooldown_minutes)
 
 
 def send_telegram(text):
@@ -196,7 +218,7 @@ def send_telegram(text):
 def binance_link(symbol):
     pair = symbol[:-4] + "_USDT"
     url = f"https://www.binance.com/en/trade/{pair}?type=spot"
-    return f"[🔗]({url})"
+    return f"[{symbol}]({url})"
 
 
 def final_bucket(score):
@@ -207,7 +229,7 @@ def final_bucket(score):
     return "WATCH"
 
 
-# ── Análisis por timeframe ─────────────────────────────────────────────────────
+# ── Analisis por timeframe ─────────────────────────────────────────────────────
 def analyze(symbol, interval):
     try:
         df = get_klines(symbol, interval)
@@ -243,7 +265,7 @@ def analyze(symbol, interval):
     close_pos = close_position(price, high.iloc[-1], low.iloc[-1])
     strong_close = close_pos >= STRONG_CLOSE_MIN
 
-    # Tamaño del cuerpo de la última vela como % del rango HL
+    # Tamano del cuerpo de la ultima vela como % del rango HL
     candle_range = max(high.iloc[-1] - low.iloc[-1], 1e-12)
     candle_body_pct = abs(close.iloc[-1] - df["open"].iloc[-1]) / candle_range
 
@@ -256,7 +278,7 @@ def analyze(symbol, interval):
     dist_to_res = (one_h_resist - price) / price if price > 0 else 0.0
     not_near_resistance = dist_to_res > ONE_H_RESIST_BUFFER or breakout
 
-    # HOLD sencillo: detectar una ruptura reciente y medir qué pasó después
+    # ── HOLD: detectar ruptura reciente y medir que paso despues ──────────────
     recent_break_idx = None
     recent_break_ref = None
     recent_break_close = None
@@ -290,6 +312,40 @@ def analyze(symbol, interval):
                 last_post = post.iloc[-1]
                 hold_strong = close_position(last_post["close"], last_post["high"], last_post["low"]) >= STRONG_CLOSE_MIN
 
+    # ── RIDING / FADING: buscar breakout en ventana amplia ────────────────────
+    riding_break_idx = None
+    riding_break_ref = None
+    riding_break_close = None
+    ride_start = max(25, len(df) - RIDING_LOOKBACK_BARS - 2)
+    for idx in range(ride_start, len(df) - 1):
+        ref_slice = high.iloc[max(0, idx - RECENT_LOOKBACK):idx]
+        if len(ref_slice) < RECENT_LOOKBACK:
+            continue
+        ref = ref_slice.max()
+        if close.iloc[idx] > ref * (1 + BREAKOUT_BUFFER):
+            riding_break_idx = idx
+            riding_break_ref = ref
+            riding_break_close = close.iloc[idx]
+
+    riding_bars_since = None
+    riding_gain = None
+    riding_above_zone = None
+    riding_vol_ok = None
+    post_break_high = None
+    fading_reversal = None
+    fading_below_zone = None
+
+    if riding_break_idx is not None and riding_break_ref and riding_break_close:
+        riding_bars_since = len(df) - 1 - riding_break_idx
+        riding_gain = safe_pct(price, riding_break_close)
+        post_slice = df.iloc[riding_break_idx + 1:]
+        post_break_high = post_slice["high"].max() if len(post_slice) > 0 else price
+        riding_above_zone = price >= riding_break_ref * (1 - RIDING_ZONE_BUFFER)
+        vol_mean_riding = volume.iloc[-21:-1].mean()
+        riding_vol_ok = vol_mean_riding > 0 and (volume.iloc[-3:].mean() / vol_mean_riding) >= RIDING_MIN_VOL_RATIO
+        fading_reversal = safe_pct(price, post_break_high) if post_break_high else 0.0
+        fading_below_zone = price < riding_break_ref * (1 - FADING_BELOW_ZONE)
+
     return symbol, interval, {
         "price": price,
         "ema_trend_up": ema_trend_up,
@@ -310,10 +366,20 @@ def analyze(symbol, interval):
         "hold_pullback_ok": hold_pullback_ok,
         "hold_strong": hold_strong,
         "bars_since_break": bars_since_break,
+        # RIDING / FADING
+        "riding_bars_since": riding_bars_since,
+        "riding_gain": riding_gain,
+        "riding_above_zone": riding_above_zone,
+        "riding_vol_ok": riding_vol_ok,
+        "riding_break_ref": riding_break_ref,
+        "riding_break_close": riding_break_close,
+        "post_break_high": post_break_high,
+        "fading_reversal": fading_reversal,
+        "fading_below_zone": fading_below_zone,
     }
 
 
-# ── Clasificación ───────────────────────────────────────────────────────────────
+# ── Clasificacion ───────────────────────────────────────────────────────────────
 def classify_symbol(symbol, tf_map, counts_history, last_seen):
     tf5 = tf_map.get("5m") or {}
     tf15 = tf_map.get("15m") or {}
@@ -326,6 +392,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
 
     candidates = []
 
+    # ── PRE-BREAK ──────────────────────────────────────────────────────────────
     pre_ok = (
         tf5.get("near_recent_max")
         and tf5.get("width_curr", 9) <= PREBREAK_BB_WIDTH_MAX
@@ -337,7 +404,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         score = 3
         reasons = []
         near_pct = ((tf5['recent_max'] - tf5['price']) / tf5['recent_max']) if tf5['recent_max'] else 0.0
-        reasons.append(f"5m a {near_pct:.2%} del máximo reciente")
+        reasons.append(f"5m a {near_pct:.2%} del maximo reciente")
         if tf5['vol_ratio'] >= 1.6:
             score += 2
             reasons.append(f"volumen 5m fuerte ({tf5['vol_ratio']:.1f}x)")
@@ -352,12 +419,12 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             reasons.append(f"volumen creciendo ({tf5['vol_growth']:.2f}x)")
         if tf5['strong_close']:
             score += 1
-            reasons.append("última vela 5m cerró fuerte")
+            reasons.append("ultima vela 5m cerro fuerte")
         if tf5['width_curr'] <= 0.025:
             score += 1
             reasons.append(f"BB 5m bien comprimida ({tf5['width_curr']:.2%})")
         else:
-            reasons.append(f"BB 5m todavía comprimida ({tf5['width_curr']:.2%})")
+            reasons.append(f"BB 5m todavia comprimida ({tf5['width_curr']:.2%})")
         if tf1h['dist_to_res'] > 0.04:
             score += 2
             reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
@@ -379,32 +446,30 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             "immediate": prev < LATE_REPEAT_COUNT and score >= IMMEDIATE_MIN_SCORE,
         })
 
+    # ── BREAKOUT ───────────────────────────────────────────────────────────────
     breakout_ok = (
         tf15.get("breakout")
         and tf15.get("vol_ratio", 0) >= BREAKOUT_MIN_VOL_RATIO
         and tf15.get("breakout_distance", 9) <= BREAKOUT_MAX_EXTENDED
         and tf15.get("width_expansion", -9) >= BREAKOUT_BB_EXPANSION_MIN
-        # Filtro de estructura: la vela de breakout en 15m debe tener cuerpo sólido
-        # y cierre en la parte alta del rango
+        # Filtro de estructura: vela de breakout solida
         and tf15.get("strong_close", False)
         and tf15.get("candle_body_pct", 0) >= BREAKOUT_MIN_BODY_PCT
-        # Confluencia multi-TF: el 5m debe mostrar momentum activo ahora mismo
+        # Confluencia multi-TF: 5m activo ahora mismo
         and tf5.get("vol_ratio", 0) >= BREAKOUT_5M_MIN_VOL_RATIO
         and tf5.get("strong_close", False)
     )
     if breakout_ok and not in_cooldown(symbol, "BREAKOUT", last_seen):
         prev = counts_history.get((symbol, "BREAKOUT"), 0)
         score = 4
-        reasons = [f"15m rompió el máximo reciente (+{tf15['breakout_distance']:.2%})"]
-        # Estructura de la vela de breakout
+        reasons = [f"15m rompio el maximo reciente (+{tf15['breakout_distance']:.2%})"]
         body_pct = tf15.get("candle_body_pct", 0)
         if body_pct >= 0.75:
             score += 2
-            reasons.append(f"vela 15m muy sólida (cuerpo {body_pct:.0%} del rango)")
+            reasons.append(f"vela 15m muy solida (cuerpo {body_pct:.0%} del rango)")
         else:
             score += 1
-            reasons.append(f"vela 15m sólida (cuerpo {body_pct:.0%} del rango)")
-        # Confluencia 5m
+            reasons.append(f"vela 15m solida (cuerpo {body_pct:.0%} del rango)")
         if tf5['vol_ratio'] >= 2.5:
             score += 2
             reasons.append(f"5m confirmando con volumen muy fuerte ({tf5['vol_ratio']:.1f}x)")
@@ -413,16 +478,16 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             reasons.append(f"5m confirmando con volumen ({tf5['vol_ratio']:.1f}x)")
         if tf15['width_expansion'] >= 0.25:
             score += 2
-            reasons.append(f"expansión BB marcada ({tf15['width_expansion']:.0%})")
+            reasons.append(f"expansion BB marcada ({tf15['width_expansion']:.0%})")
         else:
             score += 1
-            reasons.append(f"expansión BB válida ({tf15['width_expansion']:.0%})")
+            reasons.append(f"expansion BB valida ({tf15['width_expansion']:.0%})")
         if tf15['strong_close']:
             score += 1
             reasons.append("cierre 15m fuerte")
         if tf15['breakout_distance'] <= 0.02:
             score += 1
-            reasons.append("todavía no está muy extendida")
+            reasons.append("todavia no esta muy extendida")
         if tf1h['dist_to_res'] > 0.04:
             score += 2
             reasons.append(f"1h con espacio real ({tf1h['dist_to_res']:.2%})")
@@ -444,6 +509,104 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             "immediate": prev < LATE_REPEAT_COUNT and score >= IMMEDIATE_MIN_SCORE,
         })
 
+    # ── RIDING ─────────────────────────────────────────────────────────────────
+    # El breakout sigue activo: subio, sostiene la zona, volumen sostenido
+    # No penaliza por repeticion — ese es el punto
+    riding_gain = tf15.get("riding_gain") or 0.0
+    riding_ok = (
+        tf15.get("riding_above_zone")
+        and tf15.get("riding_vol_ok")
+        and RIDING_MIN_GAIN <= riding_gain <= RIDING_MAX_GAIN
+        and tf15.get("riding_bars_since") is not None
+        and tf15["riding_bars_since"] >= 1
+        and (not RIDING_EMA_MUST_TREND or tf1h.get("ema_trend_up"))
+        # No duplicar con BREAKOUT activo en esta misma vela
+        and not tf15.get("breakout")
+    )
+    if riding_ok and not in_cooldown(symbol, "RIDING", last_seen):
+        prev = counts_history.get((symbol, "RIDING"), 0)
+        score = 6  # base alta: ya probo que sostiene
+        reasons = [
+            f"sigue subiendo desde el breakout (+{riding_gain:.2%}, "
+            f"{tf15['riding_bars_since']} velas atras)"
+        ]
+        if riding_gain >= 0.05:
+            score += 3
+            reasons.append(f"movimiento fuerte (+{riding_gain:.2%} total)")
+        elif riding_gain >= 0.02:
+            score += 2
+            reasons.append(f"ganancia solida (+{riding_gain:.2%} total)")
+        else:
+            score += 1
+            reasons.append(f"ganancia inicial (+{riding_gain:.2%} total)")
+        if tf15.get("riding_vol_ok"):
+            score += 1
+            reasons.append("volumen sostenido — no hay colapso de momentum")
+        if tf15.get("strong_close"):
+            score += 1
+            reasons.append("ultima vela 15m cierra fuerte")
+        if tf1h.get("ema_trend_up"):
+            score += 1
+            reasons.append("1h EMA sigue alcista")
+        if tf1h.get("dist_to_res", 0) > 0.04:
+            score += 2
+            reasons.append(f"1h con espacio real ({tf1h['dist_to_res']:.2%})")
+        else:
+            score += 1
+            reasons.append("1h alcista")
+        candidates.append({
+            "symbol": symbol,
+            "label": "RIDING",
+            "history_tf": "RIDING",
+            "score": score,
+            "priority": 2,
+            "bucket": final_bucket(score),
+            "reasons": reasons,
+            "late": False,      # nunca "late" — el punto es que siga apareciendo
+            "timeframe": "15m",
+            "immediate": score >= IMMEDIATE_MIN_SCORE,
+            "riding_repeat": prev,
+        })
+
+    # ── FADING ─────────────────────────────────────────────────────────────────
+    # El breakout esta devolviendo — aviso de salida
+    fading_reversal = tf15.get("fading_reversal") or 0.0
+    fading_ok = (
+        tf15.get("riding_bars_since") is not None
+        and tf15["riding_bars_since"] >= 1
+        and fading_reversal <= -FADING_REVERSAL_MIN
+        and (
+            tf15.get("fading_below_zone")
+            or fading_reversal <= -0.03
+        )
+        and not tf15.get("breakout")
+    )
+    if fading_ok and not in_cooldown(symbol, "FADING", last_seen):
+        score = 5
+        reasons = [f"devolviendo {abs(fading_reversal):.2%} desde el maximo post-break"]
+        if tf15.get("fading_below_zone"):
+            score += 2
+            reasons.append("precio perforo la zona de soporte rota — senal de salida")
+        else:
+            score += 1
+            reasons.append("pullback significativo — monitoreá zona de soporte")
+        if not tf15.get("riding_vol_ok"):
+            score += 1
+            reasons.append("volumen tambien cayo — momentum perdido")
+        candidates.append({
+            "symbol": symbol,
+            "label": "FADING",
+            "history_tf": "FADING",
+            "score": score,
+            "priority": 4,
+            "bucket": "WATCH",
+            "reasons": reasons,
+            "late": False,
+            "timeframe": "15m",
+            "immediate": bool(tf15.get("fading_below_zone")),
+        })
+
+    # ── HOLD ───────────────────────────────────────────────────────────────────
     hold_ok = (
         tf15.get("hold_recent_break")
         and tf15.get("hold_kept_zone")
@@ -459,13 +622,13 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         score += 1
         reasons.append("pullback sano")
         score += 1
-        reasons.append("última vela post-break cierra fuerte")
+        reasons.append("ultima vela post-break cierra fuerte")
         if tf1h['dist_to_res'] > 0.04:
             score += 2
             reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
         else:
             score += 1
-            reasons.append("1h acompaña")
+            reasons.append("1h acompa")
         if prev >= LATE_REPEAT_COUNT:
             score -= 1
         candidates.append({
@@ -492,9 +655,28 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
 def format_alert(alert, counts_history, with_reasons=True):
     prev = counts_history.get((alert["symbol"], alert["history_tf"]), 0)
     late_tag = " [LATE]" if alert.get("late") else ""
-    hist_tag = f"  _(+{prev} en {HISTORY_HOURS}h)_" if prev > 0 else ""
+
+    # Para RIDING el historial es positivo — indica cuantas veces confirmo
+    if alert["history_tf"] == "RIDING" and prev > 0:
+        hist_tag = f"  _(confirmo {prev}x en {HISTORY_HOURS}h)_"
+    elif alert["history_tf"] == "FADING":
+        hist_tag = "  _(SALIDA)_"
+    elif prev > 0:
+        hist_tag = f"  _(+{prev} en {HISTORY_HOURS}h)_"
+    else:
+        hist_tag = ""
+
+    # Emoji por tipo
+    emoji = {
+        "RIDING": "🚀",
+        "FADING": "⚠️",
+        "BREAKOUT": "💥",
+        "PRE-BREAK": "👀",
+        "HOLD": "🤝",
+    }.get(alert["label"], "")
+
     header = (
-        f"[{alert['bucket']}] [{alert['label']}{late_tag}] {alert['symbol']} "
+        f"{emoji} [{alert['bucket']}] [{alert['label']}{late_tag}] {alert['symbol']} "
         f"score {alert['score']} • {alert['timeframe']} {binance_link(alert['symbol'])}{hist_tag}"
     )
     if not with_reasons:
@@ -507,15 +689,26 @@ def dedupe_and_rank(alerts):
     best = {}
     for alert in alerts:
         cur = best.get(alert["symbol"])
-        if cur is None or (alert["score"], alert["priority"]) > (cur["score"], cur["priority"]):
+        # FADING siempre gana sobre cualquier otro estado para el mismo simbolo
+        if cur is None:
+            best[alert["symbol"]] = alert
+        elif alert["history_tf"] == "FADING" and cur["history_tf"] != "FADING":
+            best[alert["symbol"]] = alert
+        elif cur["history_tf"] != "FADING" and (alert["score"], alert["priority"]) > (cur["score"], cur["priority"]):
             best[alert["symbol"]] = alert
     ranked = list(best.values())
-    ranked.sort(key=lambda x: (x["score"], x["priority"]), reverse=True)
+    # Orden: FADING primero (avisar salida), luego por score desc
+    ranked.sort(key=lambda x: (
+        1 if x["history_tf"] == "FADING" else 0,
+        x["score"],
+        x["priority"],
+    ), reverse=True)
     return ranked[:TOP_ALERT_COUNT]
 
 
 def send_immediate(alert, counts_history):
-    send_telegram(f"🔥 PRIORITY NOW\n{format_alert(alert, counts_history)}")
+    label = "⚠️ SALIDA — precio devolviendo" if alert["history_tf"] == "FADING" else "🔥 PRIORITY NOW"
+    send_telegram(f"{label}\n{format_alert(alert, counts_history)}")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -546,7 +739,7 @@ def main():
                 continue
 
             candidates.append(alert)
-            print(f"  ✅ {symbol} -> {alert['bucket']} {alert['label']} score={alert['score']} late={alert['late']}")
+            print(f"  {alert['label']} {symbol} score={alert['score']} bucket={alert['bucket']}")
 
             key = (alert["symbol"], alert["history_tf"])
             if alert.get("immediate") and key not in immediate_sent_keys:
@@ -554,7 +747,7 @@ def main():
                     send_immediate(alert, counts_history)
                     immediate_sent_keys.add(key)
                 except Exception as e:
-                    print(f"  ⚠ error envío inmediato {symbol}: {e}")
+                    print(f"  error envio inmediato {symbol}: {e}")
 
     if not candidates:
         print("Sin setups en este run.")
@@ -565,22 +758,39 @@ def main():
 
     summary_lines = []
     for idx, alert in enumerate(selected, start=1):
-        prefix = "👑 BEST" if idx == 1 else ("💪 STRONG" if idx == 2 else "👀 WATCH")
-        summary_lines.append(f"{prefix} #{idx}\n{format_alert(alert, counts_history)}")
+        if alert["history_tf"] == "FADING":
+            prefix = "⚠️ SALIDA"
+        elif alert["history_tf"] == "RIDING":
+            prefix = f"🚀 RIDING #{idx}"
+        elif idx == 1:
+            prefix = "👑 BEST"
+        else:
+            prefix = "💪 STRONG"
+        summary_lines.append(f"{prefix}\n{format_alert(alert, counts_history)}")
 
     body = "\n\n".join(summary_lines)
+
+    riding_count = sum(1 for a in candidates if a["history_tf"] == "RIDING")
+    fading_count = sum(1 for a in candidates if a["history_tf"] == "FADING")
+    extra = ""
+    if riding_count:
+        extra += f"| 🚀 {riding_count} riding "
+    if fading_count:
+        extra += f"| ⚠️ {fading_count} fading "
+
     header = (
         f"🎯 TOP SETUPS • {now}\n"
-        f"solo top {TOP_ALERT_COUNT} ordenadas por prioridad real\n"
-        f"1) score  2) estructura  3) espacio 1h\n"
-        f"cooldown {STATE_COOLDOWN_MINUTES}m • {len(pairs)} pares\n"
+        f"top {TOP_ALERT_COUNT} {extra}\n"
+        f"RIDING cd {COOLDOWN_BY_STATE['RIDING']}m • BREAKOUT cd {COOLDOWN_BY_STATE['BREAKOUT']}m"
+        f" • {len(pairs)} pares\n"
     )
     send_telegram(header + "\n" + body)
 
-    print(f"Total candidatos: {len(candidates)}")
+    print(f"Total candidatos: {len(candidates)} (RIDING: {riding_count}, FADING: {fading_count})")
     print(f"Inmediatos: {len(immediate_sent_keys)}")
     print(f"Top final: {len(selected)}")
 
 
 if __name__ == "__main__":
-    main()
+    main()h
+uc
