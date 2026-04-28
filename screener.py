@@ -42,8 +42,8 @@ LATE_REPEAT_COUNT = 1
 
 # Cooldown por tipo de estado (minutos)
 COOLDOWN_BY_STATE = {
-    "PREBREAK": 60,
-    "BREAKOUT": 30,
+    "PREBREAK": 0,
+    "BREAKOUT": 0,
     "RIDING":   15,
     "FADING":  120,
     "HOLD":     45,
