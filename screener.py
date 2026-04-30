@@ -42,18 +42,27 @@ LATE_REPEAT_COUNT = 1
 
 # Cooldown por tipo de estado (minutos)
 COOLDOWN_BY_STATE = {
-    "PREBREAK": 0,
-    "BREAKOUT": 0,
+    "PREBREAK": 60,
+    "BREAKOUT": 30,
     "RIDING":   15,
     "FADING":  120,
     "HOLD":     45,
 }
 
+# ── Señales activas ────────────────────────────────────────────────────────────
+# Controlado desde el panel HTML vía variable en screener.py
+# Valores posibles: PREBREAK, BREAKOUT, RIDING, FADING, HOLD
+ACTIVE_SIGNALS_PREBREAK = True
+ACTIVE_SIGNALS_BREAKOUT = True
+ACTIVE_SIGNALS_RIDING   = True
+ACTIVE_SIGNALS_FADING   = True
+ACTIVE_SIGNALS_HOLD     = True
+
 # Indicadores simples
 EMA_SLOW = 21
 RECENT_LOOKBACK = 15
 PREBREAK_NEAR_MAX = 0.010
-PREBREAK_MIN_VOL_RATIO = 7        # ← CAMBIO 1: era 1.20, ahora filtra ruido real
+PREBREAK_MIN_VOL_RATIO = 20.0
 PREBREAK_VOLUME_GROWTH_MIN = 1.10
 PREBREAK_BB_WIDTH_MAX = 0.035
 
@@ -383,260 +392,265 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     candidates = []
 
     # ── PRE-BREAK ──────────────────────────────────────────────────────────────
-    pre_ok = (
-        tf5.get("near_recent_max")
-        and tf5.get("width_curr", 9) <= PREBREAK_BB_WIDTH_MAX
-        and tf5.get("vol_ratio", 0) >= PREBREAK_MIN_VOL_RATIO
-        and tf5.get("vol_growth", 0) >= PREBREAK_VOLUME_GROWTH_MIN
-    )
-    if pre_ok and not in_cooldown(symbol, "PREBREAK", last_seen):
-        prev = counts_history.get((symbol, "PREBREAK"), 0)
-        score = 3
-        reasons = []
-        near_pct = ((tf5['recent_max'] - tf5['price']) / tf5['recent_max']) if tf5['recent_max'] else 0.0
-        reasons.append(f"5m a {near_pct:.2%} del maximo reciente")
-        if tf5['vol_ratio'] >= 1.6:
-            score += 2
-            reasons.append(f"volumen 5m fuerte ({tf5['vol_ratio']:.1f}x)")
-        else:
-            score += 1
-            reasons.append(f"volumen 5m arriba de lo normal ({tf5['vol_ratio']:.1f}x)")
-        if tf5['vol_growth'] >= 1.3:
-            score += 2
-            reasons.append(f"volumen creciendo bien ({tf5['vol_growth']:.2f}x)")
-        else:
-            score += 1
-            reasons.append(f"volumen creciendo ({tf5['vol_growth']:.2f}x)")
-        if tf5['strong_close']:
-            score += 1
-            reasons.append("ultima vela 5m cerro fuerte")
-        if tf5['width_curr'] <= 0.025:
-            score += 1
-            reasons.append(f"BB 5m bien comprimida ({tf5['width_curr']:.2%})")
-        else:
-            reasons.append(f"BB 5m todavia comprimida ({tf5['width_curr']:.2%})")
-        if tf1h['dist_to_res'] > 0.04:
-            score += 2
-            reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
-        else:
-            score += 1
-            reasons.append("1h alcista y con espacio")
-        if prev >= LATE_REPEAT_COUNT:
-            score -= 1
-        candidates.append({
-            "symbol": symbol,
-            "label": "PRE-BREAK",
-            "history_tf": "PREBREAK",
-            "score": score,
-            "priority": 1,
-            "bucket": final_bucket(score),
-            "reasons": reasons,
-            "late": prev >= LATE_REPEAT_COUNT,
-            "timeframe": "5m",
-            "immediate": prev < LATE_REPEAT_COUNT and score >= IMMEDIATE_MIN_SCORE,
-            "price": tf5["price"],                   # ← CAMBIO 2
-            "ref_price": tf5["recent_max"],          # ← CAMBIO 2
-        })
+    if ACTIVE_SIGNALS_PREBREAK:
+        pre_ok = (
+            tf5.get("near_recent_max")
+            and tf5.get("width_curr", 9) <= PREBREAK_BB_WIDTH_MAX
+            and tf5.get("vol_ratio", 0) >= PREBREAK_MIN_VOL_RATIO
+            and tf5.get("vol_growth", 0) >= PREBREAK_VOLUME_GROWTH_MIN
+        )
+        if pre_ok and not in_cooldown(symbol, "PREBREAK", last_seen):
+            prev = counts_history.get((symbol, "PREBREAK"), 0)
+            score = 3
+            reasons = []
+            near_pct = ((tf5['recent_max'] - tf5['price']) / tf5['recent_max']) if tf5['recent_max'] else 0.0
+            reasons.append(f"5m a {near_pct:.2%} del maximo reciente")
+            if tf5['vol_ratio'] >= 1.6:
+                score += 2
+                reasons.append(f"volumen 5m fuerte ({tf5['vol_ratio']:.1f}x)")
+            else:
+                score += 1
+                reasons.append(f"volumen 5m arriba de lo normal ({tf5['vol_ratio']:.1f}x)")
+            if tf5['vol_growth'] >= 1.3:
+                score += 2
+                reasons.append(f"volumen creciendo bien ({tf5['vol_growth']:.2f}x)")
+            else:
+                score += 1
+                reasons.append(f"volumen creciendo ({tf5['vol_growth']:.2f}x)")
+            if tf5['strong_close']:
+                score += 1
+                reasons.append("ultima vela 5m cerro fuerte")
+            if tf5['width_curr'] <= 0.025:
+                score += 1
+                reasons.append(f"BB 5m bien comprimida ({tf5['width_curr']:.2%})")
+            else:
+                reasons.append(f"BB 5m todavia comprimida ({tf5['width_curr']:.2%})")
+            if tf1h['dist_to_res'] > 0.04:
+                score += 2
+                reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
+            else:
+                score += 1
+                reasons.append("1h alcista y con espacio")
+            if prev >= LATE_REPEAT_COUNT:
+                score -= 1
+            candidates.append({
+                "symbol": symbol,
+                "label": "PRE-BREAK",
+                "history_tf": "PREBREAK",
+                "score": score,
+                "priority": 1,
+                "bucket": final_bucket(score),
+                "reasons": reasons,
+                "late": prev >= LATE_REPEAT_COUNT,
+                "timeframe": "5m",
+                "immediate": prev < LATE_REPEAT_COUNT and score >= IMMEDIATE_MIN_SCORE,
+                "price": tf5["price"],
+                "ref_price": tf5["recent_max"],
+            })
 
     # ── BREAKOUT ───────────────────────────────────────────────────────────────
-    breakout_ok = (
-        tf15.get("breakout")
-        and tf15.get("vol_ratio", 0) >= BREAKOUT_MIN_VOL_RATIO
-        and tf15.get("breakout_distance", 9) <= BREAKOUT_MAX_EXTENDED
-        and tf15.get("width_expansion", -9) >= BREAKOUT_BB_EXPANSION_MIN
-        and tf15.get("strong_close", False)
-        and tf15.get("candle_body_pct", 0) >= BREAKOUT_MIN_BODY_PCT
-        and tf5.get("vol_ratio", 0) >= BREAKOUT_5M_MIN_VOL_RATIO
-        and tf5.get("strong_close", False)
-    )
-    if breakout_ok and not in_cooldown(symbol, "BREAKOUT", last_seen):
-        prev = counts_history.get((symbol, "BREAKOUT"), 0)
-        score = 4
-        reasons = [f"15m rompio el maximo reciente (+{tf15['breakout_distance']:.2%})"]
-        body_pct = tf15.get("candle_body_pct", 0)
-        if body_pct >= 0.75:
-            score += 2
-            reasons.append(f"vela 15m muy solida (cuerpo {body_pct:.0%} del rango)")
-        else:
-            score += 1
-            reasons.append(f"vela 15m solida (cuerpo {body_pct:.0%} del rango)")
-        if tf5['vol_ratio'] >= 2.5:
-            score += 2
-            reasons.append(f"5m confirmando con volumen muy fuerte ({tf5['vol_ratio']:.1f}x)")
-        else:
-            score += 1
-            reasons.append(f"5m confirmando con volumen ({tf5['vol_ratio']:.1f}x)")
-        if tf15['width_expansion'] >= 0.25:
-            score += 2
-            reasons.append(f"expansion BB marcada ({tf15['width_expansion']:.0%})")
-        else:
-            score += 1
-            reasons.append(f"expansion BB valida ({tf15['width_expansion']:.0%})")
-        if tf15['strong_close']:
-            score += 1
-            reasons.append("cierre 15m fuerte")
-        if tf15['breakout_distance'] <= 0.02:
-            score += 1
-            reasons.append("todavia no esta muy extendida")
-        if tf1h['dist_to_res'] > 0.04:
-            score += 2
-            reasons.append(f"1h con espacio real ({tf1h['dist_to_res']:.2%})")
-        else:
-            score += 1
-            reasons.append("1h alcista y con espacio")
-        if prev >= LATE_REPEAT_COUNT:
-            score -= 1
-        candidates.append({
-            "symbol": symbol,
-            "label": "BREAKOUT",
-            "history_tf": "BREAKOUT",
-            "score": score,
-            "priority": 2,
-            "bucket": final_bucket(score),
-            "reasons": reasons,
-            "late": prev >= LATE_REPEAT_COUNT,
-            "timeframe": "15m",
-            "immediate": prev < LATE_REPEAT_COUNT and score >= IMMEDIATE_MIN_SCORE,
-            "price": tf15["price"],                  # ← CAMBIO 2
-            "ref_price": tf15["recent_max"],         # ← CAMBIO 2
-        })
+    if ACTIVE_SIGNALS_BREAKOUT:
+        breakout_ok = (
+            tf15.get("breakout")
+            and tf15.get("vol_ratio", 0) >= BREAKOUT_MIN_VOL_RATIO
+            and tf15.get("breakout_distance", 9) <= BREAKOUT_MAX_EXTENDED
+            and tf15.get("width_expansion", -9) >= BREAKOUT_BB_EXPANSION_MIN
+            and tf15.get("strong_close", False)
+            and tf15.get("candle_body_pct", 0) >= BREAKOUT_MIN_BODY_PCT
+            and tf5.get("vol_ratio", 0) >= BREAKOUT_5M_MIN_VOL_RATIO
+            and tf5.get("strong_close", False)
+        )
+        if breakout_ok and not in_cooldown(symbol, "BREAKOUT", last_seen):
+            prev = counts_history.get((symbol, "BREAKOUT"), 0)
+            score = 4
+            reasons = [f"15m rompio el maximo reciente (+{tf15['breakout_distance']:.2%})"]
+            body_pct = tf15.get("candle_body_pct", 0)
+            if body_pct >= 0.75:
+                score += 2
+                reasons.append(f"vela 15m muy solida (cuerpo {body_pct:.0%} del rango)")
+            else:
+                score += 1
+                reasons.append(f"vela 15m solida (cuerpo {body_pct:.0%} del rango)")
+            if tf5['vol_ratio'] >= 2.5:
+                score += 2
+                reasons.append(f"5m confirmando con volumen muy fuerte ({tf5['vol_ratio']:.1f}x)")
+            else:
+                score += 1
+                reasons.append(f"5m confirmando con volumen ({tf5['vol_ratio']:.1f}x)")
+            if tf15['width_expansion'] >= 0.25:
+                score += 2
+                reasons.append(f"expansion BB marcada ({tf15['width_expansion']:.0%})")
+            else:
+                score += 1
+                reasons.append(f"expansion BB valida ({tf15['width_expansion']:.0%})")
+            if tf15['strong_close']:
+                score += 1
+                reasons.append("cierre 15m fuerte")
+            if tf15['breakout_distance'] <= 0.02:
+                score += 1
+                reasons.append("todavia no esta muy extendida")
+            if tf1h['dist_to_res'] > 0.04:
+                score += 2
+                reasons.append(f"1h con espacio real ({tf1h['dist_to_res']:.2%})")
+            else:
+                score += 1
+                reasons.append("1h alcista y con espacio")
+            if prev >= LATE_REPEAT_COUNT:
+                score -= 1
+            candidates.append({
+                "symbol": symbol,
+                "label": "BREAKOUT",
+                "history_tf": "BREAKOUT",
+                "score": score,
+                "priority": 2,
+                "bucket": final_bucket(score),
+                "reasons": reasons,
+                "late": prev >= LATE_REPEAT_COUNT,
+                "timeframe": "15m",
+                "immediate": prev < LATE_REPEAT_COUNT and score >= IMMEDIATE_MIN_SCORE,
+                "price": tf15["price"],
+                "ref_price": tf15["recent_max"],
+            })
 
     # ── RIDING ─────────────────────────────────────────────────────────────────
-    riding_gain = tf15.get("riding_gain") or 0.0
-    riding_ok = (
-        tf15.get("riding_above_zone")
-        and tf15.get("riding_vol_ok")
-        and RIDING_MIN_GAIN <= riding_gain <= RIDING_MAX_GAIN
-        and tf15.get("riding_bars_since") is not None
-        and tf15["riding_bars_since"] >= 1
-        and (not RIDING_EMA_MUST_TREND or tf1h.get("ema_trend_up"))
-        and not tf15.get("breakout")
-    )
-    if riding_ok and not in_cooldown(symbol, "RIDING", last_seen):
-        prev = counts_history.get((symbol, "RIDING"), 0)
-        score = 6
-        reasons = [
-            f"sigue subiendo desde el breakout (+{riding_gain:.2%}, "
-            f"{tf15['riding_bars_since']} velas atras)"
-        ]
-        if riding_gain >= 0.05:
-            score += 3
-            reasons.append(f"movimiento fuerte (+{riding_gain:.2%} total)")
-        elif riding_gain >= 0.02:
-            score += 2
-            reasons.append(f"ganancia solida (+{riding_gain:.2%} total)")
-        else:
-            score += 1
-            reasons.append(f"ganancia inicial (+{riding_gain:.2%} total)")
-        if tf15.get("riding_vol_ok"):
-            score += 1
-            reasons.append("volumen sostenido — no hay colapso de momentum")
-        if tf15.get("strong_close"):
-            score += 1
-            reasons.append("ultima vela 15m cierra fuerte")
-        if tf1h.get("ema_trend_up"):
-            score += 1
-            reasons.append("1h EMA sigue alcista")
-        if tf1h.get("dist_to_res", 0) > 0.04:
-            score += 2
-            reasons.append(f"1h con espacio real ({tf1h['dist_to_res']:.2%})")
-        else:
-            score += 1
-            reasons.append("1h alcista")
-        candidates.append({
-            "symbol": symbol,
-            "label": "RIDING",
-            "history_tf": "RIDING",
-            "score": score,
-            "priority": 2,
-            "bucket": final_bucket(score),
-            "reasons": reasons,
-            "late": False,
-            "timeframe": "15m",
-            "immediate": score >= IMMEDIATE_MIN_SCORE,
-            "riding_repeat": prev,
-            "price": tf15["price"],                          # ← CAMBIO 2
-            "ref_price": tf15.get("riding_break_close"),     # ← CAMBIO 2
-        })
+    if ACTIVE_SIGNALS_RIDING:
+        riding_gain = tf15.get("riding_gain") or 0.0
+        riding_ok = (
+            tf15.get("riding_above_zone")
+            and tf15.get("riding_vol_ok")
+            and RIDING_MIN_GAIN <= riding_gain <= RIDING_MAX_GAIN
+            and tf15.get("riding_bars_since") is not None
+            and tf15["riding_bars_since"] >= 1
+            and (not RIDING_EMA_MUST_TREND or tf1h.get("ema_trend_up"))
+            and not tf15.get("breakout")
+        )
+        if riding_ok and not in_cooldown(symbol, "RIDING", last_seen):
+            prev = counts_history.get((symbol, "RIDING"), 0)
+            score = 6
+            reasons = [
+                f"sigue subiendo desde el breakout (+{riding_gain:.2%}, "
+                f"{tf15['riding_bars_since']} velas atras)"
+            ]
+            if riding_gain >= 0.05:
+                score += 3
+                reasons.append(f"movimiento fuerte (+{riding_gain:.2%} total)")
+            elif riding_gain >= 0.02:
+                score += 2
+                reasons.append(f"ganancia solida (+{riding_gain:.2%} total)")
+            else:
+                score += 1
+                reasons.append(f"ganancia inicial (+{riding_gain:.2%} total)")
+            if tf15.get("riding_vol_ok"):
+                score += 1
+                reasons.append("volumen sostenido — no hay colapso de momentum")
+            if tf15.get("strong_close"):
+                score += 1
+                reasons.append("ultima vela 15m cierra fuerte")
+            if tf1h.get("ema_trend_up"):
+                score += 1
+                reasons.append("1h EMA sigue alcista")
+            if tf1h.get("dist_to_res", 0) > 0.04:
+                score += 2
+                reasons.append(f"1h con espacio real ({tf1h['dist_to_res']:.2%})")
+            else:
+                score += 1
+                reasons.append("1h alcista")
+            candidates.append({
+                "symbol": symbol,
+                "label": "RIDING",
+                "history_tf": "RIDING",
+                "score": score,
+                "priority": 2,
+                "bucket": final_bucket(score),
+                "reasons": reasons,
+                "late": False,
+                "timeframe": "15m",
+                "immediate": score >= IMMEDIATE_MIN_SCORE,
+                "riding_repeat": prev,
+                "price": tf15["price"],
+                "ref_price": tf15.get("riding_break_close"),
+            })
 
     # ── FADING ─────────────────────────────────────────────────────────────────
-    fading_reversal = tf15.get("fading_reversal") or 0.0
-    fading_ok = (
-        tf15.get("riding_bars_since") is not None
-        and tf15["riding_bars_since"] >= 1
-        and fading_reversal <= -FADING_REVERSAL_MIN
-        and (
-            tf15.get("fading_below_zone")
-            or fading_reversal <= -0.03
+    if ACTIVE_SIGNALS_FADING:
+        fading_reversal = tf15.get("fading_reversal") or 0.0
+        fading_ok = (
+            tf15.get("riding_bars_since") is not None
+            and tf15["riding_bars_since"] >= 1
+            and fading_reversal <= -FADING_REVERSAL_MIN
+            and (
+                tf15.get("fading_below_zone")
+                or fading_reversal <= -0.03
+            )
+            and not tf15.get("breakout")
         )
-        and not tf15.get("breakout")
-    )
-    if fading_ok and not in_cooldown(symbol, "FADING", last_seen):
-        score = 5
-        reasons = [f"devolviendo {abs(fading_reversal):.2%} desde el maximo post-break"]
-        if tf15.get("fading_below_zone"):
-            score += 2
-            reasons.append("precio perforo la zona de soporte rota — senal de salida")
-        else:
-            score += 1
-            reasons.append("pullback significativo — monitoreá zona de soporte")
-        if not tf15.get("riding_vol_ok"):
-            score += 1
-            reasons.append("volumen tambien cayo — momentum perdido")
-        candidates.append({
-            "symbol": symbol,
-            "label": "FADING",
-            "history_tf": "FADING",
-            "score": score,
-            "priority": 4,
-            "bucket": "WATCH",
-            "reasons": reasons,
-            "late": False,
-            "timeframe": "15m",
-            "immediate": bool(tf15.get("fading_below_zone")),
-            "price": tf15["price"],                          # ← CAMBIO 2
-            "ref_price": tf15.get("post_break_high"),        # ← CAMBIO 2
-        })
+        if fading_ok and not in_cooldown(symbol, "FADING", last_seen):
+            score = 5
+            reasons = [f"devolviendo {abs(fading_reversal):.2%} desde el maximo post-break"]
+            if tf15.get("fading_below_zone"):
+                score += 2
+                reasons.append("precio perforo la zona de soporte rota — senal de salida")
+            else:
+                score += 1
+                reasons.append("pullback significativo — monitoreá zona de soporte")
+            if not tf15.get("riding_vol_ok"):
+                score += 1
+                reasons.append("volumen tambien cayo — momentum perdido")
+            candidates.append({
+                "symbol": symbol,
+                "label": "FADING",
+                "history_tf": "FADING",
+                "score": score,
+                "priority": 4,
+                "bucket": "WATCH",
+                "reasons": reasons,
+                "late": False,
+                "timeframe": "15m",
+                "immediate": bool(tf15.get("fading_below_zone")),
+                "price": tf15["price"],
+                "ref_price": tf15.get("post_break_high"),
+            })
 
     # ── HOLD ───────────────────────────────────────────────────────────────────
-    hold_ok = (
-        tf15.get("hold_recent_break")
-        and tf15.get("hold_kept_zone")
-        and tf15.get("hold_pullback_ok")
-        and tf15.get("hold_strong")
-    )
-    if hold_ok and not in_cooldown(symbol, "HOLD", last_seen):
-        prev = counts_history.get((symbol, "HOLD"), 0)
-        score = 5
-        reasons = [f"ruptura reciente en 15m hace {tf15['bars_since_break']} velas"]
-        score += 2
-        reasons.append("sigue arriba de la resistencia rota")
-        score += 1
-        reasons.append("pullback sano")
-        score += 1
-        reasons.append("ultima vela post-break cierra fuerte")
-        if tf1h['dist_to_res'] > 0.04:
+    if ACTIVE_SIGNALS_HOLD:
+        hold_ok = (
+            tf15.get("hold_recent_break")
+            and tf15.get("hold_kept_zone")
+            and tf15.get("hold_pullback_ok")
+            and tf15.get("hold_strong")
+        )
+        if hold_ok and not in_cooldown(symbol, "HOLD", last_seen):
+            prev = counts_history.get((symbol, "HOLD"), 0)
+            score = 5
+            reasons = [f"ruptura reciente en 15m hace {tf15['bars_since_break']} velas"]
             score += 2
-            reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
-        else:
+            reasons.append("sigue arriba de la resistencia rota")
             score += 1
-            reasons.append("1h acompaña")
-        if prev >= LATE_REPEAT_COUNT:
-            score -= 1
-        candidates.append({
-            "symbol": symbol,
-            "label": "HOLD",
-            "history_tf": "HOLD",
-            "score": score,
-            "priority": 3,
-            "bucket": final_bucket(score),
-            "reasons": reasons,
-            "late": prev >= LATE_REPEAT_COUNT,
-            "timeframe": "15m",
-            "immediate": False,
-            "price": tf15["price"],                                              # ← CAMBIO 2
-            "ref_price": tf15.get("riding_break_ref") or tf15["recent_max"],    # ← CAMBIO 2
-        })
+            reasons.append("pullback sano")
+            score += 1
+            reasons.append("ultima vela post-break cierra fuerte")
+            if tf1h['dist_to_res'] > 0.04:
+                score += 2
+                reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
+            else:
+                score += 1
+                reasons.append("1h acompaña")
+            if prev >= LATE_REPEAT_COUNT:
+                score -= 1
+            candidates.append({
+                "symbol": symbol,
+                "label": "HOLD",
+                "history_tf": "HOLD",
+                "score": score,
+                "priority": 3,
+                "bucket": final_bucket(score),
+                "reasons": reasons,
+                "late": prev >= LATE_REPEAT_COUNT,
+                "timeframe": "15m",
+                "immediate": False,
+                "price": tf15["price"],
+                "ref_price": tf15.get("riding_break_ref") or tf15["recent_max"],
+            })
 
     if not candidates:
         return None
@@ -675,7 +689,7 @@ def format_alert(alert, counts_history, with_reasons=True):
     if not with_reasons:
         return header
 
-    # ── CAMBIO 3: línea de precio con % desde referencia ──────────────────────
+    # Línea de precio con % desde referencia
     price = alert.get("price", 0)
     ref = alert.get("ref_price") or 0
     if ref and ref > 0 and price > 0:
@@ -688,7 +702,6 @@ def format_alert(alert, counts_history, with_reasons=True):
             price_line = f"  💰 {price:.6g} USDT ({pct:+.2f}% desde zona de ruptura)"
     else:
         price_line = f"  💰 {price:.6g} USDT"
-    # ─────────────────────────────────────────────────────────────────────────
 
     body = "\n".join(f"  - {r}" for r in alert["reasons"][:3])
     return f"{header}\n{price_line}\n{body}"
@@ -722,7 +735,17 @@ def send_immediate(alert, counts_history):
 def main():
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     pairs = get_all_usdt_pairs()
+
+    # Resumen de señales activas para el log
+    active_names = []
+    if ACTIVE_SIGNALS_PREBREAK: active_names.append("PRE-BREAK")
+    if ACTIVE_SIGNALS_BREAKOUT: active_names.append("BREAKOUT")
+    if ACTIVE_SIGNALS_RIDING:   active_names.append("RIDING")
+    if ACTIVE_SIGNALS_FADING:   active_names.append("FADING")
+    if ACTIVE_SIGNALS_HOLD:     active_names.append("HOLD")
+
     print(f"[{now}] Escaneando {len(pairs)} pares USDT ({' + '.join(INTERVALS)}) con {MAX_WORKERS} workers...")
+    print(f"Señales activas: {', '.join(active_names) if active_names else 'NINGUNA'}")
 
     counts_history, last_seen = fetch_history()
     tasks = [(sym, tf) for sym in pairs for tf in INTERVALS]
@@ -785,11 +808,11 @@ def main():
     if fading_count:
         extra += f"| ⚠️ {fading_count} fading "
 
+    active_tag = " • ".join(active_names) if active_names else "ninguna"
     header = (
         f"🎯 TOP SETUPS • {now}\n"
-        f"top {TOP_ALERT_COUNT} {extra}\n"
-        f"RIDING cd {COOLDOWN_BY_STATE['RIDING']}m • BREAK cd {COOLDOWN_BY_STATE['BREAKOUT']}m"
-        f" • {len(pairs)} pares\n"
+        f"top {TOP_ALERT_COUNT} {extra}• {len(pairs)} pares\n"
+        f"señales: {active_tag}\n"
     )
     send_telegram(header + "\n" + body)
 
