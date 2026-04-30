@@ -16,6 +16,7 @@
   --orange: #f78166;
   --blue: #58a6ff;
   --yellow: #e3b341;
+  --purple: #bc8cff;
   --text: #c9d1d9;
   --muted: #484f58;
   --muted2: #30363d;
@@ -74,13 +75,15 @@ h1 { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: 
 .card:nth-child(4){animation-delay:.12s} .card:nth-child(5){animation-delay:.16s}
 .card:nth-child(6){animation-delay:.20s} .card:nth-child(7){animation-delay:.24s}
 .card:nth-child(8){animation-delay:.28s} .card:nth-child(9){animation-delay:.32s}
+.card:nth-child(10){animation-delay:.36s}
 .card-header { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--border); cursor:pointer; user-select:none; }
 .card-header:hover { background: rgba(255,255,255,0.02); }
 .card-title { display:flex; align-items:center; gap:10px; font-size:12px; letter-spacing:1px; text-transform:uppercase; color:#fff; }
 .pill { font-size:10px; padding:2px 8px; border-radius:2px; letter-spacing:1px; font-weight:700; }
-.pill-on  { background: var(--accent-dim); color: var(--accent); }
-.pill-off { background: var(--muted2); color: var(--muted); }
-.pill-new { background: rgba(88,166,255,0.15); color: var(--blue); }
+.pill-on   { background: var(--accent-dim); color: var(--accent); }
+.pill-off  { background: var(--muted2); color: var(--muted); }
+.pill-new  { background: rgba(88,166,255,0.15); color: var(--blue); }
+.pill-warn { background: rgba(227,179,65,0.15); color: var(--yellow); }
 .card-body { padding: 20px; }
 .card-body.hidden { display: none; }
 .field-group { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
@@ -112,7 +115,7 @@ select option { background: var(--surface2); }
 .combo-box { background:rgba(88,166,255,0.05); border:1px solid rgba(88,166,255,0.2); padding:12px 16px; margin-bottom:16px; font-size:11px; color:var(--blue); line-height:1.6; }
 .combo-box strong { color:#fff; }
 .example { background:var(--bg); border-left:2px solid var(--muted2); padding:10px 14px; font-size:11px; color:var(--muted); margin-top:12px; line-height:1.7; }
-.example .hi { color:var(--accent); }
+.example .hi   { color:var(--accent); }
 .example .warn { color:var(--yellow); }
 .divider { height:1px; background:var(--border); margin:16px 0; }
 .btn { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; padding:10px 20px; border:none; cursor:pointer; transition:all 0.15s; display:inline-flex; align-items:center; gap:8px; white-space:nowrap; }
@@ -126,70 +129,92 @@ select option { background: var(--surface2); }
 .btn-sm { padding:7px 14px; font-size:10px; }
 .footer-bar { position:fixed; bottom:0; left:220px; right:0; background:var(--surface); border-top:1px solid var(--border); padding:14px 40px; display:flex; align-items:center; gap:14px; z-index:100; }
 #status { flex:1; font-size:11px; letter-spacing:1px; min-height:16px; }
-#status.ok { color:var(--accent); }
-#status.err { color:var(--orange); }
+#status.ok      { color:var(--accent); }
+#status.err     { color:var(--orange); }
 #status.loading { color:var(--blue); }
 
-/* ── Multi-timeframe selector ─────────────────────────────────── */
-.tf-grid {
+/* ── Signal filter chips ────────────────────────────────────────── */
+.signal-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.signal-chip { position: relative; }
+.signal-chip input[type=checkbox] { display: none; }
+.signal-chip label {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.tf-chip {
-  position: relative;
-}
-.tf-chip input[type=checkbox] {
-  display: none;
-}
-.tf-chip label {
-  display: inline-flex;
+  flex-direction: column;
   align-items: center;
   gap: 6px;
-  padding: 7px 14px;
+  padding: 14px 8px 10px;
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--muted);
   font-family: 'Space Mono', monospace;
-  font-size: 11px;
+  font-size: 10px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   cursor: pointer;
   transition: all 0.15s;
   user-select: none;
+  text-align: center;
+  line-height: 1.3;
 }
-.tf-chip label:hover {
-  border-color: var(--text);
-  color: var(--text);
-}
-.tf-chip input:checked + label {
+.signal-chip label .sig-emoji { font-size: 20px; line-height: 1; }
+.signal-chip label .sig-desc  { font-size: 9px; color: var(--muted); letter-spacing: 0.5px; margin-top: 2px; line-height: 1.3; }
+.signal-chip label:hover { border-color: var(--text); color: var(--text); }
+.signal-chip input:checked + label {
   border-color: var(--accent);
   background: var(--accent-dim);
   color: var(--accent);
 }
-.tf-chip input:checked + label::before {
-  content: '✓';
-  font-size: 10px;
-}
-.tf-preview {
-  margin-top: 12px;
+.signal-chip input:checked + label .sig-desc { color: rgba(57,211,83,0.7); }
+.signal-preview {
+  margin-top: 4px;
   font-size: 10px;
   color: var(--muted);
   letter-spacing: 1px;
+  line-height: 1.6;
 }
-.tf-preview span { color: var(--accent); }
-.tf-warn {
-  margin-top: 8px;
+.signal-preview span { color: var(--accent); }
+.signal-preview .none { color: var(--orange); }
+.signal-warn {
+  margin-top: 10px;
+  padding: 10px 14px;
+  background: rgba(247,129,102,0.07);
+  border-left: 2px solid var(--orange);
   font-size: 10px;
-  color: var(--yellow);
+  color: var(--orange);
   letter-spacing: 0.5px;
+  line-height: 1.5;
 }
+
+/* ── Multi-timeframe selector ─────────────────────────────────── */
+.tf-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.tf-chip { position: relative; }
+.tf-chip input[type=checkbox] { display: none; }
+.tf-chip label {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border: 1px solid var(--border);
+  background: var(--bg); color: var(--muted);
+  font-family: 'Space Mono', monospace; font-size: 11px;
+  letter-spacing: 1.5px; text-transform: uppercase;
+  cursor: pointer; transition: all 0.15s; user-select: none;
+}
+.tf-chip label:hover { border-color: var(--text); color: var(--text); }
+.tf-chip input:checked + label { border-color: var(--accent); background: var(--accent-dim); color: var(--accent); }
+.tf-chip input:checked + label::before { content: '✓'; font-size: 10px; }
+.tf-preview { margin-top: 12px; font-size: 10px; color: var(--muted); letter-spacing: 1px; }
+.tf-preview span { color: var(--accent); }
+.tf-warn { margin-top: 8px; font-size: 10px; color: var(--yellow); letter-spacing: 0.5px; }
 
 @media (max-width:700px) {
   .layout { grid-template-columns:1fr; }
   .sidebar { display:none; }
   .footer-bar { left:0; }
   .main { padding:20px 16px 80px; }
+  .signal-grid { grid-template-columns: repeat(3,1fr); }
 }
 </style>
 </head>
@@ -203,6 +228,7 @@ select option { background: var(--surface2); }
   </div>
   <span class="nav-section-label">Setup</span>
   <a class="nav-item active" href="#auth"><div class="nav-dot"></div> GitHub Auth</a>
+  <a class="nav-item" href="#signals"><div class="nav-dot"></div> Signal Filters</a>
   <a class="nav-item" href="#general"><div class="nav-dot"></div> General</a>
   <span class="nav-section-label">Indicadores</span>
   <a class="nav-item" href="#bb-squeeze"><div class="nav-dot"></div> BB Squeeze</a>
@@ -244,6 +270,71 @@ select option { background: var(--surface2); }
     </div>
   </div>
 
+  <!-- SIGNAL FILTERS -->
+  <div class="card" id="signals">
+    <div class="card-header" onclick="toggleCard(this)">
+      <div class="card-title"><span>🎯</span> Signal Filters</div>
+      <span class="pill pill-on" id="badge-signals">TODOS ON</span>
+    </div>
+    <div class="card-body">
+      <p style="font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6;">
+        Activá o desactivá cada tipo de señal. Solo las señales seleccionadas se evaluarán y enviarán a Telegram.
+      </p>
+
+      <div class="signal-grid">
+
+        <div class="signal-chip">
+          <input type="checkbox" id="sig-PREBREAK" checked onchange="updateSignalPreview()">
+          <label for="sig-PREBREAK">
+            <span class="sig-emoji">👀</span>
+            PRE-BREAK
+            <span class="sig-desc">5m cerca de romper con vol creciendo</span>
+          </label>
+        </div>
+
+        <div class="signal-chip">
+          <input type="checkbox" id="sig-BREAKOUT" checked onchange="updateSignalPreview()">
+          <label for="sig-BREAKOUT">
+            <span class="sig-emoji">💥</span>
+            BREAKOUT
+            <span class="sig-desc">15m rompe máximo con vol + BB expansion</span>
+          </label>
+        </div>
+
+        <div class="signal-chip">
+          <input type="checkbox" id="sig-RIDING" checked onchange="updateSignalPreview()">
+          <label for="sig-RIDING">
+            <span class="sig-emoji">🚀</span>
+            RIDING
+            <span class="sig-desc">Breakout sostenido, sigue subiendo</span>
+          </label>
+        </div>
+
+        <div class="signal-chip">
+          <input type="checkbox" id="sig-FADING" checked onchange="updateSignalPreview()">
+          <label for="sig-FADING">
+            <span class="sig-emoji">⚠️</span>
+            FADING
+            <span class="sig-desc">Precio devolviendo, señal de salida</span>
+          </label>
+        </div>
+
+        <div class="signal-chip">
+          <input type="checkbox" id="sig-HOLD" checked onchange="updateSignalPreview()">
+          <label for="sig-HOLD">
+            <span class="sig-emoji">🤝</span>
+            HOLD
+            <span class="sig-desc">Ruptura reciente que se sostiene</span>
+          </label>
+        </div>
+
+      </div>
+
+      <div class="signal-preview" id="signal-preview"></div>
+      <div class="signal-warn" id="signal-warn" style="display:none"></div>
+    </div>
+  </div>
+
   <!-- GENERAL -->
   <div class="card" id="general">
     <div class="card-header" onclick="toggleCard(this)">
@@ -251,46 +342,20 @@ select option { background: var(--surface2); }
       <span class="pill pill-on">ACTIVO</span>
     </div>
     <div class="card-body">
-
-      <!-- MULTI-TIMEFRAME -->
       <div class="field" style="margin-bottom:16px;">
         <label>INTERVALS <em>seleccioná uno o más</em></label>
         <div class="tf-grid" style="margin-top:8px;">
-          <div class="tf-chip">
-            <input type="checkbox" id="tf-1m" value="1m" onchange="updateTfPreview()">
-            <label for="tf-1m">1m</label>
-          </div>
-          <div class="tf-chip">
-            <input type="checkbox" id="tf-5m" value="5m" onchange="updateTfPreview()">
-            <label for="tf-5m">5m</label>
-          </div>
-          <div class="tf-chip">
-            <input type="checkbox" id="tf-15m" value="15m" onchange="updateTfPreview()">
-            <label for="tf-15m">15m</label>
-          </div>
-          <div class="tf-chip">
-            <input type="checkbox" id="tf-1h" value="1h" onchange="updateTfPreview()" checked>
-            <label for="tf-1h">1h</label>
-          </div>
-          <div class="tf-chip">
-            <input type="checkbox" id="tf-4h" value="4h" onchange="updateTfPreview()">
-            <label for="tf-4h">4h</label>
-          </div>
-          <div class="tf-chip">
-            <input type="checkbox" id="tf-1d" value="1d" onchange="updateTfPreview()">
-            <label for="tf-1d">1d</label>
-          </div>
+          <div class="tf-chip"><input type="checkbox" id="tf-1m"  value="1m"  onchange="updateTfPreview()"><label for="tf-1m">1m</label></div>
+          <div class="tf-chip"><input type="checkbox" id="tf-5m"  value="5m"  onchange="updateTfPreview()"><label for="tf-5m">5m</label></div>
+          <div class="tf-chip"><input type="checkbox" id="tf-15m" value="15m" onchange="updateTfPreview()"><label for="tf-15m">15m</label></div>
+          <div class="tf-chip"><input type="checkbox" id="tf-1h"  value="1h"  onchange="updateTfPreview()" checked><label for="tf-1h">1h</label></div>
+          <div class="tf-chip"><input type="checkbox" id="tf-4h"  value="4h"  onchange="updateTfPreview()"><label for="tf-4h">4h</label></div>
+          <div class="tf-chip"><input type="checkbox" id="tf-1d"  value="1d"  onchange="updateTfPreview()"><label for="tf-1d">1d</label></div>
         </div>
-        <div class="tf-preview" id="tf-preview">
-          → INTERVALS = <span id="tf-preview-val">["1h"]</span>
-        </div>
-        <div class="tf-warn" id="tf-warn" style="display:none">
-          ⚠ Múltiples TF multiplican las llamadas API — monitoreá los rate limits
-        </div>
+        <div class="tf-preview" id="tf-preview">→ INTERVALS = <span id="tf-preview-val">["1h"]</span></div>
+        <div class="tf-warn" id="tf-warn" style="display:none">⚠ Múltiples TF multiplican las llamadas API — monitoreá los rate limits</div>
       </div>
-
       <div class="divider"></div>
-
       <div class="field-group cols-3">
         <div class="field">
           <label>TOP_N <em>pares</em></label>
@@ -302,13 +367,13 @@ select option { background: var(--surface2); }
         </div>
         <div class="field">
           <label>LIMIT <em>velas/símbolo</em></label>
-          <input type="number" id="LIMIT" value="100" min="30" max="500">
+          <input type="number" id="LIMIT" value="180" min="30" max="500">
         </div>
       </div>
       <div class="field-group cols-1">
         <div class="field">
           <label>MIN_QUOTE_VOLUME <em>USD 24h</em></label>
-          <input type="number" id="MIN_QUOTE_VOLUME" value="100000" min="0" step="10000">
+          <input type="number" id="MIN_QUOTE_VOLUME" value="300000" min="0" step="10000">
           <div class="field-desc">Excluye pares con menos volumen diario</div>
         </div>
       </div>
@@ -323,14 +388,8 @@ select option { background: var(--surface2); }
     </div>
     <div class="card-body hidden">
       <div class="toggle-row">
-        <div class="toggle-label">
-          Activar BB Squeeze
-          <small>Alerta cuando las bandas están muy comprimidas</small>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="en-bb-squeeze" onchange="onToggle('bb-squeeze')">
-          <span class="slider"></span>
-        </label>
+        <div class="toggle-label">Activar BB Squeeze<small>Alerta cuando las bandas están muy comprimidas</small></div>
+        <label class="switch"><input type="checkbox" id="en-bb-squeeze" onchange="onToggle('bb-squeeze')"><span class="slider"></span></label>
       </div>
       <div class="sub-fields hidden" id="sub-bb-squeeze">
         <div class="field-group cols-1">
@@ -340,10 +399,7 @@ select option { background: var(--surface2); }
             <div class="field-desc">Ej: 0.10 = alerta si el ancho de las BB es ≤ 10% del precio medio</div>
           </div>
         </div>
-        <div class="example">
-          width <span class="hi">0.04</span> → ✅ alerta (muy comprimido)<br>
-          width <span class="warn">0.15</span> → ✗ sin alerta (sobre el umbral)
-        </div>
+        <div class="example">width <span class="hi">0.04</span> → ✅ alerta<br>width <span class="warn">0.15</span> → ✗ sin alerta</div>
       </div>
     </div>
   </div>
@@ -355,21 +411,10 @@ select option { background: var(--surface2); }
       <span class="pill pill-new" id="badge-expansion">ON</span>
     </div>
     <div class="card-body">
-      <div class="combo-box">
-        <strong>Combo de 3 condiciones simultáneas:</strong><br>
-        1. BB width se expande rápido (delta absoluto <em>o</em> porcentual)<br>
-        2. Volumen actual supera umbral — 🟢 normal / 🟡 fuerte / 🔴 extremo<br>
-        3. Vela alcista (close &gt; open)
-      </div>
+      <div class="combo-box"><strong>Combo de 3 condiciones simultáneas:</strong><br>1. BB width se expande rápido<br>2. Volumen actual supera umbral<br>3. Vela alcista (close &gt; open)</div>
       <div class="toggle-row">
-        <div class="toggle-label">
-          Activar combo BB Expansion
-          <small>Las 3 condiciones deben cumplirse al mismo tiempo</small>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="en-expansion" checked onchange="onToggle('expansion')">
-          <span class="slider"></span>
-        </label>
+        <div class="toggle-label">Activar combo BB Expansion<small>Las 3 condiciones deben cumplirse</small></div>
+        <label class="switch"><input type="checkbox" id="en-expansion" checked onchange="onToggle('expansion')"><span class="slider"></span></label>
       </div>
       <div class="sub-fields" id="sub-expansion">
         <div class="divider"></div>
@@ -377,38 +422,23 @@ select option { background: var(--surface2); }
           <div class="field">
             <label>BB_EXPANSION_MIN <em>delta absoluto mínimo</em></label>
             <input type="number" id="BB_EXPANSION_MIN" value="0.095" step="0.005" min="0.001" max="1">
-            <div class="field-desc">Si el width sube al menos este valor en 1 vela</div>
           </div>
           <div class="field">
             <label>BB_EXPANSION_PCT <em>o delta % mínimo</em></label>
             <input type="number" id="BB_EXPANSION_PCT" value="0.03" step="0.01" min="0.01" max="10">
-            <div class="field-desc">Si el width creció al menos X% relativo al anterior</div>
           </div>
         </div>
         <div class="field-group cols-1">
           <div class="field">
-            <label>BB_WIDTH_MAX <em>width máximo permitido</em></label>
+            <label>BB_WIDTH_MAX</label>
             <input type="number" id="BB_WIDTH_MAX" value="5.0" step="0.5" min="0.1" max="100">
-            <div class="field-desc">Filtra pares con BB anómalas (delisting, colapso de precio)</div>
           </div>
         </div>
         <div class="divider"></div>
         <div class="field-group cols-3">
-          <div class="field">
-            <label>EXP_VOL_NORMAL <em>🟢</em></label>
-            <input type="number" id="EXP_VOL_NORMAL" value="2.0" step="0.5" min="1" max="20">
-            <div class="field-desc">Mínimo para considerar spike (combo)</div>
-          </div>
-          <div class="field">
-            <label>EXP_VOL_FUERTE <em>🟡</em></label>
-            <input type="number" id="EXP_VOL_FUERTE" value="5.0" step="0.5" min="1" max="50">
-            <div class="field-desc">Spike significativo (combo)</div>
-          </div>
-          <div class="field">
-            <label>EXP_VOL_EXTREMO <em>🔴</em></label>
-            <input type="number" id="EXP_VOL_EXTREMO" value="10.0" step="1" min="1" max="100">
-            <div class="field-desc">Spike extremo (combo)</div>
-          </div>
+          <div class="field"><label>EXP_VOL_NORMAL <em>🟢</em></label><input type="number" id="EXP_VOL_NORMAL" value="2.0" step="0.5" min="1" max="20"></div>
+          <div class="field"><label>EXP_VOL_FUERTE <em>🟡</em></label><input type="number" id="EXP_VOL_FUERTE" value="5.0" step="0.5" min="1" max="50"></div>
+          <div class="field"><label>EXP_VOL_EXTREMO <em>🔴</em></label><input type="number" id="EXP_VOL_EXTREMO" value="10.0" step="1" min="1" max="100"></div>
         </div>
       </div>
     </div>
@@ -422,32 +452,14 @@ select option { background: var(--surface2); }
     </div>
     <div class="card-body hidden">
       <div class="toggle-row">
-        <div class="toggle-label">
-          Activar RSI
-          <small>Alerta en zonas de sobrecompra y sobreventa</small>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="en-rsi" onchange="onToggle('rsi')">
-          <span class="slider"></span>
-        </label>
+        <div class="toggle-label">Activar RSI<small>Alerta en zonas de sobrecompra y sobreventa</small></div>
+        <label class="switch"><input type="checkbox" id="en-rsi" onchange="onToggle('rsi')"><span class="slider"></span></label>
       </div>
       <div class="sub-fields hidden" id="sub-rsi">
         <div class="field-group cols-3">
-          <div class="field">
-            <label>RSI_OVERSOLD</label>
-            <input type="number" id="RSI_OVERSOLD" value="30" min="1" max="49">
-            <div class="field-desc">📉 alerta si RSI ≤ este valor</div>
-          </div>
-          <div class="field">
-            <label>RSI_OVERBOUGHT</label>
-            <input type="number" id="RSI_OVERBOUGHT" value="70" min="51" max="99">
-            <div class="field-desc">📈 alerta si RSI ≥ este valor</div>
-          </div>
-          <div class="field">
-            <label>RSI_WINDOW <em>período</em></label>
-            <input type="number" id="RSI_WINDOW" value="14" min="2" max="50">
-            <div class="field-desc">Período del RSI (default 14)</div>
-          </div>
+          <div class="field"><label>RSI_OVERSOLD</label><input type="number" id="RSI_OVERSOLD" value="30" min="1" max="49"></div>
+          <div class="field"><label>RSI_OVERBOUGHT</label><input type="number" id="RSI_OVERBOUGHT" value="70" min="51" max="99"></div>
+          <div class="field"><label>RSI_WINDOW</label><input type="number" id="RSI_WINDOW" value="14" min="2" max="50"></div>
         </div>
       </div>
     </div>
@@ -461,32 +473,14 @@ select option { background: var(--surface2); }
     </div>
     <div class="card-body hidden">
       <div class="toggle-row">
-        <div class="toggle-label">
-          Activar MACD crossover
-          <small>Detecta cruces alcistas y bajistas de la línea MACD</small>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="en-macd" onchange="onToggle('macd')">
-          <span class="slider"></span>
-        </label>
+        <div class="toggle-label">Activar MACD crossover<small>Detecta cruces alcistas y bajistas</small></div>
+        <label class="switch"><input type="checkbox" id="en-macd" onchange="onToggle('macd')"><span class="slider"></span></label>
       </div>
       <div class="sub-fields hidden" id="sub-macd">
         <div class="field-group cols-3">
-          <div class="field">
-            <label>MACD_FAST</label>
-            <input type="number" id="MACD_FAST" value="12" min="2" max="50">
-            <div class="field-desc">EMA rápida (default 12)</div>
-          </div>
-          <div class="field">
-            <label>MACD_SLOW</label>
-            <input type="number" id="MACD_SLOW" value="26" min="5" max="200">
-            <div class="field-desc">EMA lenta (default 26)</div>
-          </div>
-          <div class="field">
-            <label>MACD_SIGNAL</label>
-            <input type="number" id="MACD_SIGNAL" value="9" min="2" max="50">
-            <div class="field-desc">Señal (default 9)</div>
-          </div>
+          <div class="field"><label>MACD_FAST</label><input type="number" id="MACD_FAST" value="12" min="2" max="50"></div>
+          <div class="field"><label>MACD_SLOW</label><input type="number" id="MACD_SLOW" value="26" min="5" max="200"></div>
+          <div class="field"><label>MACD_SIGNAL</label><input type="number" id="MACD_SIGNAL" value="9" min="2" max="50"></div>
         </div>
       </div>
     </div>
@@ -500,27 +494,13 @@ select option { background: var(--surface2); }
     </div>
     <div class="card-body hidden">
       <div class="toggle-row">
-        <div class="toggle-label">
-          Activar EMA crossover
-          <small>Detecta cuando la EMA rápida cruza la EMA lenta</small>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="en-ema" onchange="onToggle('ema')">
-          <span class="slider"></span>
-        </label>
+        <div class="toggle-label">Activar EMA crossover<small>Detecta cuando la EMA rápida cruza la EMA lenta</small></div>
+        <label class="switch"><input type="checkbox" id="en-ema" onchange="onToggle('ema')"><span class="slider"></span></label>
       </div>
       <div class="sub-fields hidden" id="sub-ema">
         <div class="field-group">
-          <div class="field">
-            <label>EMA_FAST <em>período rápido</em></label>
-            <input type="number" id="EMA_FAST" value="9" min="2" max="50">
-            <div class="field-desc">EMA rápida (default 9)</div>
-          </div>
-          <div class="field">
-            <label>EMA_SLOW <em>período lento</em></label>
-            <input type="number" id="EMA_SLOW" value="21" min="5" max="200">
-            <div class="field-desc">EMA lenta (default 21)</div>
-          </div>
+          <div class="field"><label>EMA_FAST</label><input type="number" id="EMA_FAST" value="9" min="2" max="50"></div>
+          <div class="field"><label>EMA_SLOW</label><input type="number" id="EMA_SLOW" value="21" min="5" max="200"></div>
         </div>
       </div>
     </div>
@@ -534,21 +514,11 @@ select option { background: var(--surface2); }
     </div>
     <div class="card-body hidden">
       <div class="toggle-row">
-        <div class="toggle-label">
-          Activar BB Breakout
-          <small>Precio cierra fuera de la banda superior o inferior</small>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="en-bb-breakout" onchange="onToggle('bb-breakout')">
-          <span class="slider"></span>
-        </label>
+        <div class="toggle-label">Activar BB Breakout<small>Precio cierra fuera de la banda superior o inferior</small></div>
+        <label class="switch"><input type="checkbox" id="en-bb-breakout" onchange="onToggle('bb-breakout')"><span class="slider"></span></label>
       </div>
       <div class="sub-fields hidden" id="sub-bb-breakout">
-        <div class="example">
-          Dispara cuando <span class="hi">close &gt; upper band</span> (breakout arriba)<br>
-          o cuando <span class="warn">close &lt; lower band</span> (breakout abajo).<br>
-          No tiene parámetros adicionales — usa las BB estándar (20, 2σ).
-        </div>
+        <div class="example">Dispara cuando <span class="hi">close &gt; upper band</span> o <span class="warn">close &lt; lower band</span>.<br>Usa BB estándar (20, 2σ).</div>
       </div>
     </div>
   </div>
@@ -561,36 +531,14 @@ select option { background: var(--surface2); }
     </div>
     <div class="card-body hidden">
       <div class="toggle-row">
-        <div class="toggle-label">
-          Activar volumen spike independiente
-          <small>Sin requerir BB expansion ni precio subiendo</small>
-        </div>
-        <label class="switch">
-          <input type="checkbox" id="en-vol" onchange="onToggle('vol')">
-          <span class="slider"></span>
-        </label>
+        <div class="toggle-label">Activar volumen spike independiente<small>Sin requerir BB expansion ni precio subiendo</small></div>
+        <label class="switch"><input type="checkbox" id="en-vol" onchange="onToggle('vol')"><span class="slider"></span></label>
       </div>
       <div class="sub-fields hidden" id="sub-vol">
         <div class="field-group cols-3">
-          <div class="field">
-            <label>VOL_NORMAL <em>🟢 mínimo</em></label>
-            <input type="number" id="VOL_NORMAL" value="2.0" step="0.5" min="1" max="20">
-            <div class="field-desc">Spike leve (ej: 2x promedio)</div>
-          </div>
-          <div class="field">
-            <label>VOL_FUERTE <em>🟡 medio</em></label>
-            <input type="number" id="VOL_FUERTE" value="5.0" step="0.5" min="1" max="50">
-            <div class="field-desc">Spike significativo (ej: 5x)</div>
-          </div>
-          <div class="field">
-            <label>VOL_EXTREMO <em>🔴 alto</em></label>
-            <input type="number" id="VOL_EXTREMO" value="10.0" step="1" min="1" max="100">
-            <div class="field-desc">Spike extremo (ej: 10x+)</div>
-          </div>
-        </div>
-        <div class="example">
-          Independiente del BB Expansion — tiene sus propios umbrales.<br>
-          Dispara aunque el precio baje o las BB no se expandan.
+          <div class="field"><label>VOL_NORMAL <em>🟢</em></label><input type="number" id="VOL_NORMAL" value="2.0" step="0.5" min="1" max="20"></div>
+          <div class="field"><label>VOL_FUERTE <em>🟡</em></label><input type="number" id="VOL_FUERTE" value="5.0" step="0.5" min="1" max="50"></div>
+          <div class="field"><label>VOL_EXTREMO <em>🔴</em></label><input type="number" id="VOL_EXTREMO" value="10.0" step="1" min="1" max="100"></div>
         </div>
       </div>
     </div>
@@ -606,8 +554,10 @@ select option { background: var(--surface2); }
 </div>
 
 <script>
-const ALL_TF = ['1m','5m','15m','1h','4h','1d'];
+const ALL_TF      = ['1m','5m','15m','1h','4h','1d'];
+const ALL_SIGNALS = ['PREBREAK','BREAKOUT','RIDING','FADING','HOLD'];
 
+// ── Persistir token y repo ─────────────────────────────────────────────────
 ['gh-token','gh-repo'].forEach(id => {
   const el = document.getElementById(id);
   const saved = localStorage.getItem(id);
@@ -615,10 +565,47 @@ const ALL_TF = ['1m','5m','15m','1h','4h','1d'];
   el.addEventListener('input', () => localStorage.setItem(id, el.value));
 });
 
+// ── Signal preview ─────────────────────────────────────────────────────────
+function getActiveSignals() {
+  return ALL_SIGNALS.filter(s => document.getElementById('sig-' + s).checked);
+}
+
+function updateSignalPreview() {
+  const active = getActiveSignals();
+  const preview = document.getElementById('signal-preview');
+  const warn    = document.getElementById('signal-warn');
+  const badge   = document.getElementById('badge-signals');
+
+  if (active.length === 0) {
+    preview.innerHTML = '<span class="none">⚠ Ninguna señal activa — el screener no enviará alertas</span>';
+    warn.style.display = 'block';
+    warn.textContent = 'Activá al menos una señal antes de guardar.';
+    badge.textContent = 'NINGUNA';
+    badge.className = 'pill pill-off';
+  } else if (active.length === ALL_SIGNALS.length) {
+    preview.innerHTML = '→ señales activas: <span>' + active.join(', ') + '</span>';
+    warn.style.display = 'none';
+    badge.textContent = 'TODOS ON';
+    badge.className = 'pill pill-on';
+  } else {
+    preview.innerHTML = '→ señales activas: <span>' + active.join(', ') + '</span>';
+    if (active.includes('FADING') && !active.includes('BREAKOUT') && !active.includes('RIDING')) {
+      warn.style.display = 'block';
+      warn.textContent = 'FADING sin BREAKOUT/RIDING: puede que no detecte breakouts previos para alertar la salida.';
+    } else {
+      warn.style.display = 'none';
+    }
+    badge.textContent = active.length + '/' + ALL_SIGNALS.length + ' ON';
+    badge.className = 'pill pill-warn';
+  }
+}
+
+updateSignalPreview();
+
+// ── TF preview ─────────────────────────────────────────────────────────────
 function getSelectedTf() {
   return ALL_TF.filter(tf => document.getElementById('tf-' + tf).checked);
 }
-
 function updateTfPreview() {
   const selected = getSelectedTf();
   const previewEl = document.getElementById('tf-preview-val');
@@ -632,18 +619,19 @@ function updateTfPreview() {
   }
   warnEl.style.display = selected.length > 1 ? 'block' : 'none';
 }
-
 updateTfPreview();
 
+// ── Card toggle ────────────────────────────────────────────────────────────
 function toggleCard(header) {
   header.nextElementSibling.classList.toggle('hidden');
 }
 
+// ── Indicator on/off ───────────────────────────────────────────────────────
 function onToggle(key) {
   const on    = document.getElementById('en-' + key).checked;
   const sub   = document.getElementById('sub-' + key);
   const badge = document.getElementById('badge-' + key);
-  if (sub) sub.classList.toggle('hidden', !on);
+  if (sub)   sub.classList.toggle('hidden', !on);
   if (badge) {
     if (key === 'expansion') {
       badge.className  = on ? 'pill pill-new' : 'pill pill-off';
@@ -655,6 +643,7 @@ function onToggle(key) {
   }
 }
 
+// ── Status ─────────────────────────────────────────────────────────────────
 function setStatus(msg, type='') {
   const el = document.getElementById('status');
   el.textContent = msg;
@@ -669,7 +658,6 @@ function headers() {
     'X-GitHub-Api-Version': '2022-11-28'
   };
 }
-
 function repo() { return document.getElementById('gh-repo').value.trim(); }
 
 function decodeBase64Utf8(b64) {
@@ -677,7 +665,6 @@ function decodeBase64Utf8(b64) {
   const bytes = Uint8Array.from(binary, ch => ch.charCodeAt(0));
   return new TextDecoder('utf-8').decode(bytes);
 }
-
 function encodeBase64Utf8(str) {
   const bytes = new TextEncoder().encode(str);
   let binary = '';
@@ -687,6 +674,7 @@ function encodeBase64Utf8(str) {
 
 let _sha = null, _original = '';
 
+// ── Load config from GitHub ────────────────────────────────────────────────
 async function loadConfig() {
   if (!document.getElementById('gh-token').value.trim()) {
     setStatus('Ingresá el token primero', 'err'); return;
@@ -703,8 +691,9 @@ async function loadConfig() {
   } catch(e) { setStatus('✗ ' + e.message, 'err'); }
 }
 
+// ── Parse screener.py → UI ─────────────────────────────────────────────────
 function parseIntoUI(c) {
-  // Parse INTERVALS list e.g. INTERVALS = ["1h", "1m"]  or  ["1h"]
+  // INTERVALS
   const mIntervals = c.match(/^INTERVALS\s*=\s*\[([^\]]*)\]/m);
   if (mIntervals) {
     const parsed = mIntervals[1].match(/["']([^"']+)["']/g) || [];
@@ -716,31 +705,37 @@ function parseIntoUI(c) {
     updateTfPreview();
   }
 
+  // ACTIVE_SIGNALS_* booleans
+  ALL_SIGNALS.forEach(sig => {
+    const m = c.match(new RegExp(`^ACTIVE_SIGNALS_${sig}\\s*=\\s*(True|False)`, 'm'));
+    const el = document.getElementById('sig-' + sig);
+    if (m && el) el.checked = m[1] === 'True';
+  });
+  updateSignalPreview();
+
+  // Numeric fields
   const getVal = key => {
     const m = c.match(new RegExp(`^${key}\\s*=\\s*([^\\s#\\n]+)`, 'm'));
     return m ? m[1].replace(/['"]/g,'') : null;
   };
-
   const fields = [
     'LIMIT','TOP_N','MAX_WORKERS','MIN_QUOTE_VOLUME',
-    'BB_WIDTH_MIN',
-    'BB_EXPANSION_MIN','BB_EXPANSION_PCT','BB_WIDTH_MAX',
+    'BB_WIDTH_MIN','BB_EXPANSION_MIN','BB_EXPANSION_PCT','BB_WIDTH_MAX',
     'EXP_VOL_NORMAL','EXP_VOL_FUERTE','EXP_VOL_EXTREMO',
     'RSI_OVERSOLD','RSI_OVERBOUGHT','RSI_WINDOW',
     'MACD_FAST','MACD_SLOW','MACD_SIGNAL',
     'EMA_FAST','EMA_SLOW',
     'VOL_NORMAL','VOL_FUERTE','VOL_EXTREMO'
   ];
-
   fields.forEach(k => {
     const el = document.getElementById(k);
     const v  = getVal(k);
     if (el && v !== null) el.value = v;
   });
 
+  // Indicator on/off
   const isLive = pattern =>
     c.split('\n').some(line => pattern.test(line) && !/^\s*#/.test(line));
-
   const states = {
     'bb-squeeze':  isLive(/BB squeeze filtrado/),
     'expansion':   isLive(/BB expansion \+ volumen, sin price_up/),
@@ -750,7 +745,6 @@ function parseIntoUI(c) {
     'bb-breakout': isLive(/if price > hband\.iloc\[-1\]:/),
     'vol':         isLive(/Vol Spike standalone \(EARLY\)/)
   };
-
   Object.entries(states).forEach(([key, active]) => {
     const box = document.getElementById('en-' + key);
     if (!box) return;
@@ -759,6 +753,7 @@ function parseIntoUI(c) {
   });
 }
 
+// ── Save config to GitHub ──────────────────────────────────────────────────
 function setCommentState(src, startNeedle, endNeedle, active) {
   const lines = src.split('\n');
   let inside = false;
@@ -778,6 +773,8 @@ async function saveConfig() {
   if (!_sha) { setStatus('Cargá la config primero', 'err'); return; }
   const selected = getSelectedTf();
   if (selected.length === 0) { setStatus('Seleccioná al menos un timeframe', 'err'); return; }
+  const activeSigs = getActiveSignals();
+  if (activeSigs.length === 0) { setStatus('Activá al menos una señal', 'err'); return; }
 
   const btn = document.getElementById('save-btn');
   btn.disabled = true;
@@ -786,57 +783,44 @@ async function saveConfig() {
   try {
     let c = _original;
 
-    // Reemplazar INTERVALS (lista multi-TF)
+    // INTERVALS
     const tfList = selected.map(tf => `"${tf}"`).join(', ');
     c = c.replace(/^(INTERVALS\s*=\s*)\[.*?\]/m, `$1[${tfList}]`);
 
+    // ACTIVE_SIGNALS_* — reemplazar cada booleano
+    ALL_SIGNALS.forEach(sig => {
+      const active = activeSigs.includes(sig);
+      c = c.replace(
+        new RegExp(`(^ACTIVE_SIGNALS_${sig}\\s*=\\s*)(True|False)`, 'm'),
+        `$1${active ? 'True' : 'False'}`
+      );
+    });
+
+    // Numeric fields
     const numericFields = [
       'LIMIT','TOP_N','MAX_WORKERS','MIN_QUOTE_VOLUME',
-      'BB_WIDTH_MIN',
-      'BB_EXPANSION_MIN','BB_EXPANSION_PCT','BB_WIDTH_MAX',
+      'BB_WIDTH_MIN','BB_EXPANSION_MIN','BB_EXPANSION_PCT','BB_WIDTH_MAX',
       'EXP_VOL_NORMAL','EXP_VOL_FUERTE','EXP_VOL_EXTREMO',
       'RSI_OVERSOLD','RSI_OVERBOUGHT','RSI_WINDOW',
       'MACD_FAST','MACD_SLOW','MACD_SIGNAL',
       'EMA_FAST','EMA_SLOW',
       'VOL_NORMAL','VOL_FUERTE','VOL_EXTREMO'
     ];
-
     numericFields.forEach(k => {
       const el = document.getElementById(k);
       if (el) c = c.replace(new RegExp(`(^${k}\\s*=\\s*).*`, 'm'), `$1${el.value}`);
     });
 
+    // Indicator on/off
     const specs = {
-      'bb-squeeze': {
-        start: '# ── BB squeeze filtrado (EARLY)',
-        end:   'signals.append('
-      },
-      'expansion': {
-        start: 'vol_mean      = volume.iloc[-21:-1].mean()',
-        end:   'f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"'
-      },
-      'rsi': {
-        start: 'rsi_val = ta.momentum.RSIIndicator(close, window=RSI_WINDOW).rsi().iloc[-1]',
-        end:   'signals.append(f"📈 RSI={rsi_val:.1f} (sobrecompra)")'
-      },
-      'macd': {
-        start: 'macd_ind  = ta.trend.MACD(close, window_slow=MACD_SLOW, window_fast=MACD_FAST, window_sign=MACD_SIGNAL)',
-        end:   'signals.append("⚡ MACD crossover bajista")'
-      },
-      'ema': {
-        start: 'ema_fast = ta.trend.EMAIndicator(close, window=EMA_FAST).ema_indicator()',
-        end:   'signals.append(f"🔀 EMA{EMA_FAST} cruzó abajo EMA{EMA_SLOW} (bajista)")'
-      },
-      'bb-breakout': {
-        start: 'if price > hband.iloc[-1]:',
-        end:   'signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")'
-      },
-      'vol': {
-        start: '# ── Vol Spike standalone (EARLY)',
-        end:   'signals.append('
-      }
+      'bb-squeeze': { start: '# ── BB squeeze filtrado (EARLY)', end: 'signals.append(' },
+      'expansion':  { start: 'vol_mean      = volume.iloc[-21:-1].mean()', end: 'f"{width_prev:.2%} → {width_curr:.2%} (+{width_pct_chg:.0%})"' },
+      'rsi':        { start: 'rsi_val = ta.momentum.RSIIndicator(close, window=RSI_WINDOW).rsi().iloc[-1]', end: 'signals.append(f"📈 RSI={rsi_val:.1f} (sobrecompra)")' },
+      'macd':       { start: 'macd_ind  = ta.trend.MACD(close, window_slow=MACD_SLOW, window_fast=MACD_FAST, window_sign=MACD_SIGNAL)', end: 'signals.append("⚡ MACD crossover bajista")' },
+      'ema':        { start: 'ema_fast = ta.trend.EMAIndicator(close, window=EMA_FAST).ema_indicator()', end: 'signals.append(f"🔀 EMA{EMA_FAST} cruzó abajo EMA{EMA_SLOW} (bajista)")' },
+      'bb-breakout':{ start: 'if price > hband.iloc[-1]:', end: 'signals.append(f"🔥 BB breakout abajo (close={price:.4f} < lower={lband.iloc[-1]:.4f})")' },
+      'vol':        { start: '# ── Vol Spike standalone (EARLY)', end: 'signals.append(' }
     };
-
     Object.entries(specs).forEach(([key, spec]) => {
       const active = document.getElementById('en-' + key).checked;
       c = setCommentState(c, spec.start, spec.end, active);
@@ -846,7 +830,7 @@ async function saveConfig() {
       method: 'PUT',
       headers: headers(),
       body: JSON.stringify({
-        message: `config: intervals=[${selected.join(',')}] via control panel`,
+        message: `config: signals=[${activeSigs.join(',')}] tfs=[${selected.join(',')}] via control panel`,
         content: encodeBase64Utf8(c),
         sha: _sha
       })
@@ -860,7 +844,7 @@ async function saveConfig() {
     const data = await res.json();
     _sha = data.content.sha;
     _original = c;
-    setStatus(`✓ Guardado — TFs activos: ${selected.join(', ')}`, 'ok');
+    setStatus(`✓ Guardado — señales: ${activeSigs.join(', ')} | TFs: ${selected.join(', ')}`, 'ok');
   } catch(e) {
     setStatus('✗ Error: ' + e.message, 'err');
   } finally {
@@ -868,6 +852,7 @@ async function saveConfig() {
   }
 }
 
+// ── Trigger workflow ───────────────────────────────────────────────────────
 async function triggerWorkflow() {
   if (!document.getElementById('gh-token').value.trim()) {
     setStatus('Ingresá el token primero', 'err'); return;
