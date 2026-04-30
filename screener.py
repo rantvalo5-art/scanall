@@ -788,7 +788,7 @@ def main():
     header = (
         f"🎯 TOP SETUPS • {now}\n"
         f"top {TOP_ALERT_COUNT} {extra}\n"
-        f"RIDING cd {COOLDOWN_BY_STATE['RIDING']}m • BREAKOUT cd {COOLDOWN_BY_STATE['BREAKOUT']}m"
+        f"RIDING cd {COOLDOWN_BY_STATE['RIDING']}m • BREAK cd {COOLDOWN_BY_STATE['BREAKOUT']}m"
         f" • {len(pairs)} pares\n"
     )
     send_telegram(header + "\n" + body)
