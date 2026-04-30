@@ -34,7 +34,7 @@ LIMIT = 180
 TOP_N = 9999
 MAX_WORKERS = 20
 MIN_QUOTE_VOLUME = 300000
-TOP_ALERT_COUNT = 2
+TOP_ALERT_COUNT = 3
 
 # Historial / spam
 HISTORY_HOURS = 8
@@ -42,8 +42,8 @@ LATE_REPEAT_COUNT = 1
 
 # Cooldown por tipo de estado (minutos)
 COOLDOWN_BY_STATE = {
-    "PREBREAK": 60,
-    "BREAKOUT": 30,
+    "PREBREAK": 0,
+    "BREAKOUT": 0,
     "RIDING":   15,
     "FADING":  120,
     "HOLD":     45,
