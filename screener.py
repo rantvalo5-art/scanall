@@ -52,11 +52,11 @@ COOLDOWN_BY_STATE = {
 # ── Señales activas ────────────────────────────────────────────────────────────
 # Controlado desde el panel HTML vía variable en screener.py
 # Valores posibles: PREBREAK, BREAKOUT, RIDING, FADING, HOLD
-ACTIVE_SIGNALS_PREBREAK = True
+ACTIVE_SIGNALS_PREBREAK = False
 ACTIVE_SIGNALS_BREAKOUT = True
-ACTIVE_SIGNALS_RIDING   = True
-ACTIVE_SIGNALS_FADING   = True
-ACTIVE_SIGNALS_HOLD     = True
+ACTIVE_SIGNALS_RIDING   = False
+ACTIVE_SIGNALS_FADING   = False
+ACTIVE_SIGNALS_HOLD     = False
 
 # Indicadores simples
 EMA_SLOW = 21
