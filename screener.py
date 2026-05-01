@@ -42,8 +42,8 @@ LATE_REPEAT_COUNT = 1
 
 # Cooldown por tipo de estado (minutos)
 COOLDOWN_BY_STATE = {
-    "PREBREAK": 0,
-    "BREAKOUT": 0,
+    "PREBREAK": 15,
+    "BREAKOUT": 15,
     "RIDING":   15,
     "FADING":  120,
     "HOLD":     45,
@@ -221,6 +221,19 @@ def send_telegram(text):
 def binance_link(symbol):
     pair = symbol[:-4] + "_USDT"
     url = f"https://www.binance.com/en/trade/{pair}?type=spot"
+    return f"[{symbol}]({url})"
+
+
+# TF del screener → intervalo de TradingView
+TV_TF_MAP = {
+    "1m": "1", "5m": "5", "15m": "15", "30m": "30",
+    "1h": "60", "2h": "120", "4h": "240", "1d": "D",
+}
+
+
+def tradingview_link(symbol, timeframe="15m"):
+    tv_interval = TV_TF_MAP.get(timeframe, "15")
+    url = f"https://www.tradingview.com/chart/?symbol=BINANCE:{symbol}&interval={tv_interval}"
     return f"[{symbol}]({url})"
 
 
@@ -683,7 +696,7 @@ def format_alert(alert, counts_history, with_reasons=True):
 
     header = (
         f"{emoji} [{alert['bucket']}] [{alert['label']}{late_tag}] {alert['symbol']} "
-        f"score {alert['score']} • {alert['timeframe']} {binance_link(alert['symbol'])}{hist_tag}"
+        f"score {alert['score']} • {alert['timeframe']} {tradingview_link(alert['symbol'], alert['timeframe'])}{hist_tag}"
     )
 
     if not with_reasons:
@@ -729,6 +742,36 @@ def dedupe_and_rank(alerts):
 def send_immediate(alert, counts_history):
     label = "⚠️ SALIDA — precio devolviendo" if alert["history_tf"] == "FADING" else "🔥 PRIORITY NOW"
     send_telegram(f"{label}\n{format_alert(alert, counts_history)}")
+
+
+# ── Contexto de mercado (BTC) ─────────────────────────────────────────────────
+def get_btc_context():
+    """Devuelve un string corto con el régimen de BTC en 4h para el header.
+    Si falla, devuelve string vacío para no romper el flujo."""
+    try:
+        df = get_klines("BTCUSDT", "4h")
+        if len(df) < 30:
+            return ""
+        close = df["close"]
+        last = close.iloc[-1]
+        prev = close.iloc[-2]
+        change_pct = (last / prev - 1) * 100  # cambio última vela 4h cerrada vs anterior
+
+        ema_slow = ta.trend.EMAIndicator(close, window=EMA_SLOW).ema_indicator()
+        trend_up = last > ema_slow.iloc[-1] and ema_slow.iloc[-1] > ema_slow.iloc[-4]
+        trend_down = last < ema_slow.iloc[-1] and ema_slow.iloc[-1] < ema_slow.iloc[-4]
+
+        if trend_up:
+            trend_label = "alcista 🟢"
+        elif trend_down:
+            trend_label = "bajista 🔴"
+        else:
+            trend_label = "lateral 🟡"
+
+        return f"BTC 4h: {change_pct:+.2f}% • tendencia: {trend_label}"
+    except Exception as e:
+        print(f"get_btc_context error: {e}")
+        return ""
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -809,8 +852,11 @@ def main():
         extra += f"| ⚠️ {fading_count} fading "
 
     active_tag = " • ".join(active_names) if active_names else "ninguna"
+    btc_ctx = get_btc_context()
+    btc_line = f"{btc_ctx}\n" if btc_ctx else ""
     header = (
         f"🎯 TOP SETUPS • {now}\n"
+        f"{btc_line}"
         f"top {TOP_ALERT_COUNT} {extra}• {len(pairs)} pares\n"
         f"señales: {active_tag}\n"
     )
