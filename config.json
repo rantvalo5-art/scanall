@@ -40,7 +40,7 @@
   },
   "prebreak": {
     "PREBREAK_NEAR_MAX": 0.01,
-    "PREBREAK_MIN_VOL_RATIO": 20,
+    "PREBREAK_MIN_VOL_RATIO": 2.5,
     "PREBREAK_VOLUME_GROWTH_MIN": 1.1,
     "PREBREAK_BB_WIDTH_MAX": 0.035
   },
