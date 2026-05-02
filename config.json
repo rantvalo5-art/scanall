@@ -1,6 +1,10 @@
 {
   "general": {
-    "INTERVALS": ["5m", "15m", "1h"],
+    "INTERVALS": [
+      "5m",
+      "15m",
+      "1h"
+    ],
     "LIMIT": 180,
     "TOP_N": 9999,
     "MAX_WORKERS": 20,
@@ -24,7 +28,7 @@
     "HOLD": 45
   },
   "active_signals": {
-    "PREBREAK": false,
+    "PREBREAK": true,
     "BREAKOUT": true,
     "RIDING": false,
     "FADING": false,
@@ -35,24 +39,24 @@
     "RECENT_LOOKBACK": 15
   },
   "prebreak": {
-    "PREBREAK_NEAR_MAX": 0.010,
-    "PREBREAK_MIN_VOL_RATIO": 20.0,
-    "PREBREAK_VOLUME_GROWTH_MIN": 1.10,
+    "PREBREAK_NEAR_MAX": 0.01,
+    "PREBREAK_MIN_VOL_RATIO": 20,
+    "PREBREAK_VOLUME_GROWTH_MIN": 1.1,
     "PREBREAK_BB_WIDTH_MAX": 0.035
   },
   "breakout": {
     "BREAKOUT_BUFFER": 0.001,
-    "BREAKOUT_MIN_VOL_RATIO": 1.80,
-    "BREAKOUT_MAX_EXTENDED": 0.040,
+    "BREAKOUT_MIN_VOL_RATIO": 1.8,
+    "BREAKOUT_MAX_EXTENDED": 0.04,
     "BREAKOUT_BB_EXPANSION_MIN": 0.12,
-    "BREAKOUT_5M_MIN_VOL_RATIO": 1.10,
-    "BREAKOUT_MIN_BODY_PCT": 0.40
+    "BREAKOUT_5M_MIN_VOL_RATIO": 1.1,
+    "BREAKOUT_MIN_BODY_PCT": 0.4
   },
   "hold": {
     "HOLD_LOOKBACK_BARS": 8,
     "HOLD_RECENT_BREAK_MAX_BARS": 5,
     "HOLD_ZONE_BUFFER": 0.003,
-    "HOLD_PULLBACK_MAX": 0.030,
+    "HOLD_PULLBACK_MAX": 0.03,
     "STRONG_CLOSE_MIN": 0.65,
     "ONE_H_RESIST_LOOKBACK": 24,
     "ONE_H_RESIST_BUFFER": 0.015
@@ -62,7 +66,7 @@
     "RIDING_MIN_GAIN": 0.005,
     "RIDING_MAX_GAIN": 0.15,
     "RIDING_ZONE_BUFFER": 0.012,
-    "RIDING_MIN_VOL_RATIO": 1.20,
+    "RIDING_MIN_VOL_RATIO": 1.2,
     "RIDING_EMA_MUST_TREND": true
   },
   "fading": {
