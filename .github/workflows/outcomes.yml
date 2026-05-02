@@ -1,0 +1,23 @@
+name: Update Outcomes
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *" # cada 15 min
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install dependencies
+        run: pip install requests pandas==2.2.3
+      - name: Run update_outcomes
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python update_outcomes.py
