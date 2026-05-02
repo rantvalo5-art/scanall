@@ -6,94 +6,102 @@ Screener simplificado con prioridad real:
 - FADING: precio devolviendo después de un breakout — avisa una vez para salir
 - HOLD: 15m rompe y sostiene la zona
 
-Además:
-- calcula un score por símbolo
-- elige el mejor setup por moneda
-- rankea las mejores oportunidades
-- clasifica en BEST / STRONG / WATCH
-- manda solo pocas alertas, ordenadas por prioridad
-- RIDING no tiene penalización por repetición — se repite mientras sea válido
+Configuración en config.json (raíz del repo). Si falta o está roto, el script aborta.
 """
 
+import json
 import os
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
 
 import pandas as pd
 import requests
 import ta
 
-# ── Configuración ──────────────────────────────────────────────────────────────
+# ── Carga de configuración ────────────────────────────────────────────────────
+CONFIG_PATH = Path(__file__).parent / "config.json"
+if not CONFIG_PATH.exists():
+    raise SystemExit(f"FATAL: config.json no encontrado en {CONFIG_PATH}")
+
+try:
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        CONFIG = json.load(f)
+except json.JSONDecodeError as e:
+    raise SystemExit(f"FATAL: config.json tiene JSON inválido: {e}")
+
+def _cfg(section, key):
+    """Acceso estricto: si falta una clave, abortamos para que el error sea visible."""
+    try:
+        return CONFIG[section][key]
+    except KeyError:
+        raise SystemExit(f"FATAL: config.json no tiene {section}.{key}")
+
+# ── Variables de entorno ──────────────────────────────────────────────────────
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
 SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
 
-INTERVALS = ["5m", "15m", "1h"]
-LIMIT = 180
-TOP_N = 9999
-MAX_WORKERS = 20
-MIN_QUOTE_VOLUME = 300000
-TOP_ALERT_COUNT = 3
+# ── Configuración derivada ────────────────────────────────────────────────────
+INTERVALS         = _cfg("general", "INTERVALS")
+LIMIT             = _cfg("general", "LIMIT")
+TOP_N             = _cfg("general", "TOP_N")
+MAX_WORKERS       = _cfg("general", "MAX_WORKERS")
+MIN_QUOTE_VOLUME  = _cfg("general", "MIN_QUOTE_VOLUME")
+TOP_ALERT_COUNT   = _cfg("general", "TOP_ALERT_COUNT")
 
-# Historial / spam
-HISTORY_HOURS = 8
-LATE_REPEAT_COUNT = 1
+HISTORY_HOURS            = _cfg("history", "HISTORY_HOURS")
+LATE_REPEAT_COUNT        = _cfg("history", "LATE_REPEAT_COUNT")
+SNAPSHOT_RETENTION_DAYS  = _cfg("history", "SNAPSHOT_RETENTION_DAYS")
 
-# Cooldown por tipo de estado (minutos)
-COOLDOWN_BY_STATE = {
-    "PREBREAK": 15,
-    "BREAKOUT": 15,
-    "RIDING":   15,
-    "FADING":  120,
-    "HOLD":     45,
-}
+MAX_IMMEDIATE_PER_RUN = _cfg("anti_spam", "MAX_IMMEDIATE_PER_RUN")
+BURST_THRESHOLD       = _cfg("anti_spam", "BURST_THRESHOLD")
 
-# ── Señales activas ────────────────────────────────────────────────────────────
-# Controlado desde el panel HTML vía variable en screener.py
-# Valores posibles: PREBREAK, BREAKOUT, RIDING, FADING, HOLD
-ACTIVE_SIGNALS_PREBREAK = False
-ACTIVE_SIGNALS_BREAKOUT = True
-ACTIVE_SIGNALS_RIDING   = False
-ACTIVE_SIGNALS_FADING   = False
-ACTIVE_SIGNALS_HOLD     = False
+COOLDOWN_BY_STATE = CONFIG.get("cooldowns_minutes", {})
 
-# Indicadores simples
-EMA_SLOW = 21
-RECENT_LOOKBACK = 15
-PREBREAK_NEAR_MAX = 0.010
-PREBREAK_MIN_VOL_RATIO = 20.0
-PREBREAK_VOLUME_GROWTH_MIN = 1.10
-PREBREAK_BB_WIDTH_MAX = 0.035
+ACTIVE_SIGNALS_PREBREAK = _cfg("active_signals", "PREBREAK")
+ACTIVE_SIGNALS_BREAKOUT = _cfg("active_signals", "BREAKOUT")
+ACTIVE_SIGNALS_RIDING   = _cfg("active_signals", "RIDING")
+ACTIVE_SIGNALS_FADING   = _cfg("active_signals", "FADING")
+ACTIVE_SIGNALS_HOLD     = _cfg("active_signals", "HOLD")
 
-BREAKOUT_BUFFER = 0.001
-BREAKOUT_MIN_VOL_RATIO = 1.80
-BREAKOUT_MAX_EXTENDED = 0.040
-BREAKOUT_BB_EXPANSION_MIN = 0.12
-BREAKOUT_5M_MIN_VOL_RATIO = 1.10
-BREAKOUT_MIN_BODY_PCT = 0.40
+EMA_SLOW        = _cfg("indicators", "EMA_SLOW")
+RECENT_LOOKBACK = _cfg("indicators", "RECENT_LOOKBACK")
 
-HOLD_LOOKBACK_BARS = 8
-HOLD_RECENT_BREAK_MAX_BARS = 5
-HOLD_ZONE_BUFFER = 0.003
-HOLD_PULLBACK_MAX = 0.030
-STRONG_CLOSE_MIN = 0.65
-ONE_H_RESIST_LOOKBACK = 24
-ONE_H_RESIST_BUFFER = 0.015
+PREBREAK_NEAR_MAX           = _cfg("prebreak", "PREBREAK_NEAR_MAX")
+PREBREAK_MIN_VOL_RATIO      = _cfg("prebreak", "PREBREAK_MIN_VOL_RATIO")
+PREBREAK_VOLUME_GROWTH_MIN  = _cfg("prebreak", "PREBREAK_VOLUME_GROWTH_MIN")
+PREBREAK_BB_WIDTH_MAX       = _cfg("prebreak", "PREBREAK_BB_WIDTH_MAX")
 
-RIDING_LOOKBACK_BARS = 20
-RIDING_MIN_GAIN = 0.005
-RIDING_MAX_GAIN = 0.15
-RIDING_ZONE_BUFFER = 0.012
-RIDING_MIN_VOL_RATIO = 1.20
-RIDING_EMA_MUST_TREND = True
+BREAKOUT_BUFFER             = _cfg("breakout", "BREAKOUT_BUFFER")
+BREAKOUT_MIN_VOL_RATIO      = _cfg("breakout", "BREAKOUT_MIN_VOL_RATIO")
+BREAKOUT_MAX_EXTENDED       = _cfg("breakout", "BREAKOUT_MAX_EXTENDED")
+BREAKOUT_BB_EXPANSION_MIN   = _cfg("breakout", "BREAKOUT_BB_EXPANSION_MIN")
+BREAKOUT_5M_MIN_VOL_RATIO   = _cfg("breakout", "BREAKOUT_5M_MIN_VOL_RATIO")
+BREAKOUT_MIN_BODY_PCT       = _cfg("breakout", "BREAKOUT_MIN_BODY_PCT")
 
-FADING_REVERSAL_MIN = 0.015
-FADING_BELOW_ZONE = 0.008
+HOLD_LOOKBACK_BARS          = _cfg("hold", "HOLD_LOOKBACK_BARS")
+HOLD_RECENT_BREAK_MAX_BARS  = _cfg("hold", "HOLD_RECENT_BREAK_MAX_BARS")
+HOLD_ZONE_BUFFER            = _cfg("hold", "HOLD_ZONE_BUFFER")
+HOLD_PULLBACK_MAX           = _cfg("hold", "HOLD_PULLBACK_MAX")
+STRONG_CLOSE_MIN            = _cfg("hold", "STRONG_CLOSE_MIN")
+ONE_H_RESIST_LOOKBACK       = _cfg("hold", "ONE_H_RESIST_LOOKBACK")
+ONE_H_RESIST_BUFFER         = _cfg("hold", "ONE_H_RESIST_BUFFER")
 
-BEST_MIN_SCORE = 10
-STRONG_MIN_SCORE = 8
-IMMEDIATE_MIN_SCORE = 9
+RIDING_LOOKBACK_BARS    = _cfg("riding", "RIDING_LOOKBACK_BARS")
+RIDING_MIN_GAIN         = _cfg("riding", "RIDING_MIN_GAIN")
+RIDING_MAX_GAIN         = _cfg("riding", "RIDING_MAX_GAIN")
+RIDING_ZONE_BUFFER      = _cfg("riding", "RIDING_ZONE_BUFFER")
+RIDING_MIN_VOL_RATIO    = _cfg("riding", "RIDING_MIN_VOL_RATIO")
+RIDING_EMA_MUST_TREND   = _cfg("riding", "RIDING_EMA_MUST_TREND")
+
+FADING_REVERSAL_MIN = _cfg("fading", "FADING_REVERSAL_MIN")
+FADING_BELOW_ZONE   = _cfg("fading", "FADING_BELOW_ZONE")
+
+BEST_MIN_SCORE      = _cfg("scoring", "BEST_MIN_SCORE")
+STRONG_MIN_SCORE    = _cfg("scoring", "STRONG_MIN_SCORE")
+IMMEDIATE_MIN_SCORE = _cfg("scoring", "IMMEDIATE_MIN_SCORE")
 
 
 # ── Supabase ───────────────────────────────────────────────────────────────────
@@ -151,6 +159,39 @@ def insert_history(alert_rows):
         print(f"Supabase insert_history error: {e}")
 
 
+def insert_pairs_snapshot(pairs):
+    """Snapshot de qué pares cotizaban en este run + auto-purge de filas viejas.
+    Sirve para reconstruir el universo histórico cuando armemos tracking de outcomes."""
+    if not pairs:
+        return
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    purge_before = (now - timedelta(days=SNAPSHOT_RETENTION_DAYS)).isoformat()
+    rows = [{"run_at": now_iso, "symbol": s} for s in pairs]
+    try:
+        # Insert en batches por si Supabase tiene límite de payload
+        BATCH = 500
+        for i in range(0, len(rows), BATCH):
+            r = requests.post(
+                f"{SUPABASE_URL}/rest/v1/screener_pairs_snapshot",
+                headers=_sb_headers(),
+                json=rows[i:i + BATCH],
+                timeout=15,
+            )
+            r.raise_for_status()
+        # Auto-purge
+        r2 = requests.delete(
+            f"{SUPABASE_URL}/rest/v1/screener_pairs_snapshot",
+            headers=_sb_headers(),
+            params={"run_at": f"lt.{purge_before}"},
+            timeout=15,
+        )
+        r2.raise_for_status()
+        print(f"  snapshot: {len(rows)} pares guardados (purge >{SNAPSHOT_RETENTION_DAYS}d)")
+    except Exception as e:
+        print(f"Supabase insert_pairs_snapshot error: {e}")
+
+
 # ── Datos Binance ──────────────────────────────────────────────────────────────
 def get_active_usdt_symbols():
     r = requests.get("https://data-api.binance.vision/api/v3/exchangeInfo", timeout=20)
@@ -162,7 +203,9 @@ def get_active_usdt_symbols():
     }
 
 
-def get_all_usdt_pairs(n=TOP_N):
+def get_all_usdt_pairs(n=None):
+    if n is None:
+        n = TOP_N
     active_symbols = get_active_usdt_symbols()
     r = requests.get("https://data-api.binance.vision/api/v3/ticker/24hr", timeout=15)
     r.raise_for_status()
@@ -218,12 +261,6 @@ def send_telegram(text):
     ).raise_for_status()
 
 
-def binance_link(symbol):
-    pair = symbol[:-4] + "_USDT"
-    url = f"https://www.binance.com/en/trade/{pair}?type=spot"
-    return f"[{symbol}]({url})"
-
-
 # TF del screener → intervalo de TradingView
 TV_TF_MAP = {
     "1m": "1", "5m": "5", "15m": "15", "30m": "30",
@@ -243,6 +280,35 @@ def final_bucket(score):
     if score >= STRONG_MIN_SCORE:
         return "STRONG"
     return "WATCH"
+
+
+# ── Contexto de mercado (BTC) ─────────────────────────────────────────────────
+def get_btc_context():
+    """Régimen de BTC en 4h para el header del batch."""
+    try:
+        df = get_klines("BTCUSDT", "4h")
+        if len(df) < 30:
+            return ""
+        close = df["close"]
+        last = close.iloc[-1]
+        prev = close.iloc[-2]
+        change_pct = (last / prev - 1) * 100
+
+        ema_slow = ta.trend.EMAIndicator(close, window=EMA_SLOW).ema_indicator()
+        trend_up = last > ema_slow.iloc[-1] and ema_slow.iloc[-1] > ema_slow.iloc[-4]
+        trend_down = last < ema_slow.iloc[-1] and ema_slow.iloc[-1] < ema_slow.iloc[-4]
+
+        if trend_up:
+            trend_label = "alcista 🟢"
+        elif trend_down:
+            trend_label = "bajista 🔴"
+        else:
+            trend_label = "lateral 🟡"
+
+        return f"BTC 4h: {change_pct:+.2f}% • tendencia: {trend_label}"
+    except Exception as e:
+        print(f"get_btc_context error: {e}")
+        return ""
 
 
 # ── Analisis por timeframe ─────────────────────────────────────────────────────
@@ -702,7 +768,6 @@ def format_alert(alert, counts_history, with_reasons=True):
     if not with_reasons:
         return header
 
-    # Línea de precio con % desde referencia
     price = alert.get("price", 0)
     ref = alert.get("ref_price") or 0
     if ref and ref > 0 and price > 0:
@@ -744,36 +809,6 @@ def send_immediate(alert, counts_history):
     send_telegram(f"{label}\n{format_alert(alert, counts_history)}")
 
 
-# ── Contexto de mercado (BTC) ─────────────────────────────────────────────────
-def get_btc_context():
-    """Devuelve un string corto con el régimen de BTC en 4h para el header.
-    Si falla, devuelve string vacío para no romper el flujo."""
-    try:
-        df = get_klines("BTCUSDT", "4h")
-        if len(df) < 30:
-            return ""
-        close = df["close"]
-        last = close.iloc[-1]
-        prev = close.iloc[-2]
-        change_pct = (last / prev - 1) * 100  # cambio última vela 4h cerrada vs anterior
-
-        ema_slow = ta.trend.EMAIndicator(close, window=EMA_SLOW).ema_indicator()
-        trend_up = last > ema_slow.iloc[-1] and ema_slow.iloc[-1] > ema_slow.iloc[-4]
-        trend_down = last < ema_slow.iloc[-1] and ema_slow.iloc[-1] < ema_slow.iloc[-4]
-
-        if trend_up:
-            trend_label = "alcista 🟢"
-        elif trend_down:
-            trend_label = "bajista 🔴"
-        else:
-            trend_label = "lateral 🟡"
-
-        return f"BTC 4h: {change_pct:+.2f}% • tendencia: {trend_label}"
-    except Exception as e:
-        print(f"get_btc_context error: {e}")
-        return ""
-
-
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -790,12 +825,16 @@ def main():
     print(f"[{now}] Escaneando {len(pairs)} pares USDT ({' + '.join(INTERVALS)}) con {MAX_WORKERS} workers...")
     print(f"Señales activas: {', '.join(active_names) if active_names else 'NINGUNA'}")
 
+    # Snapshot de pares activos en este run (para reconstruir universo histórico)
+    insert_pairs_snapshot(pairs)
+
     counts_history, last_seen = fetch_history()
     tasks = [(sym, tf) for sym in pairs for tf in INTERVALS]
     per_symbol = {sym: {} for sym in pairs}
     candidates = []
     processed = set()
     immediate_sent_keys = set()
+    immediate_skipped = 0  # Anti-spam: cuántas inmediatas saltamos por tope
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {executor.submit(analyze, sym, tf): (sym, tf) for sym, tf in tasks}
@@ -816,6 +855,11 @@ def main():
 
             key = (alert["symbol"], alert["history_tf"])
             if alert.get("immediate") and key not in immediate_sent_keys:
+                # Anti-spam: tope de inmediatas por run
+                if len(immediate_sent_keys) >= MAX_IMMEDIATE_PER_RUN:
+                    immediate_skipped += 1
+                    print(f"  inmediata saltada (tope {MAX_IMMEDIATE_PER_RUN}): {symbol}")
+                    continue
                 try:
                     send_immediate(alert, counts_history)
                     immediate_sent_keys.add(key)
@@ -851,19 +895,32 @@ def main():
     if fading_count:
         extra += f"| ⚠️ {fading_count} fading "
 
+    # Anti-spam: flag de burst si hay muchos candidates
+    burst_line = ""
+    if len(candidates) >= BURST_THRESHOLD:
+        burst_line = f"🌊 BURST: {len(candidates)} setups detectados — movimiento de mercado\n"
+
+    # Anti-spam: avisar si saltamos inmediatas
+    skipped_line = ""
+    if immediate_skipped > 0:
+        skipped_line = f"ℹ️ {immediate_skipped} alertas inmediatas saltadas (tope: {MAX_IMMEDIATE_PER_RUN})\n"
+
     active_tag = " • ".join(active_names) if active_names else "ninguna"
     btc_ctx = get_btc_context()
     btc_line = f"{btc_ctx}\n" if btc_ctx else ""
+
     header = (
         f"🎯 TOP SETUPS • {now}\n"
         f"{btc_line}"
+        f"{burst_line}"
+        f"{skipped_line}"
         f"top {TOP_ALERT_COUNT} {extra}• {len(pairs)} pares\n"
         f"señales: {active_tag}\n"
     )
     send_telegram(header + "\n" + body)
 
     print(f"Total candidatos: {len(candidates)} (RIDING: {riding_count}, FADING: {fading_count})")
-    print(f"Inmediatos: {len(immediate_sent_keys)}")
+    print(f"Inmediatos enviados: {len(immediate_sent_keys)} | saltados: {immediate_skipped}")
     print(f"Top final: {len(selected)}")
 
 
