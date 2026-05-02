@@ -637,35 +637,35 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         )
         if pre_ok and not in_cooldown(symbol, "PREBREAK", last_seen):
             prev = counts_history.get((symbol, "PREBREAK"), 0)
-            score = 3
+            score = 2
             reasons = []
             near_pct = ((tf5['recent_max'] - tf5['price']) / tf5['recent_max']) if tf5['recent_max'] else 0.0
             reasons.append(f"5m a {near_pct:.2%} del maximo reciente")
-            if tf5['vol_ratio'] >= 1.6:
-                score += 2
+            if tf5['vol_ratio'] >= 3.0:
+                score += 3
                 reasons.append(f"volumen 5m fuerte ({tf5['vol_ratio']:.1f}x)")
             else:
                 score += 1
                 reasons.append(f"volumen 5m arriba de lo normal ({tf5['vol_ratio']:.1f}x)")
-            if tf5['vol_growth'] >= 1.3:
+            if tf5['vol_growth'] >= 1.5:
                 score += 2
                 reasons.append(f"volumen creciendo bien ({tf5['vol_growth']:.2f}x)")
             else:
-                score += 1
+                score += 0
                 reasons.append(f"volumen creciendo ({tf5['vol_growth']:.2f}x)")
             if tf5['strong_close']:
                 score += 1
                 reasons.append("ultima vela 5m cerro fuerte")
-            if tf5['width_curr'] <= 0.025:
-                score += 1
+            if tf5['width_curr'] <= 0.018:
+                score += 2
                 reasons.append(f"BB 5m bien comprimida ({tf5['width_curr']:.2%})")
             else:
                 reasons.append(f"BB 5m todavia comprimida ({tf5['width_curr']:.2%})")
             if tf1h['dist_to_res'] > 0.04:
-                score += 2
+                score += 1
                 reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
             else:
-                score += 1
+                score += 0
                 reasons.append("1h alcista y con espacio")
             if prev >= LATE_REPEAT_COUNT:
                 score -= 1
@@ -698,7 +698,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         )
         if breakout_ok and not in_cooldown(symbol, "BREAKOUT", last_seen):
             prev = counts_history.get((symbol, "BREAKOUT"), 0)
-            score = 4
+            score = 3
             reasons = [f"15m rompio el maximo reciente (+{tf15['breakout_distance']:.2%})"]
             body_pct = tf15.get("candle_body_pct", 0)
             if body_pct >= 0.75:
@@ -707,14 +707,14 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             else:
                 score += 1
                 reasons.append(f"vela 15m solida (cuerpo {body_pct:.0%} del rango)")
-            if tf5['vol_ratio'] >= 2.5:
-                score += 2
+            if tf5['vol_ratio'] >= 4.0:
+                score += 3
                 reasons.append(f"5m confirmando con volumen muy fuerte ({tf5['vol_ratio']:.1f}x)")
             else:
                 score += 1
                 reasons.append(f"5m confirmando con volumen ({tf5['vol_ratio']:.1f}x)")
-            if tf15['width_expansion'] >= 0.25:
-                score += 2
+            if tf15['width_expansion'] >= 0.35:
+                score += 3
                 reasons.append(f"expansion BB marcada ({tf15['width_expansion']:.0%})")
             else:
                 score += 1
@@ -726,10 +726,10 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 score += 1
                 reasons.append("todavia no esta muy extendida")
             if tf1h['dist_to_res'] > 0.04:
-                score += 2
+                score += 1
                 reasons.append(f"1h con espacio real ({tf1h['dist_to_res']:.2%})")
             else:
-                score += 1
+                score += 0
                 reasons.append("1h alcista y con espacio")
             if prev >= LATE_REPEAT_COUNT:
                 score -= 1
@@ -898,12 +898,14 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         cs = tf_data.get("candle_status", "closed")
         c["candle_status"] = cs
         if cs == "forming":
-            c["score"] = max(0, c["score"] - FORMING_CANDLE_PENALTY)
-            c["bucket"] = final_bucket(c["score"])
+            c["_discard"] = True
             # Si por la penalización ya no llega a IMMEDIATE_MIN_SCORE, bajamos el flag
             if c.get("immediate") and c["score"] < IMMEDIATE_MIN_SCORE:
                 c["immediate"] = False
-
+    candidates = [c for c in candidates if not c.get("_discard")]
+    if not candidates:
+    return None
+    
     candidates.sort(key=lambda x: (x["score"], x["priority"]), reverse=True)
     return candidates[0]
 
