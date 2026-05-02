@@ -13,11 +13,21 @@ import json
 import os
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from io import BytesIO
 from pathlib import Path
 
 import pandas as pd
 import requests
 import ta
+
+# mplfinance es opcional: si no está instalado, los charts se desactivan en runtime
+try:
+    import matplotlib
+    matplotlib.use("Agg")  # backend sin display, necesario en CI
+    import mplfinance as mpf
+    _HAS_MPLFINANCE = True
+except ImportError:
+    _HAS_MPLFINANCE = False
 
 # ── Carga de configuración ────────────────────────────────────────────────────
 CONFIG_PATH = Path(__file__).parent / "config.json"
@@ -102,6 +112,16 @@ FADING_BELOW_ZONE   = _cfg("fading", "FADING_BELOW_ZONE")
 BEST_MIN_SCORE      = _cfg("scoring", "BEST_MIN_SCORE")
 STRONG_MIN_SCORE    = _cfg("scoring", "STRONG_MIN_SCORE")
 IMMEDIATE_MIN_SCORE = _cfg("scoring", "IMMEDIATE_MIN_SCORE")
+FORMING_CANDLE_PENALTY = _cfg("scoring", "FORMING_CANDLE_PENALTY")
+
+CHART_ENABLED = _cfg("chart", "ENABLED")
+CHART_BARS    = _cfg("chart", "BARS")
+CHART_WIDTH   = _cfg("chart", "WIDTH")
+CHART_HEIGHT  = _cfg("chart", "HEIGHT")
+CHART_STYLE   = _cfg("chart", "STYLE")
+
+OUTCOMES_ENABLED              = _cfg("outcomes", "ENABLED")
+OUTCOMES_TRACK_ALL_CANDIDATES = _cfg("outcomes", "TRACK_ALL_CANDIDATES")
 
 
 # ── Supabase ───────────────────────────────────────────────────────────────────
@@ -192,6 +212,39 @@ def insert_pairs_snapshot(pairs):
         print(f"Supabase insert_pairs_snapshot error: {e}")
 
 
+def insert_outcomes(alerts):
+    """Inserta filas en screener_outcomes para tracking de cómo evolucionan las alertas.
+    Solo guarda los datos del momento de la alerta — los outcomes (precio +15m/+1h/+4h/+24h)
+    los completa el job update_outcomes.py que corre después."""
+    if not OUTCOMES_ENABLED or not alerts:
+        return
+    now_iso = datetime.now(timezone.utc).isoformat()
+    rows = []
+    for a in alerts:
+        rows.append({
+            "alerted_at": now_iso,
+            "symbol": a["symbol"],
+            "signal_type": a["history_tf"],
+            "timeframe": a["timeframe"],
+            "score": int(a["score"]),
+            "bucket": a.get("bucket"),
+            "entry_price": float(a["price"]),
+            "ref_price": float(a["ref_price"]) if a.get("ref_price") else None,
+            "candle_status": a.get("candle_status", "closed"),
+        })
+    try:
+        r = requests.post(
+            f"{SUPABASE_URL}/rest/v1/screener_outcomes",
+            headers=_sb_headers(),
+            json=rows,
+            timeout=10,
+        )
+        r.raise_for_status()
+        print(f"  outcomes: {len(rows)} alertas trackeadas")
+    except Exception as e:
+        print(f"Supabase insert_outcomes error: {e}")
+
+
 # ── Datos Binance ──────────────────────────────────────────────────────────────
 def get_active_usdt_symbols():
     r = requests.get("https://data-api.binance.vision/api/v3/exchangeInfo", timeout=20)
@@ -232,6 +285,9 @@ def get_klines(symbol, interval):
     ])
     for col in ["open", "high", "low", "close", "volume"]:
         df[col] = df[col].astype(float)
+    # close_time viene en ms UTC desde Binance; lo dejo como int para usar luego
+    df["close_time"] = df["close_time"].astype("int64")
+    df["open_time"] = df["open_time"].astype("int64")
     return df
 
 
@@ -272,6 +328,97 @@ def tradingview_link(symbol, timeframe="15m"):
     tv_interval = TV_TF_MAP.get(timeframe, "15")
     url = f"https://www.tradingview.com/chart/?symbol=BINANCE:{symbol}&interval={tv_interval}"
     return f"[{symbol}]({url})"
+
+
+# ── Chart image (mplfinance) ──────────────────────────────────────────────────
+def generate_chart_image(df, symbol, timeframe, ref_price=None):
+    """Genera una PNG en memoria con las últimas N velas + BB(20,2) + EMA21 + volumen.
+    Si ref_price está, dibuja una línea horizontal (zona de ruptura/breakout/etc).
+    Devuelve bytes (BytesIO) o None si mplfinance no está disponible o falla."""
+    if not _HAS_MPLFINANCE or not CHART_ENABLED:
+        return None
+    try:
+        # Últimas N velas
+        chart_df = df.tail(CHART_BARS).copy()
+        # mplfinance espera columnas Open/High/Low/Close/Volume capitalizadas con DatetimeIndex
+        chart_df["timestamp"] = pd.to_datetime(chart_df["open_time"], unit="ms", utc=True)
+        chart_df = chart_df.set_index("timestamp")
+        chart_df = chart_df.rename(columns={
+            "open": "Open", "high": "High", "low": "Low",
+            "close": "Close", "volume": "Volume",
+        })
+        chart_df = chart_df[["Open", "High", "Low", "Close", "Volume"]]
+
+        # Calculo BB y EMA sobre el df recortado para que coincida el largo
+        bb = ta.volatility.BollingerBands(chart_df["Close"], window=20, window_dev=2)
+        hband = bb.bollinger_hband()
+        lband = bb.bollinger_lband()
+        mavg  = bb.bollinger_mavg()
+        ema21 = ta.trend.EMAIndicator(chart_df["Close"], window=EMA_SLOW).ema_indicator()
+
+        addplots = [
+            mpf.make_addplot(hband, color="#888", width=0.7),
+            mpf.make_addplot(lband, color="#888", width=0.7),
+            mpf.make_addplot(mavg,  color="#888", width=0.5, linestyle="--"),
+            mpf.make_addplot(ema21, color="#e3b341", width=1.0),
+        ]
+
+        hlines = None
+        if ref_price and ref_price > 0:
+            hlines = dict(hlines=[float(ref_price)], colors=["#39d353"], linestyle="--", linewidths=0.8)
+
+        buf = BytesIO()
+        # figratio acepta tuplas; el tamaño final se controla con figscale
+        # WIDTH/HEIGHT en px → convertir a pulgadas asumiendo 100 dpi
+        fig_w_inch = CHART_WIDTH / 100
+        fig_h_inch = CHART_HEIGHT / 100
+
+        kwargs = dict(
+            type="candle",
+            style=CHART_STYLE,
+            addplot=addplots,
+            volume=True,
+            figsize=(fig_w_inch, fig_h_inch),
+            title=f"\n{symbol} • {timeframe}",
+            tight_layout=True,
+            savefig=dict(fname=buf, format="png", dpi=100, bbox_inches="tight"),
+        )
+        if hlines:
+            kwargs["hlines"] = hlines
+
+        mpf.plot(chart_df, **kwargs)
+        buf.seek(0)
+        return buf
+    except Exception as e:
+        print(f"  generate_chart_image error {symbol} {timeframe}: {e}")
+        return None
+
+
+def send_telegram_photo(image_buf, caption):
+    """Envía una imagen a Telegram con caption. La caption tiene límite de 1024 chars."""
+    if len(caption) > 1024:
+        caption = caption[:1020] + "…"
+    try:
+        files = {"photo": ("chart.png", image_buf, "image/png")}
+        data = {
+            "chat_id": TELEGRAM_CHAT_ID,
+            "caption": caption,
+            "parse_mode": "Markdown",
+        }
+        r = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto",
+            data=data,
+            files=files,
+            timeout=15,
+        )
+        r.raise_for_status()
+    except Exception as e:
+        print(f"  send_telegram_photo error: {e}")
+        # Fallback: si falla la imagen, mando solo el texto para no perder la alerta
+        try:
+            send_telegram(caption)
+        except Exception:
+            pass
 
 
 def final_bucket(score):
@@ -425,6 +572,13 @@ def analyze(symbol, interval):
         fading_reversal = safe_pct(price, post_break_high) if post_break_high else 0.0
         fading_below_zone = price < riding_break_ref * (1 - FADING_BELOW_ZONE)
 
+    # Detección vela cerrada vs en formación.
+    # Binance entrega close_time como ms UTC del último ms de la vela.
+    # Si now < close_time, la vela todavía se está formando.
+    last_close_time_ms = int(df["close_time"].iloc[-1])
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    candle_status = "closed" if now_ms >= last_close_time_ms else "forming"
+
     return symbol, interval, {
         "price": price,
         "ema_trend_up": ema_trend_up,
@@ -454,6 +608,9 @@ def analyze(symbol, interval):
         "post_break_high": post_break_high,
         "fading_reversal": fading_reversal,
         "fading_below_zone": fading_below_zone,
+        "candle_status": candle_status,
+        # df completo guardado SOLO para generar charts después; no se usa en classify
+        "_df": df,
     }
 
 
@@ -734,6 +891,19 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     if not candidates:
         return None
 
+    # Aplicar candle_status a cada candidate y penalizar score si está en formación.
+    # candle_status viene del TF principal de la alerta.
+    for c in candidates:
+        tf_data = tf_map.get(c["timeframe"]) or {}
+        cs = tf_data.get("candle_status", "closed")
+        c["candle_status"] = cs
+        if cs == "forming":
+            c["score"] = max(0, c["score"] - FORMING_CANDLE_PENALTY)
+            c["bucket"] = final_bucket(c["score"])
+            # Si por la penalización ya no llega a IMMEDIATE_MIN_SCORE, bajamos el flag
+            if c.get("immediate") and c["score"] < IMMEDIATE_MIN_SCORE:
+                c["immediate"] = False
+
     candidates.sort(key=lambda x: (x["score"], x["priority"]), reverse=True)
     return candidates[0]
 
@@ -781,8 +951,12 @@ def format_alert(alert, counts_history, with_reasons=True):
     else:
         price_line = f"  💰 {price:.6g} USDT"
 
+    # Marca de vela cerrada vs en formación
+    cs = alert.get("candle_status", "closed")
+    candle_line = "  ✅ vela cerrada" if cs == "closed" else "  🟡 vela en formación"
+
     body = "\n".join(f"  - {r}" for r in alert["reasons"][:3])
-    return f"{header}\n{price_line}\n{body}"
+    return f"{header}\n{price_line}\n{candle_line}\n{body}"
 
 
 def dedupe_and_rank(alerts):
@@ -804,9 +978,25 @@ def dedupe_and_rank(alerts):
     return ranked[:TOP_ALERT_COUNT]
 
 
-def send_immediate(alert, counts_history):
+def send_immediate(alert, counts_history, tf_map):
+    """Envía alerta inmediata. Si hay imagen disponible la manda con sendPhoto;
+    si no, fallback a texto plano con sendMessage."""
     label = "⚠️ SALIDA — precio devolviendo" if alert["history_tf"] == "FADING" else "🔥 PRIORITY NOW"
-    send_telegram(f"{label}\n{format_alert(alert, counts_history)}")
+    text = f"{label}\n{format_alert(alert, counts_history)}"
+
+    # Intentar imagen
+    tf_data = tf_map.get(alert["timeframe"]) or {}
+    df = tf_data.get("_df")
+    if df is not None and CHART_ENABLED and _HAS_MPLFINANCE:
+        img = generate_chart_image(
+            df, alert["symbol"], alert["timeframe"], ref_price=alert.get("ref_price"),
+        )
+        if img is not None:
+            send_telegram_photo(img, text)
+            return
+
+    # Fallback: texto plano
+    send_telegram(text)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -834,6 +1024,7 @@ def main():
     candidates = []
     processed = set()
     immediate_sent_keys = set()
+    immediate_sent_alerts = []  # alertas inmediatas que sí se enviaron, para trackearlas
     immediate_skipped = 0  # Anti-spam: cuántas inmediatas saltamos por tope
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -861,17 +1052,27 @@ def main():
                     print(f"  inmediata saltada (tope {MAX_IMMEDIATE_PER_RUN}): {symbol}")
                     continue
                 try:
-                    send_immediate(alert, counts_history)
+                    send_immediate(alert, counts_history, per_symbol[symbol])
                     immediate_sent_keys.add(key)
+                    immediate_sent_alerts.append(alert)
                 except Exception as e:
                     print(f"  error envio inmediato {symbol}: {e}")
 
     if not candidates:
         print("Sin setups en este run.")
+        # Aún sin candidates, las inmediatas (si hubiera) ya se mandaron y se trackearon abajo
+        if immediate_sent_alerts:
+            insert_outcomes(immediate_sent_alerts)
         return
 
     selected = dedupe_and_rank(candidates)
     insert_history(selected)
+
+    # Tracking de outcomes: combinamos selected + inmediatas que NO estén ya en selected
+    selected_keys = {(a["symbol"], a["history_tf"]) for a in selected}
+    extra_immediates = [a for a in immediate_sent_alerts
+                        if (a["symbol"], a["history_tf"]) not in selected_keys]
+    insert_outcomes(selected + extra_immediates)
 
     summary_lines = []
     for idx, alert in enumerate(selected, start=1):
