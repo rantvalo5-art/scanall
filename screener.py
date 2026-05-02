@@ -904,7 +904,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 c["immediate"] = False
     candidates = [c for c in candidates if not c.get("_discard")]
     if not candidates:
-    return None
+        return None
     
     candidates.sort(key=lambda x: (x["score"], x["priority"]), reverse=True)
     return candidates[0]
