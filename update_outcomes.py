@@ -55,7 +55,9 @@ def _sb_headers():
 
 
 def fetch_pending_outcomes():
-    """Trae alertas que aún no están completas, ordenadas por más viejas primero."""
+    """Trae alertas que aún no están completas Y que tienen al menos un checkpoint
+    sin llenar (price_15m/1h/4h/24h). El filtro OR evita que una alerta procesada
+    parcialmente bloquee la cola hasta que cumpla 24h."""
     try:
         r = requests.get(
             f"{SUPABASE_URL}/rest/v1/screener_outcomes",
@@ -63,6 +65,7 @@ def fetch_pending_outcomes():
             params={
                 "select": "id,alerted_at,symbol,entry_price,price_15m,price_1h,price_4h,price_24h,outcomes_complete",
                 "outcomes_complete": "eq.false",
+                "or": "(price_15m.is.null,price_1h.is.null,price_4h.is.null,price_24h.is.null)",
                 "order": "alerted_at.asc",
                 "limit": str(BATCH_SIZE),
             },

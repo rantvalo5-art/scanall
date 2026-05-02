@@ -89,7 +89,7 @@
   "outcomes": {
     "ENABLED": true,
     "TRACK_ALL_CANDIDATES": false,
-    "BATCH_SIZE": 50,
+    "BATCH_SIZE": 500,
     "RETENTION_DAYS": 90
   }
 }
