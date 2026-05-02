@@ -898,13 +898,11 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         cs = tf_data.get("candle_status", "closed")
         c["candle_status"] = cs
         if cs == "forming":
-            c["_discard"] = True
+            c["score"] = max(0, c["score"] - FORMING_CANDLE_PENALTY)
+            c["bucket"] = final_bucket(c["score"])
             # Si por la penalización ya no llega a IMMEDIATE_MIN_SCORE, bajamos el flag
             if c.get("immediate") and c["score"] < IMMEDIATE_MIN_SCORE:
                 c["immediate"] = False
-    candidates = [c for c in candidates if not c.get("_discard")]
-    if not candidates:
-        return None
     
     candidates.sort(key=lambda x: (x["score"], x["priority"]), reverse=True)
     return candidates[0]
