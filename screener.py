@@ -4,7 +4,7 @@ Screener simplificado con prioridad real:
 - BREAKOUT: 15m rompe máximo reciente con volumen y expansión
 - RIDING: breakout que sigue subiendo y sosteniendo — se repite cada run
 - FADING: precio devolviendo después de un breakout — avisa una vez para salir
-- HOLD: 15m rompe y sostiene la zona
+- HOLD: 15m rompe y sostiene la zonas
 
 Configuración en config.json (raíz del repo). Si falta o está roto, el script aborta.
 """
