@@ -1,0 +1,77 @@
+{
+  "general": {
+    "INTERVALS": ["5m", "15m", "1h"],
+    "LIMIT": 180,
+    "TOP_N": 9999,
+    "MAX_WORKERS": 20,
+    "MIN_QUOTE_VOLUME": 300000,
+    "TOP_ALERT_COUNT": 3
+  },
+  "history": {
+    "HISTORY_HOURS": 8,
+    "LATE_REPEAT_COUNT": 1,
+    "SNAPSHOT_RETENTION_DAYS": 30
+  },
+  "anti_spam": {
+    "MAX_IMMEDIATE_PER_RUN": 2,
+    "BURST_THRESHOLD": 10
+  },
+  "cooldowns_minutes": {
+    "PREBREAK": 15,
+    "BREAKOUT": 15,
+    "RIDING": 15,
+    "FADING": 120,
+    "HOLD": 45
+  },
+  "active_signals": {
+    "PREBREAK": false,
+    "BREAKOUT": true,
+    "RIDING": false,
+    "FADING": false,
+    "HOLD": false
+  },
+  "indicators": {
+    "EMA_SLOW": 21,
+    "RECENT_LOOKBACK": 15
+  },
+  "prebreak": {
+    "PREBREAK_NEAR_MAX": 0.010,
+    "PREBREAK_MIN_VOL_RATIO": 20.0,
+    "PREBREAK_VOLUME_GROWTH_MIN": 1.10,
+    "PREBREAK_BB_WIDTH_MAX": 0.035
+  },
+  "breakout": {
+    "BREAKOUT_BUFFER": 0.001,
+    "BREAKOUT_MIN_VOL_RATIO": 1.80,
+    "BREAKOUT_MAX_EXTENDED": 0.040,
+    "BREAKOUT_BB_EXPANSION_MIN": 0.12,
+    "BREAKOUT_5M_MIN_VOL_RATIO": 1.10,
+    "BREAKOUT_MIN_BODY_PCT": 0.40
+  },
+  "hold": {
+    "HOLD_LOOKBACK_BARS": 8,
+    "HOLD_RECENT_BREAK_MAX_BARS": 5,
+    "HOLD_ZONE_BUFFER": 0.003,
+    "HOLD_PULLBACK_MAX": 0.030,
+    "STRONG_CLOSE_MIN": 0.65,
+    "ONE_H_RESIST_LOOKBACK": 24,
+    "ONE_H_RESIST_BUFFER": 0.015
+  },
+  "riding": {
+    "RIDING_LOOKBACK_BARS": 20,
+    "RIDING_MIN_GAIN": 0.005,
+    "RIDING_MAX_GAIN": 0.15,
+    "RIDING_ZONE_BUFFER": 0.012,
+    "RIDING_MIN_VOL_RATIO": 1.20,
+    "RIDING_EMA_MUST_TREND": true
+  },
+  "fading": {
+    "FADING_REVERSAL_MIN": 0.015,
+    "FADING_BELOW_ZONE": 0.008
+  },
+  "scoring": {
+    "BEST_MIN_SCORE": 10,
+    "STRONG_MIN_SCORE": 8,
+    "IMMEDIATE_MIN_SCORE": 9
+  }
+}
