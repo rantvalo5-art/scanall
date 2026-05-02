@@ -1,38 +1,30 @@
 name: Crypto Screener
-
 on:
   workflow_dispatch:
   repository_dispatch:
     types: [run-screener]
-
   schedule:
     - cron: "*/5 * * * *" # Cada 5 min (puede tener 5-15 min delay en horas pico)
-
   # OPCIONAL: para máxima puntualidad, descomentá esto y configurá cron-job.org
   # repository_dispatch:
   #   types: [run-screener]
-
 jobs:
   scan:
     runs-on: ubuntu-latest
     timeout-minutes: 12
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: "pip"
-
       - name: Install dependencies
         run: pip install requests pandas==2.2.3 ta mplfinance
-
       - name: Run screener
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          SUPABASE_KEY:     ${{ secrets.SUPABASE_KEY }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: python screener.py
