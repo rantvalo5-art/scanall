@@ -99,6 +99,8 @@ HOLD_PULLBACK_MAX           = _cfg("hold", "HOLD_PULLBACK_MAX")
 STRONG_CLOSE_MIN            = _cfg("hold", "STRONG_CLOSE_MIN")
 ONE_H_RESIST_LOOKBACK       = _cfg("hold", "ONE_H_RESIST_LOOKBACK")
 ONE_H_RESIST_BUFFER         = _cfg("hold", "ONE_H_RESIST_BUFFER")
+MAJOR_STRUCT_LOOKBACK       = _cfg("hold", "MAJOR_STRUCT_LOOKBACK")
+MAJOR_STRUCT_MAX_DIST       = _cfg("hold", "MAJOR_STRUCT_MAX_DIST")
 
 RIDING_LOOKBACK_BARS    = _cfg("riding", "RIDING_LOOKBACK_BARS")
 RIDING_MIN_GAIN         = _cfg("riding", "RIDING_MIN_GAIN")
@@ -114,6 +116,7 @@ BEST_MIN_SCORE      = _cfg("scoring", "BEST_MIN_SCORE")
 STRONG_MIN_SCORE    = _cfg("scoring", "STRONG_MIN_SCORE")
 IMMEDIATE_MIN_SCORE = _cfg("scoring", "IMMEDIATE_MIN_SCORE")
 FORMING_CANDLE_PENALTY = _cfg("scoring", "FORMING_CANDLE_PENALTY")
+SCORE_CAP           = _cfg("scoring", "SCORE_CAP")
 
 CHART_ENABLED = _cfg("chart", "ENABLED")
 CHART_BARS    = _cfg("chart", "BARS")
@@ -512,6 +515,20 @@ def analyze(symbol, interval):
     dist_to_res = (one_h_resist - price) / price if price > 0 else 0.0
     not_near_resistance = dist_to_res > ONE_H_RESIST_BUFFER or breakout
 
+    # Validación de estructura mayor (lookback largo, ~60 velas).
+    # En 1h son ~2.5 días — captura niveles que sí son estructura real.
+    # Si el precio está rompiendo el recent_max corto pero todavía está enterrado bajo
+    # un máximo mayor, probablemente es un bounce dentro de tendencia bajista.
+    # major_struct_ok = True si el precio rompió el máximo mayor o está cerca de tocarlo.
+    if len(high) >= MAJOR_STRUCT_LOOKBACK + 2:
+        major_struct_max = high.iloc[-(MAJOR_STRUCT_LOOKBACK + 2):-2].max()
+        major_struct_dist = (major_struct_max - price) / price if price > 0 else 0.0
+        major_struct_ok = major_struct_dist <= MAJOR_STRUCT_MAX_DIST
+    else:
+        major_struct_max = None
+        major_struct_dist = None
+        major_struct_ok = True  # sin datos suficientes, no penalizar
+
     recent_break_idx = None
     recent_break_ref = None
     recent_break_close = None
@@ -601,6 +618,9 @@ def analyze(symbol, interval):
         "breakout_distance": breakout_distance,
         "not_near_resistance": not_near_resistance,
         "dist_to_res": dist_to_res,
+        "major_struct_max": major_struct_max,
+        "major_struct_dist": major_struct_dist,
+        "major_struct_ok": major_struct_ok,
         "hold_recent_break": hold_recent_break,
         "hold_kept_zone": hold_kept_zone,
         "hold_pullback_ok": hold_pullback_ok,
@@ -634,6 +654,12 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
 
     # Filtro ATR: descartar pares muertos (volatilidad insuficiente en 1h)
     if tf1h.get("atr_pct", 0) < ATR_MIN_PCT:
+        return None
+
+    # Filtro de estructura mayor (lookback 60h en 1h): el precio debe estar cerca o arriba
+    # del máximo de las últimas ~60 velas 1h. Si está enterrado bajo un máximo mayor reciente,
+    # el "breakout" es probablemente un bounce dentro de tendencia bajista.
+    if not tf1h.get("major_struct_ok", True):
         return None
 
     candidates = []
@@ -717,9 +743,14 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             if tf15['strong_close']:
                 score += 1
                 reasons.append("cierre 15m fuerte")
-            if tf15['breakout_distance'] <= 0.02:
+            # Bonus por entrada temprana / penalty por entrada tardía:
+            # los datos muestran que BREAKOUT extendido (>2.5%) tiene más drawdown y peor avg ret.
+            if tf15['breakout_distance'] <= 0.015:
                 score += 1
-                reasons.append("todavia no esta muy extendida")
+                reasons.append("entrada temprana — todavia no extendida")
+            elif tf15['breakout_distance'] >= 0.025:
+                score -= 2
+                reasons.append(f"breakout extendido ({tf15['breakout_distance']:.2%}) — entrada tardía")
             if tf1h['dist_to_res'] > 0.04:
                 reasons.append(f"1h con espacio real ({tf1h['dist_to_res']:.2%})")
             if prev >= LATE_REPEAT_COUNT:
@@ -894,6 +925,14 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             # Si por la penalización ya no llega a IMMEDIATE_MIN_SCORE, bajamos el flag
             if c.get("immediate") and c["score"] < IMMEDIATE_MIN_SCORE:
                 c["immediate"] = False
+
+    # Cap superior: scores de 20+, 30+, 40+ en BREAKOUT son outliers que NO predicen mejor
+    # rendimiento (datos empíricos). Capeamos para que la escala 0-15 sea legible y
+    # los thresholds tengan sentido. Se aplica al final, después de bonuses/penalties.
+    for c in candidates:
+        if c["score"] > SCORE_CAP:
+            c["score"] = SCORE_CAP
+            c["bucket"] = final_bucket(c["score"])
 
     candidates.sort(key=lambda x: (x["score"], x["priority"]), reverse=True)
     return candidates[0]
