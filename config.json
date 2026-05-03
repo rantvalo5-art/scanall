@@ -77,9 +77,9 @@
     "FADING_BELOW_ZONE": 0.008
   },
   "scoring": {
-    "BEST_MIN_SCORE": 11,
-    "STRONG_MIN_SCORE": 9,
-    "IMMEDIATE_MIN_SCORE": 11,
+    "BEST_MIN_SCORE": 14,
+    "STRONG_MIN_SCORE": 11,
+    "IMMEDIATE_MIN_SCORE": 14,
     "FORMING_CANDLE_PENALTY": 3,
     "SCORE_CAP": 15
   },
