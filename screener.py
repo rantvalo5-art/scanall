@@ -78,6 +78,7 @@ ACTIVE_SIGNALS_HOLD     = _cfg("active_signals", "HOLD")
 
 EMA_SLOW        = _cfg("indicators", "EMA_SLOW")
 RECENT_LOOKBACK = _cfg("indicators", "RECENT_LOOKBACK")
+ATR_MIN_PCT     = _cfg("indicators", "ATR_MIN_PCT")
 
 PREBREAK_NEAR_MAX           = _cfg("prebreak", "PREBREAK_NEAR_MAX")
 PREBREAK_MIN_VOL_RATIO      = _cfg("prebreak", "PREBREAK_MIN_VOL_RATIO")
@@ -485,6 +486,11 @@ def analyze(symbol, interval):
     width_prev = ((hband.iloc[-2] - lband.iloc[-2]) / mavg.iloc[-2]) if mavg.iloc[-2] else 0.0
     width_expansion = safe_pct(width_curr, width_prev)
 
+    # ATR como % del precio — mide volatilidad real del par
+    atr_indicator = ta.volatility.AverageTrueRange(high, low, close, window=14)
+    atr = atr_indicator.average_true_range().iloc[-1]
+    atr_pct = (atr / price * 100) if price > 0 else 0.0
+
     vol_mean = volume.iloc[-21:-1].mean()
     vol_ratio = vol_mean and (volume.iloc[-1] / vol_mean) or 0.0
     vol_recent = volume.iloc[-3:].mean()
@@ -584,6 +590,7 @@ def analyze(symbol, interval):
         "ema_trend_up": ema_trend_up,
         "width_curr": width_curr,
         "width_expansion": width_expansion,
+        "atr_pct": atr_pct,
         "vol_ratio": vol_ratio,
         "vol_growth": vol_growth,
         "strong_close": strong_close,
@@ -625,6 +632,10 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     if not (tf1h.get("ema_trend_up") and tf1h.get("not_near_resistance")):
         return None
 
+    # Filtro ATR: descartar pares muertos (volatilidad insuficiente en 1h)
+    if tf1h.get("atr_pct", 0) < ATR_MIN_PCT:
+        return None
+
     candidates = []
 
     # ── PRE-BREAK ──────────────────────────────────────────────────────────────
@@ -637,36 +648,27 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         )
         if pre_ok and not in_cooldown(symbol, "PREBREAK", last_seen):
             prev = counts_history.get((symbol, "PREBREAK"), 0)
-            score = 2
+
+            # Score multiplicativo: factores clave se multiplican, no se suman
+            vol_factor = min(tf5['vol_ratio'] / 2.5, 3.0)       # 1.0x a 2.5, hasta 3.0 cap
+            growth_factor = min(tf5['vol_growth'] / 1.2, 2.0)    # 1.0x a 1.2, hasta 2.0 cap
+            bb_factor = max(1.0 - (tf5['width_curr'] / 0.03), 0.3)  # más comprimida = mejor, 0.3 floor
+
+            raw_score = vol_factor * growth_factor * bb_factor
+            # Normalizar a escala ~5-15
+            score = round(4 + raw_score * 3)
+
             reasons = []
             near_pct = ((tf5['recent_max'] - tf5['price']) / tf5['recent_max']) if tf5['recent_max'] else 0.0
             reasons.append(f"5m a {near_pct:.2%} del maximo reciente")
-            if tf5['vol_ratio'] >= 3.0:
-                score += 3
-                reasons.append(f"volumen 5m fuerte ({tf5['vol_ratio']:.1f}x)")
-            else:
-                score += 1
-                reasons.append(f"volumen 5m arriba de lo normal ({tf5['vol_ratio']:.1f}x)")
-            if tf5['vol_growth'] >= 1.5:
-                score += 2
-                reasons.append(f"volumen creciendo bien ({tf5['vol_growth']:.2f}x)")
-            else:
-                score += 0
-                reasons.append(f"volumen creciendo ({tf5['vol_growth']:.2f}x)")
+            reasons.append(f"volumen 5m {tf5['vol_ratio']:.1f}x (factor {vol_factor:.2f})")
+            reasons.append(f"volumen creciendo {tf5['vol_growth']:.2f}x (factor {growth_factor:.2f})")
+            reasons.append(f"BB 5m {tf5['width_curr']:.2%} (factor {bb_factor:.2f})")
             if tf5['strong_close']:
                 score += 1
                 reasons.append("ultima vela 5m cerro fuerte")
-            if tf5['width_curr'] <= 0.018:
-                score += 2
-                reasons.append(f"BB 5m bien comprimida ({tf5['width_curr']:.2%})")
-            else:
-                reasons.append(f"BB 5m todavia comprimida ({tf5['width_curr']:.2%})")
             if tf1h['dist_to_res'] > 0.04:
-                score += 1
                 reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
-            else:
-                score += 0
-                reasons.append("1h alcista y con espacio")
             if prev >= LATE_REPEAT_COUNT:
                 score -= 1
             candidates.append({
@@ -698,27 +700,20 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         )
         if breakout_ok and not in_cooldown(symbol, "BREAKOUT", last_seen):
             prev = counts_history.get((symbol, "BREAKOUT"), 0)
-            score = 3
+
+            # Score multiplicativo
+            vol_factor = min(tf5['vol_ratio'] / 2.0, 3.5)        # 5m vol confirma
+            bb_exp_factor = min(tf15['width_expansion'] / 0.15, 3.0)  # expansión BB
+            body_factor = min(tf15.get('candle_body_pct', 0.5) / 0.5, 2.0)  # cuerpo sólido
+
+            raw_score = vol_factor * bb_exp_factor * body_factor
+            # Normalizar a escala ~5-15
+            score = round(5 + raw_score * 2)
+
             reasons = [f"15m rompio el maximo reciente (+{tf15['breakout_distance']:.2%})"]
-            body_pct = tf15.get("candle_body_pct", 0)
-            if body_pct >= 0.75:
-                score += 2
-                reasons.append(f"vela 15m muy solida (cuerpo {body_pct:.0%} del rango)")
-            else:
-                score += 1
-                reasons.append(f"vela 15m solida (cuerpo {body_pct:.0%} del rango)")
-            if tf5['vol_ratio'] >= 4.0:
-                score += 3
-                reasons.append(f"5m confirmando con volumen muy fuerte ({tf5['vol_ratio']:.1f}x)")
-            else:
-                score += 1
-                reasons.append(f"5m confirmando con volumen ({tf5['vol_ratio']:.1f}x)")
-            if tf15['width_expansion'] >= 0.35:
-                score += 3
-                reasons.append(f"expansion BB marcada ({tf15['width_expansion']:.0%})")
-            else:
-                score += 1
-                reasons.append(f"expansion BB valida ({tf15['width_expansion']:.0%})")
+            reasons.append(f"5m volumen {tf5['vol_ratio']:.1f}x (factor {vol_factor:.2f})")
+            reasons.append(f"expansion BB {tf15['width_expansion']:.0%} (factor {bb_exp_factor:.2f})")
+            reasons.append(f"cuerpo vela {tf15.get('candle_body_pct', 0):.0%} (factor {body_factor:.2f})")
             if tf15['strong_close']:
                 score += 1
                 reasons.append("cierre 15m fuerte")
@@ -726,11 +721,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 score += 1
                 reasons.append("todavia no esta muy extendida")
             if tf1h['dist_to_res'] > 0.04:
-                score += 1
                 reasons.append(f"1h con espacio real ({tf1h['dist_to_res']:.2%})")
-            else:
-                score += 0
-                reasons.append("1h alcista y con espacio")
             if prev >= LATE_REPEAT_COUNT:
                 score -= 1
             candidates.append({
@@ -903,7 +894,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             # Si por la penalización ya no llega a IMMEDIATE_MIN_SCORE, bajamos el flag
             if c.get("immediate") and c["score"] < IMMEDIATE_MIN_SCORE:
                 c["immediate"] = False
-    
+
     candidates.sort(key=lambda x: (x["score"], x["priority"]), reverse=True)
     return candidates[0]
 
