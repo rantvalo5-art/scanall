@@ -36,7 +36,8 @@
   },
   "indicators": {
     "EMA_SLOW": 21,
-    "RECENT_LOOKBACK": 15
+    "RECENT_LOOKBACK": 15,
+    "ATR_MIN_PCT": 1.0
   },
   "prebreak": {
     "PREBREAK_NEAR_MAX": 0.005,
