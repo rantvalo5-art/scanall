@@ -438,6 +438,14 @@ def get_btc_context():
     """Régimen de BTC en 4h para el header del batch."""
     try:
         df = get_klines("BTCUSDT", "4h")
+        # Recortar vela en formación si existe (mismo fix que analyze()).
+        # En 4h, la vela viva pasa la mayor parte del tiempo sin cerrar — el % cambio
+        # contra una vela que recién empieza no es informativo.
+        last_close_time_ms = int(df["close_time"].iloc[-1])
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        if now_ms < last_close_time_ms:
+            df = df.iloc[:-1].reset_index(drop=True)
+
         if len(df) < 30:
             return ""
         close = df["close"]
@@ -468,6 +476,17 @@ def analyze(symbol, interval):
         df = get_klines(symbol, interval)
     except Exception:
         return symbol, interval, None
+
+    # Detectar si la última vela está en formación y recortarla.
+    # Binance devuelve klines incluyendo la vela actual (la que se está formando),
+    # cuyo close_time está en el futuro. Trabajar con vela viva mete ruido en TODO:
+    # vol_ratio incompleto, breakouts intra-vela que se devuelven, strong_close inválido,
+    # candle_body_pct sin sentido. Solución: si la última vela todavía no cerró,
+    # la descartamos. El resto del análisis usa iloc[-1] = última vela cerrada.
+    last_close_time_ms = int(df["close_time"].iloc[-1])
+    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+    if now_ms < last_close_time_ms:
+        df = df.iloc[:-1].reset_index(drop=True)
 
     if len(df) < 80:
         return symbol, interval, None
@@ -595,12 +614,10 @@ def analyze(symbol, interval):
         fading_reversal = safe_pct(price, post_break_high) if post_break_high else 0.0
         fading_below_zone = price < riding_break_ref * (1 - FADING_BELOW_ZONE)
 
-    # Detección vela cerrada vs en formación.
-    # Binance entrega close_time como ms UTC del último ms de la vela.
-    # Si now < close_time, la vela todavía se está formando.
-    last_close_time_ms = int(df["close_time"].iloc[-1])
-    now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    candle_status = "closed" if now_ms >= last_close_time_ms else "forming"
+    # candle_status siempre es "closed" porque al inicio de analyze() recortamos la vela
+    # en formación si existía. Se mantiene el campo por compatibilidad con el resto del
+    # código (logging, format_alert, etc.) y por si más adelante queremos diferenciar.
+    candle_status = "closed"
 
     return symbol, interval, {
         "price": price,
@@ -913,8 +930,11 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     if not candidates:
         return None
 
-    # Aplicar candle_status a cada candidate y penalizar score si está en formación.
-    # candle_status viene del TF principal de la alerta.
+    # Asignar candle_status a cada candidate.
+    # NOTA: con el fix de recorte de vela en formación al inicio de analyze(),
+    # cs siempre debería ser "closed". El bloque de penalización queda como defensa
+    # en profundidad por si alguien en el futuro agrega un código path que produzca
+    # datos forming (ej: otra fuente de datos).
     for c in candidates:
         tf_data = tf_map.get(c["timeframe"]) or {}
         cs = tf_data.get("candle_status", "closed")
