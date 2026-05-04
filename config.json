@@ -8,8 +8,8 @@
     "LIMIT": 180,
     "TOP_N": 9999,
     "MAX_WORKERS": 20,
-    "MIN_QUOTE_VOLUME": 600000,
-    "TOP_ALERT_COUNT": 3
+    "MIN_QUOTE_VOLUME": 400000,
+    "TOP_ALERT_COUNT": 5
   },
   "history": {
     "HISTORY_HOURS": 8,
@@ -17,12 +17,12 @@
     "SNAPSHOT_RETENTION_DAYS": 30
   },
   "anti_spam": {
-    "MAX_IMMEDIATE_PER_RUN": 2,
+    "MAX_IMMEDIATE_PER_RUN": 3,
     "BURST_THRESHOLD": 10
   },
   "cooldowns_minutes": {
     "PREBREAK": 30,
-    "BREAKOUT": 30,
+    "BREAKOUT": 20,
     "RIDING": 15,
     "FADING": 120,
     "HOLD": 45
@@ -30,9 +30,9 @@
   "active_signals": {
     "PREBREAK": true,
     "BREAKOUT": true,
-    "RIDING": false,
+    "RIDING": true,
     "FADING": false,
-    "HOLD": false
+    "HOLD": true
   },
   "indicators": {
     "EMA_SLOW": 21,
@@ -40,18 +40,18 @@
     "ATR_MIN_PCT": 1.0
   },
   "prebreak": {
-    "PREBREAK_NEAR_MAX": 0.005,
-    "PREBREAK_MIN_VOL_RATIO": 3.5,
-    "PREBREAK_VOLUME_GROWTH_MIN": 1.3,
+    "PREBREAK_NEAR_MAX": 0.008,
+    "PREBREAK_MIN_VOL_RATIO": 2.5,
+    "PREBREAK_VOLUME_GROWTH_MIN": 1.2,
     "PREBREAK_BB_WIDTH_MAX": 0.025
   },
   "breakout": {
     "BREAKOUT_BUFFER": 0.003,
-    "BREAKOUT_MIN_VOL_RATIO": 3.0,
+    "BREAKOUT_MIN_VOL_RATIO": 2.0,
     "BREAKOUT_MAX_EXTENDED": 0.04,
-    "BREAKOUT_BB_EXPANSION_MIN": 0.20,
-    "BREAKOUT_5M_MIN_VOL_RATIO": 1.1,
-    "BREAKOUT_MIN_BODY_PCT": 0.6
+    "BREAKOUT_BB_EXPANSION_MIN": 0.12,
+    "BREAKOUT_5M_MIN_VOL_RATIO": 1.0,
+    "BREAKOUT_MIN_BODY_PCT": 0.5
   },
   "hold": {
     "HOLD_LOOKBACK_BARS": 8,
@@ -79,7 +79,7 @@
   "scoring": {
     "BEST_MIN_SCORE": 14,
     "STRONG_MIN_SCORE": 11,
-    "IMMEDIATE_MIN_SCORE": 14,
+    "IMMEDIATE_MIN_SCORE": 12,
     "FORMING_CANDLE_PENALTY": 3,
     "SCORE_CAP": 15
   },
