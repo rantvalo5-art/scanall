@@ -191,6 +191,8 @@ td.symbol a:hover { text-decoration: underline; }
     <div class="field" style="flex-direction:row; gap:8px; min-width:0;">
       <button class="btn" onclick="loadAll()">↓ CARGAR</button>
       <button class="btn btn-ghost" onclick="loadAll()">↺</button>
+      <button class="btn btn-ghost" onclick="downloadJSON()" title="Descargar los outcomes actualmente cargados como JSON">⬇ JSON</button>
+      <button class="btn btn-ghost" onclick="purgeOutcomes()" title="Borrar TODOS los outcomes de Supabase" style="color:var(--orange);border-color:var(--orange);">⚠ BORRAR</button>
     </div>
   </div>
   <div id="status"></div>
@@ -425,12 +427,113 @@ async function loadAll() {
   setStatus('Cargando...', 'loading');
   try {
     const rows = await fetchOutcomes();
+    window._lastLoadedRows = rows;  // para descarga posterior
     const stats = computeStats(rows);
     renderStats(stats);
     renderTable(rows);
     setStatus(`✓ ${rows.length} outcomes cargados`, 'ok');
   } catch (e) {
     setStatus('✗ ' + e.message, 'err');
+  }
+}
+
+// ── Descargar outcomes cargados como JSON ────────────────────────────────────
+function downloadJSON() {
+  const rows = window._lastLoadedRows;
+  if (!rows || !rows.length) {
+    setStatus('✗ No hay datos cargados — pulsá CARGAR primero', 'err');
+    return;
+  }
+  const days = document.getElementById('filter-days').value;
+  const signal = document.getElementById('filter-signal').value || 'ALL';
+  const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const filename = `outcomes_${signal}_${days}d_${ts}.json`;
+
+  const blob = new Blob([JSON.stringify(rows, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  setStatus(`✓ Descargado ${filename} (${rows.length} filas)`, 'ok');
+}
+
+// ── Borrar TODOS los outcomes de Supabase ────────────────────────────────────
+async function purgeOutcomes() {
+  const url = document.getElementById('sb-url').value.trim().replace(/\/$/, '');
+  const key = document.getElementById('sb-key').value.trim();
+  if (!url || !key) {
+    setStatus('✗ Faltan URL y/o Anon Key', 'err');
+    return;
+  }
+
+  // Doble confirmación. La acción es destructiva e irreversible.
+  const ok1 = confirm(
+    '⚠ ATENCIÓN\n\n' +
+    'Esto va a BORRAR TODOS los outcomes de Supabase. Esta acción es IRREVERSIBLE.\n\n' +
+    'Antes de continuar:\n' +
+    '  1) Asegurate de haber descargado el JSON (botón ⬇ JSON).\n' +
+    '  2) Solo hace falta hacer esto si cambiaste la lógica del screener y querés empezar dataset limpio.\n\n' +
+    '¿Continuar?'
+  );
+  if (!ok1) {
+    setStatus('Cancelado', '');
+    return;
+  }
+  const confirmText = prompt(
+    'Para confirmar, escribí: BORRAR\n\n(en mayúsculas, sin comillas)'
+  );
+  if (confirmText !== 'BORRAR') {
+    setStatus('Cancelado: la confirmación no coincidió', '');
+    return;
+  }
+
+  setStatus('Borrando outcomes...', 'loading');
+  try {
+    // Supabase REST: DELETE /rest/v1/<table>?<filtro>
+    // Necesitamos un filtro siempre — usamos id no nulo (matchea todo) o un timestamp lejano.
+    // El más confiable: filtro por alerted_at < hoy + 1 día (matchea todo).
+    const futureDate = new Date(Date.now() + 86400000).toISOString();
+    const params = new URLSearchParams();
+    params.append('alerted_at', `lt.${futureDate}`);
+
+    const res = await fetch(`${url}/rest/v1/screener_outcomes?${params}`, {
+      method: 'DELETE',
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`,
+        'Prefer': 'return=representation',  // devuelve filas borradas
+      },
+    });
+
+    if (!res.ok) {
+      let msg = `${res.status} ${res.statusText}`;
+      try {
+        const e = await res.json();
+        if (e.message) msg += ` — ${e.message}`;
+        if (e.hint) msg += ` (${e.hint})`;
+      } catch(_){}
+      throw new Error(msg);
+    }
+
+    let deletedCount = '?';
+    try {
+      const deleted = await res.json();
+      deletedCount = Array.isArray(deleted) ? deleted.length : '?';
+    } catch(_){}
+
+    // Limpiar UI
+    window._lastLoadedRows = [];
+    document.getElementById('stats').innerHTML = '';
+    document.getElementById('outcomes-body').innerHTML =
+      '<tr><td colspan="15" class="muted" style="text-align:center;padding:24px;">Tabla vaciada — pulsá CARGAR para refrescar</td></tr>';
+
+    setStatus(`✓ Borrados ${deletedCount} outcomes. Dataset limpio para nueva versión.`, 'ok');
+  } catch (e) {
+    setStatus('✗ Error borrando: ' + e.message, 'err');
   }
 }
 </script>
