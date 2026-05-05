@@ -37,7 +37,13 @@
   "indicators": {
     "EMA_SLOW": 21,
     "RECENT_LOOKBACK": 15,
-    "ATR_MIN_PCT": 1.0
+    "ATR_MIN_PCT": 1.0,
+    "RECENT_LOOKBACK_LONG": 25,
+    "RECENT_LONG_PROXIMITY": 0.01,
+    "OBV_SLOPE_LOOKBACK": 10,
+    "OBV_RISING_MIN": 0.05,
+    "CVD_LOOKBACK": 10,
+    "CVD_BULLISH_MIN": 0.05
   },
   "prebreak": {
     "PREBREAK_NEAR_MAX": 0.008,
