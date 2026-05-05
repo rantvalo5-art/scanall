@@ -80,6 +80,21 @@ EMA_SLOW        = _cfg("indicators", "EMA_SLOW")
 RECENT_LOOKBACK = _cfg("indicators", "RECENT_LOOKBACK")
 ATR_MIN_PCT     = _cfg("indicators", "ATR_MIN_PCT")
 
+# Lookback extendido: usado para validar que el rompimiento sea contra un nivel real,
+# no un mini-pico de las últimas 15 velas. Default 25 velas.
+RECENT_LOOKBACK_LONG  = _cfg("indicators", "RECENT_LOOKBACK_LONG")
+# Si el precio no rompe el long, debe estar al menos a esta distancia (ej 1%) para considerarse
+# un breakout estructural. Más allá de eso, asumimos que está enterrado bajo un nivel mayor.
+RECENT_LONG_PROXIMITY = _cfg("indicators", "RECENT_LONG_PROXIMITY")
+
+# OBV: cuántas velas atrás miramos para calcular slope.
+OBV_SLOPE_LOOKBACK = _cfg("indicators", "OBV_SLOPE_LOOKBACK")
+OBV_RISING_MIN     = _cfg("indicators", "OBV_RISING_MIN")
+
+# CVD: ventana y threshold mínimo (como ratio sobre el volumen total de la ventana).
+CVD_LOOKBACK     = _cfg("indicators", "CVD_LOOKBACK")
+CVD_BULLISH_MIN  = _cfg("indicators", "CVD_BULLISH_MIN")
+
 PREBREAK_NEAR_MAX           = _cfg("prebreak", "PREBREAK_NEAR_MAX")
 PREBREAK_MIN_VOL_RATIO      = _cfg("prebreak", "PREBREAK_MIN_VOL_RATIO")
 PREBREAK_VOLUME_GROWTH_MIN  = _cfg("prebreak", "PREBREAK_VOLUME_GROWTH_MIN")
@@ -287,7 +302,7 @@ def get_klines(symbol, interval):
         "open_time", "open", "high", "low", "close", "volume",
         "close_time", "quote_vol", "trades", "taker_buy_base", "taker_buy_quote", "ignore"
     ])
-    for col in ["open", "high", "low", "close", "volume"]:
+    for col in ["open", "high", "low", "close", "volume", "taker_buy_base", "taker_buy_quote"]:
         df[col] = df[col].astype(float)
     # close_time viene en ms UTC desde Binance; lo dejo como int para usar luego
     df["close_time"] = df["close_time"].astype("int64")
@@ -525,10 +540,69 @@ def analyze(symbol, interval):
     candle_range = max(high.iloc[-1] - low.iloc[-1], 1e-12)
     candle_body_pct = abs(close.iloc[-1] - df["open"].iloc[-1]) / candle_range
 
+    # ── OBV slope: dirección del On-Balance Volume.
+    # OBV suma volumen en velas alcistas y resta en bajistas.
+    # Si el precio está cerca de un breakout y el OBV viene subiendo, hay acumulación real.
+    # Si el precio sube pero el OBV está plano o bajando, es divergencia bajista (fakeout probable).
+    # Usamos slope = (OBV_now - OBV_n_atras) / |OBV_now| como % normalizado.
+    try:
+        obv = ta.volume.OnBalanceVolumeIndicator(close, volume).on_balance_volume()
+        obv_now = obv.iloc[-1]
+        obv_ref = obv.iloc[-OBV_SLOPE_LOOKBACK]
+        obv_slope = (obv_now - obv_ref) / abs(obv_now) if abs(obv_now) > 1e-12 else 0.0
+        obv_rising = obv_slope >= OBV_RISING_MIN
+    except Exception:
+        obv_slope = 0.0
+        obv_rising = False
+
+    # ── CVD (Cumulative Volume Delta) con taker buy/sell de Binance.
+    # Binance reporta cuánto del volumen de cada vela fue iniciado por el comprador agresivo
+    # (taker_buy_base). El delta de cada vela = 2*taker_buy - volume_total
+    # (porque el resto fue iniciado por vendedor agresivo). CVD acumula esos deltas.
+    # Si CVD sube → compradores dominan. Si CVD baja con precio subiendo → distribución (fakeout).
+    try:
+        if "taker_buy_base" in df.columns:
+            taker_buy = df["taker_buy_base"].astype(float)
+            delta_per_candle = 2 * taker_buy - volume
+            cvd = delta_per_candle.cumsum()
+            cvd_now = cvd.iloc[-1]
+            cvd_ref = cvd.iloc[-CVD_LOOKBACK]
+            # Normalizamos por el volumen acumulado en la ventana para tener un ratio comparable
+            vol_window = volume.iloc[-CVD_LOOKBACK:].sum()
+            cvd_ratio = (cvd_now - cvd_ref) / vol_window if vol_window > 0 else 0.0
+            cvd_bullish = cvd_ratio >= CVD_BULLISH_MIN
+        else:
+            cvd_ratio = 0.0
+            cvd_bullish = False
+    except Exception:
+        cvd_ratio = 0.0
+        cvd_bullish = False
+
+    # ── recent_max corto (RECENT_LOOKBACK velas) y extendido (RECENT_LOOKBACK_LONG velas).
+    # El corto se usa para detectar el momento del breakout (señal rápida).
+    # El extendido valida que el rompimiento sea contra un nivel real, no un mini-pico.
+    # Un breakout verdadero rompe AMBOS niveles (o está cerca del extendido). Si solo rompe
+    # el corto pero está enterrado bajo el extendido, es un bounce dentro de un trend bajista.
     recent_max = high.iloc[-(RECENT_LOOKBACK + 2):-2].max()
     near_recent_max = recent_max > 0 and 0 <= (recent_max - price) / recent_max <= PREBREAK_NEAR_MAX
     breakout = recent_max > 0 and price > recent_max * (1 + BREAKOUT_BUFFER)
     breakout_distance = safe_pct(price, recent_max)
+
+    # Lookback extendido para validar estructura más amplia.
+    # Si len < lookback_long+2, queda igual al corto (no penaliza pares con poca historia).
+    if len(high) >= RECENT_LOOKBACK_LONG + 2:
+        recent_max_long = high.iloc[-(RECENT_LOOKBACK_LONG + 2):-2].max()
+        # breakout_long: el precio debe estar al menos cerca del nivel extendido para considerarse
+        # un breakout estructural (no un mini-pico dentro de tendencia bajista).
+        # "Cerca" = dentro de RECENT_LONG_PROXIMITY del nivel extendido.
+        if recent_max_long > 0:
+            dist_to_long = (recent_max_long - price) / recent_max_long
+            recent_long_ok = price > recent_max_long * (1 + BREAKOUT_BUFFER) or dist_to_long <= RECENT_LONG_PROXIMITY
+        else:
+            recent_long_ok = True
+    else:
+        recent_max_long = recent_max
+        recent_long_ok = True
 
     one_h_resist = high.iloc[-(ONE_H_RESIST_LOOKBACK + 2):-2].max()
     dist_to_res = (one_h_resist - price) / price if price > 0 else 0.0
@@ -633,6 +707,12 @@ def analyze(symbol, interval):
         "near_recent_max": near_recent_max,
         "breakout": breakout,
         "breakout_distance": breakout_distance,
+        "recent_max_long": recent_max_long,
+        "recent_long_ok": recent_long_ok,
+        "obv_slope": obv_slope,
+        "obv_rising": obv_rising,
+        "cvd_ratio": cvd_ratio,
+        "cvd_bullish": cvd_bullish,
         "not_near_resistance": not_near_resistance,
         "dist_to_res": dist_to_res,
         "major_struct_max": major_struct_max,
@@ -712,6 +792,28 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 reasons.append("ultima vela 5m cerro fuerte")
             if tf1h['dist_to_res'] > 0.04:
                 reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
+            # Bonus por OBV ascendente en 15m (acumulación real, no solo volumen aislado).
+            if tf15.get("obv_rising"):
+                score += 1
+                reasons.append(f"OBV 15m subiendo ({tf15['obv_slope']:+.1%}) — acumulación real")
+            elif tf15.get("obv_slope", 0) < -OBV_RISING_MIN:
+                # OBV bajando con precio cerca del máx → divergencia bajista, fakeout probable
+                score -= 1
+                reasons.append(f"⚠ OBV 15m bajando ({tf15['obv_slope']:+.1%}) — divergencia")
+            # Bonus por CVD bullish en 5m (compradores agresivos dominan).
+            if tf5.get("cvd_bullish"):
+                score += 1
+                reasons.append(f"compradores agresivos dominan ({tf5['cvd_ratio']:+.1%})")
+            elif tf5.get("cvd_ratio", 0) < -CVD_BULLISH_MIN:
+                score -= 1
+                reasons.append(f"⚠ vendedores agresivos dominan ({tf5['cvd_ratio']:+.1%})")
+            # Bonus si está cerca/arriba del máximo extendido (estructura real).
+            if tf15.get("recent_long_ok"):
+                reasons.append("rompe nivel estructural (lookback extendido)")
+            else:
+                # Está enterrado bajo un máximo mayor — bounce, no breakout estructural
+                score -= 2
+                reasons.append("⚠ enterrado bajo máximo mayor — posible bounce")
             if prev >= LATE_REPEAT_COUNT:
                 score -= 1
             candidates.append({
@@ -770,6 +872,28 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 reasons.append(f"breakout extendido ({tf15['breakout_distance']:.2%}) — entrada tardía")
             if tf1h['dist_to_res'] > 0.04:
                 reasons.append(f"1h con espacio real ({tf1h['dist_to_res']:.2%})")
+            # Bonus por OBV ascendente — confirma que no es fakeout
+            if tf15.get("obv_rising"):
+                score += 2
+                reasons.append(f"OBV 15m subiendo ({tf15['obv_slope']:+.1%}) — acumulación confirmada")
+            elif tf15.get("obv_slope", 0) < 0:
+                # Breakout con OBV plano o bajando = sospechoso
+                score -= 2
+                reasons.append(f"⚠ OBV 15m no acompaña ({tf15['obv_slope']:+.1%}) — riesgo de fakeout")
+            # Bonus por CVD bullish (compradores agresivos en la ruptura)
+            if tf15.get("cvd_bullish"):
+                score += 2
+                reasons.append(f"CVD 15m bullish ({tf15['cvd_ratio']:+.1%}) — taker buy domina")
+            elif tf15.get("cvd_ratio", 0) < -CVD_BULLISH_MIN:
+                score -= 2
+                reasons.append(f"⚠ CVD bajista ({tf15['cvd_ratio']:+.1%}) — distribución, no acumulación")
+            # Validación de estructura: el breakout debe ser contra el nivel extendido también
+            if tf15.get("recent_long_ok"):
+                reasons.append("rompe nivel estructural (lookback 25)")
+            else:
+                # Rompió el lookback corto pero está bajo un máximo mayor — bounce probable
+                score -= 3
+                reasons.append("⚠ enterrado bajo máximo mayor (lookback 25) — posible bounce")
             if prev >= LATE_REPEAT_COUNT:
                 score -= 1
             candidates.append({
