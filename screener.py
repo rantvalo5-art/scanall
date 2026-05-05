@@ -806,26 +806,27 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             if tf1h['dist_to_res'] > 0.04:
                 reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
             # Bonus por OBV ascendente en 15m (acumulación real, no solo volumen aislado).
+            # OBV bonus subido de +1 a +2 — los datos del backtest muestran que OBV es
+            # el predictor más fuerte (+4.5 puntos vs neutral).
             if tf15.get("obv_rising"):
-                score += 1
+                score += 2
                 reasons.append(f"OBV 15m subiendo ({tf15['obv_slope']:+.1%}) — acumulación real")
             elif tf15.get("obv_slope", 0) < -OBV_RISING_MIN:
                 # OBV bajando con precio cerca del máx → divergencia bajista, fakeout probable
                 score -= 1
                 reasons.append(f"⚠ OBV 15m bajando ({tf15['obv_slope']:+.1%}) — divergencia")
-            # Bonus por CVD bullish en 5m (compradores agresivos dominan).
-            if tf5.get("cvd_bullish"):
-                score += 1
-                reasons.append(f"compradores agresivos dominan ({tf5['cvd_ratio']:+.1%})")
-            elif tf5.get("cvd_ratio", 0) < -CVD_BULLISH_MIN:
-                score -= 1
-                reasons.append(f"⚠ vendedores agresivos dominan ({tf5['cvd_ratio']:+.1%})")
+            # NOTA: el bonus/penalty de CVD se removió de PREBREAK porque el backtest mostró
+            # que en PREBREAK CVD bullish rinde PEOR (+2.22%) que neutral/bearish (+5.5%).
+            # Posible explicación: en pre-breakout el CVD positivo puede indicar que las
+            # ballenas ya están saliendo a quien quiera comprar — distribución temprana.
+            # CVD se mantiene activo en BREAKOUT donde sí funciona como confirmación.
             # Bonus si está cerca/arriba del máximo extendido (estructura real).
             if tf15.get("recent_long_ok"):
                 reasons.append("rompe nivel estructural (lookback extendido)")
             else:
-                # Está enterrado bajo un máximo mayor — bounce, no breakout estructural
-                score -= 2
+                # Penalty bajado de -2 a -1 — la diferencia real es 1.6 puntos
+                # entre recent_long_ok=True (+8.03%) y False (+6.45%), no justifica -2.
+                score -= 1
                 reasons.append("⚠ enterrado bajo máximo mayor — posible bounce")
             if prev >= LATE_REPEAT_COUNT:
                 score -= 1
@@ -861,57 +862,128 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             and tf15.get("candle_body_pct", 0) >= BREAKOUT_MIN_BODY_PCT
             and tf5.get("vol_ratio", 0) >= BREAKOUT_5M_MIN_VOL_RATIO
             and tf5.get("strong_close", False)
+            # FILTRO ESTRICTO: OBV no debe estar bajando en una ruptura legítima.
+            # Backtest data: BREAKOUT con OBV rising rinde +14.72% (n=45),
+            # neutral +4.49% (n=7), falling 0 alertas. Exigir obv_slope >= 0
+            # filtra los casos más débiles sin descartar muchos válidos.
+            # Si en producción esto descarta demasiadas alertas (ej en bear market),
+            # cambiar el >= 0 por >= -0.05 para ser más permisivo.
+            and tf15.get("obv_slope", 0) >= 0
         )
         if breakout_ok and not in_cooldown(symbol, "BREAKOUT", last_seen):
             prev = counts_history.get((symbol, "BREAKOUT"), 0)
 
-            # Score multiplicativo
-            vol_factor = min(tf5['vol_ratio'] / 2.0, 3.5)        # 5m vol confirma
-            bb_exp_factor = min(tf15['width_expansion'] / 0.15, 3.0)  # expansión BB
-            body_factor = min(tf15.get('candle_body_pct', 0.5) / 0.5, 2.0)  # cuerpo sólido
+            # ─────────────────────────────────────────────────────────────────
+            # SCORING REDISEÑADO — basado en evidencia del backtest.
+            # ─────────────────────────────────────────────────────────────────
+            # El scoring multiplicativo anterior tenía correlación -0.206 con
+            # outcomes (¡invertida!). Score 15 BEST rendía +8.6%, score 12 STRONG
+            # rendía +26.2%. Causa: factores muy altos (vol >5x, BB exp >40%)
+            # son señal de CLIMAX TARDÍO, no de "breakout perfecto".
+            #
+            # Nueva fórmula (correlación +0.426 con outcomes):
+            #   - base 8
+            #   - peso fuerte a OBV (predictor #1: top 25% OBV → +15.8% vs bottom +4.4%)
+            #   - peso medio a CVD (CVD bullish en BREAKOUT → +15.1% vs +10.2% bearish)
+            #   - PENALTY si factores son extremos (señal de climax)
+            #   - bonus moderado si breakout es temprano
+            # ─────────────────────────────────────────────────────────────────
+            score = 8
 
-            raw_score = vol_factor * bb_exp_factor * body_factor
-            # Normalizar a escala ~5-15
-            score = round(5 + raw_score * 2)
+            obv_v = tf15.get("obv_slope", 0)
+            cvd_v = tf15.get("cvd_ratio", 0)
 
-            reasons = [f"15m rompio el maximo reciente (+{tf15['breakout_distance']:.2%})"]
-            reasons.append(f"5m volumen {tf5['vol_ratio']:.1f}x (factor {vol_factor:.2f})")
-            reasons.append(f"expansion BB {tf15['width_expansion']:.0%} (factor {bb_exp_factor:.2f})")
-            reasons.append(f"cuerpo vela {tf15.get('candle_body_pct', 0):.0%} (factor {body_factor:.2f})")
-            if tf15['strong_close']:
-                score += 1
-                reasons.append("cierre 15m fuerte")
-            # Bonus por entrada temprana / penalty por entrada tardía:
-            # los datos muestran que BREAKOUT extendido (>2.5%) tiene más drawdown y peor avg ret.
-            if tf15['breakout_distance'] <= 0.015:
-                score += 1
-                reasons.append("entrada temprana — todavia no extendida")
-            elif tf15['breakout_distance'] >= 0.025:
-                score -= 2
-                reasons.append(f"breakout extendido ({tf15['breakout_distance']:.2%}) — entrada tardía")
-            if tf1h['dist_to_res'] > 0.04:
-                reasons.append(f"1h con espacio real ({tf1h['dist_to_res']:.2%})")
-            # Bonus por OBV ascendente — confirma que no es fakeout
-            if tf15.get("obv_rising"):
+            # OBV — predictor más fuerte
+            if obv_v >= 0.3:
+                score += 4
+                obv_label = "OBV explosivo"
+            elif obv_v >= 0.1:
+                score += 3
+                obv_label = "OBV fuerte"
+            elif obv_v >= 0.05:
                 score += 2
-                reasons.append(f"OBV 15m subiendo ({tf15['obv_slope']:+.1%}) — acumulación confirmada")
-            elif tf15.get("obv_slope", 0) < 0:
-                # Breakout con OBV plano o bajando = sospechoso
+                obv_label = "OBV subiendo"
+            elif obv_v >= 0:
+                score += 0
+                obv_label = "OBV plano"
+            else:
                 score -= 2
-                reasons.append(f"⚠ OBV 15m no acompaña ({tf15['obv_slope']:+.1%}) — riesgo de fakeout")
-            # Bonus por CVD bullish (compradores agresivos en la ruptura)
-            if tf15.get("cvd_bullish"):
+                obv_label = "⚠ OBV bajando"
+
+            # CVD — peso medio
+            if cvd_v >= 0.1:
                 score += 2
-                reasons.append(f"CVD 15m bullish ({tf15['cvd_ratio']:+.1%}) — taker buy domina")
-            elif tf15.get("cvd_ratio", 0) < -CVD_BULLISH_MIN:
+                cvd_label = "CVD muy bullish"
+            elif cvd_v >= 0.05:
+                score += 1
+                cvd_label = "CVD bullish"
+            elif cvd_v >= -0.05:
+                cvd_label = "CVD neutral"
+            else:
+                score -= 1
+                cvd_label = "⚠ CVD bearish"
+
+            # Climax penalty: si los factores son EXTREMOS, el move ya está casi consumido.
+            # Detectamos climax con 2+ de estos: vol_ratio>5x, bb_expansion>0.4, body>0.85
+            climax_signals = 0
+            if tf15.get("vol_ratio", 0) >= 5.0:
+                climax_signals += 1
+            if tf15.get("width_expansion", 0) >= 0.4:
+                climax_signals += 1
+            if tf15.get("candle_body_pct", 0) >= 0.85:
+                climax_signals += 1
+            if climax_signals >= 2:
                 score -= 2
-                reasons.append(f"⚠ CVD bajista ({tf15['cvd_ratio']:+.1%}) — distribución, no acumulación")
-            # Validación de estructura: el breakout debe ser contra el nivel extendido también
+                climax_note = f"⚠ posible climax ({climax_signals} factores extremos)"
+            else:
+                climax_note = None
+
+            # Entrada temprana vs tardía
+            if tf15["breakout_distance"] <= 0.015:
+                score += 2
+                entry_note = "entrada temprana"
+            elif tf15["breakout_distance"] >= 0.025:
+                score -= 1
+                entry_note = "breakout extendido — entrada tardía"
+            else:
+                entry_note = None
+
+            # recent_long_ok — 1.6 puntos de diferencia en backtest
+            if not tf15.get("recent_long_ok", True):
+                score -= 1
+                struct_note = "⚠ enterrado bajo máximo mayor"
+            else:
+                struct_note = None
+
+            # Late repeat penalty
+            if prev >= LATE_REPEAT_COUNT:
+                score -= 1
+
+            # Cap (configurado a 18 ahora)
+            score = min(score, SCORE_CAP)
+
+            # Reasons (visualmente)
+            reasons = [
+                f"15m rompio +{tf15['breakout_distance']:.2%} (vol {tf15.get('vol_ratio', 0):.1f}x, "
+                f"BB exp {tf15.get('width_expansion', 0):.0%})"
+            ]
+            reasons.append(f"{obv_label} ({obv_v:+.1%})")
+            reasons.append(f"{cvd_label} ({cvd_v:+.1%})")
+            if climax_note:
+                reasons.append(climax_note)
+            if entry_note:
+                reasons.append(entry_note)
+            if struct_note:
+                reasons.append(struct_note)
+            if tf1h.get("dist_to_res", 0) > 0.04:
+                reasons.append(f"1h con espacio ({tf1h['dist_to_res']:.2%})")
+            # Validación de estructura: el breakout debe ser contra el nivel extendido también.
+            # Penalty bajado de -3 a -1 — la diferencia real entre recent_long_ok=True/False
+            # es 1.6 puntos en avg_max_24h, no justifica -3.
             if tf15.get("recent_long_ok"):
                 reasons.append("rompe nivel estructural (lookback 25)")
             else:
-                # Rompió el lookback corto pero está bajo un máximo mayor — bounce probable
-                score -= 3
+                score -= 1
                 reasons.append("⚠ enterrado bajo máximo mayor (lookback 25) — posible bounce")
             if prev >= LATE_REPEAT_COUNT:
                 score -= 1
