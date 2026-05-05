@@ -83,11 +83,11 @@
     "FADING_BELOW_ZONE": 0.008
   },
   "scoring": {
-    "BEST_MIN_SCORE": 14,
-    "STRONG_MIN_SCORE": 11,
-    "IMMEDIATE_MIN_SCORE": 12,
+    "BEST_MIN_SCORE": 16,
+    "STRONG_MIN_SCORE": 12,
+    "IMMEDIATE_MIN_SCORE": 14,
     "FORMING_CANDLE_PENALTY": 3,
-    "SCORE_CAP": 15
+    "SCORE_CAP": 18
   },
   "chart": {
     "ENABLED": true,
@@ -99,7 +99,7 @@
   "outcomes": {
     "ENABLED": true,
     "TRACK_ALL_CANDIDATES": false,
-    "BATCH_SIZE": 900,
+    "BATCH_SIZE": 500,
     "RETENTION_DAYS": 90
   }
 }
