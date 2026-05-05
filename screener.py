@@ -234,12 +234,22 @@ def insert_pairs_snapshot(pairs):
 def insert_outcomes(alerts):
     """Inserta filas en screener_outcomes para tracking de cómo evolucionan las alertas.
     Solo guarda los datos del momento de la alerta — los outcomes (precio +15m/+1h/+4h/+24h)
-    los completa el job update_outcomes.py que corre después."""
+    los completa el job update_outcomes.py que corre después.
+
+    Campos nuevos (requieren migración previa de la tabla en Supabase):
+      - obv_slope:      slope del OBV en 15m (cómo viene la acumulación)
+      - cvd_ratio:      ratio de Cumulative Volume Delta en 15m (presión taker buy vs sell)
+      - recent_long_ok: si la alerta pasó el filtro de estructura mayor (lookback 25)
+    Si la migración no está aplicada, la inserción seguirá fallando — agregalos antes."""
     if not OUTCOMES_ENABLED or not alerts:
         return
     now_iso = datetime.now(timezone.utc).isoformat()
     rows = []
     for a in alerts:
+        # Convertir floats con None-safety. Estos campos son nuevos y pueden no estar
+        # en alertas viejas que quedaron en cola, así que toleramos su ausencia.
+        obv = a.get("obv_slope")
+        cvd = a.get("cvd_ratio")
         rows.append({
             "alerted_at": now_iso,
             "symbol": a["symbol"],
@@ -250,6 +260,9 @@ def insert_outcomes(alerts):
             "entry_price": float(a["price"]),
             "ref_price": float(a["ref_price"]) if a.get("ref_price") else None,
             "candle_status": a.get("candle_status", "closed"),
+            "obv_slope": float(obv) if obv is not None else None,
+            "cvd_ratio": float(cvd) if cvd is not None else None,
+            "recent_long_ok": bool(a["recent_long_ok"]) if a.get("recent_long_ok") is not None else None,
         })
     try:
         r = requests.post(
@@ -829,6 +842,12 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "immediate": prev < LATE_REPEAT_COUNT and score >= IMMEDIATE_MIN_SCORE,
                 "price": tf5["price"],
                 "ref_price": tf5["recent_max"],
+                # Snapshots de indicadores nuevos para tracking de outcomes.
+                # PREBREAK detecta en 5m pero el OBV/CVD que importa es 15m
+                # (donde se va a producir el breakout que estamos anticipando).
+                "obv_slope": tf15.get("obv_slope"),
+                "cvd_ratio": tf15.get("cvd_ratio"),
+                "recent_long_ok": tf15.get("recent_long_ok"),
             })
 
     # ── BREAKOUT ───────────────────────────────────────────────────────────────
@@ -909,6 +928,10 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "immediate": prev < LATE_REPEAT_COUNT and score >= IMMEDIATE_MIN_SCORE,
                 "price": tf15["price"],
                 "ref_price": tf15["recent_max"],
+                # Snapshots de indicadores nuevos para tracking de outcomes.
+                "obv_slope": tf15.get("obv_slope"),
+                "cvd_ratio": tf15.get("cvd_ratio"),
+                "recent_long_ok": tf15.get("recent_long_ok"),
             })
 
     # ── RIDING ─────────────────────────────────────────────────────────────────
@@ -968,6 +991,9 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "riding_repeat": prev,
                 "price": tf15["price"],
                 "ref_price": tf15.get("riding_break_close"),
+                "obv_slope": tf15.get("obv_slope"),
+                "cvd_ratio": tf15.get("cvd_ratio"),
+                "recent_long_ok": tf15.get("recent_long_ok"),
             })
 
     # ── FADING ─────────────────────────────────────────────────────────────────
@@ -1008,6 +1034,9 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "immediate": bool(tf15.get("fading_below_zone")),
                 "price": tf15["price"],
                 "ref_price": tf15.get("post_break_high"),
+                "obv_slope": tf15.get("obv_slope"),
+                "cvd_ratio": tf15.get("cvd_ratio"),
+                "recent_long_ok": tf15.get("recent_long_ok"),
             })
 
     # ── HOLD ───────────────────────────────────────────────────────────────────
@@ -1049,6 +1078,9 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "immediate": False,
                 "price": tf15["price"],
                 "ref_price": tf15.get("riding_break_ref") or tf15["recent_max"],
+                "obv_slope": tf15.get("obv_slope"),
+                "cvd_ratio": tf15.get("cvd_ratio"),
+                "recent_long_ok": tf15.get("recent_long_ok"),
             })
 
     if not candidates:
