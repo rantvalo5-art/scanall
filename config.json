@@ -8,7 +8,7 @@
     "LIMIT": 180,
     "TOP_N": 9999,
     "MAX_WORKERS": 20,
-    "MIN_QUOTE_VOLUME": 400000,
+    "MIN_QUOTE_VOLUME": 600000,
     "TOP_ALERT_COUNT": 5
   },
   "history": {
@@ -83,11 +83,11 @@
     "FADING_BELOW_ZONE": 0.008
   },
   "scoring": {
-    "BEST_MIN_SCORE": 16,
-    "STRONG_MIN_SCORE": 12,
+    "BEST_MIN_SCORE": 14,
+    "STRONG_MIN_SCORE": 13,
     "IMMEDIATE_MIN_SCORE": 14,
     "FORMING_CANDLE_PENALTY": 3,
-    "SCORE_CAP": 18
+    "SCORE_CAP": 15
   },
   "chart": {
     "ENABLED": true,
