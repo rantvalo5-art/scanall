@@ -1020,7 +1020,11 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         )
         if riding_ok and not in_cooldown(symbol, "RIDING", last_seen):
             prev = counts_history.get((symbol, "RIDING"), 0)
-            score = 6
+            # Score base bajado de 6 a 4 — RIDING tiene drawdown alto inherente.
+            # En el backtest, RIDING en BEST tenía R/R 1.30 vs BREAKOUT 4.83.
+            # Bajando la base, RIDING llega a STRONG/BEST solo con momentum confirmado
+            # (OBV+CVD bullish + ganancia fuerte).
+            score = 4
             reasons = [
                 f"sigue subiendo desde el breakout (+{riding_gain:.2%}, "
                 f"{tf15['riding_bars_since']} velas atras)"
@@ -1049,6 +1053,22 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             else:
                 score += 1
                 reasons.append("1h alcista")
+            # Bonus OBV/CVD para diferenciar RIDING entre sí.
+            # Sin estos bonuses, todos los RIDING aterrizaban en el mismo score (~11).
+            # Con esto, los RIDING con momentum confirmado (OBV+CVD subiendo) suben a 13-14
+            # y los que el momentum se les agota se quedan en 9-10.
+            if tf15.get("obv_rising"):
+                score += 1
+                reasons.append(f"OBV 15m sigue subiendo ({tf15['obv_slope']:+.1%})")
+            elif tf15.get("obv_slope", 0) < 0:
+                score -= 2
+                reasons.append(f"⚠ OBV 15m bajando ({tf15['obv_slope']:+.1%}) — momentum se agota")
+            if tf15.get("cvd_bullish"):
+                score += 1
+                reasons.append("compradores agresivos siguen dominando")
+            elif tf15.get("cvd_ratio", 0) < -CVD_BULLISH_MIN:
+                score -= 2
+                reasons.append(f"⚠ CVD bajista — vendedores tomando control")
             candidates.append({
                 "symbol": symbol,
                 "label": "RIDING",
@@ -1135,6 +1155,26 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             else:
                 score += 1
                 reasons.append("1h acompaña")
+            # Bonus OBV/CVD para diferenciar HOLD entre sí.
+            # Sin estos bonuses, todos los HOLD aterrizaban en el mismo score (~10).
+            # HOLD con OBV+CVD positivos = consolidación con compradores activos = sube a 12-13.
+            # HOLD con OBV bajando = la zona se está debilitando = baja a 8-9.
+            if tf15.get("obv_rising"):
+                score += 1
+                reasons.append(f"OBV sigue subiendo ({tf15['obv_slope']:+.1%}) — zona fortalecida")
+            elif tf15.get("obv_slope", 0) < -OBV_RISING_MIN:
+                score -= 2
+                reasons.append(f"⚠ OBV bajando ({tf15['obv_slope']:+.1%}) — zona debilitada")
+            if tf15.get("cvd_bullish"):
+                score += 1
+                reasons.append("compradores siguen activos en la zona")
+            elif tf15.get("cvd_ratio", 0) < -CVD_BULLISH_MIN:
+                score -= 2
+                reasons.append(f"⚠ vendedores ganando — zona en riesgo")
+            # Penalty si está enterrado bajo máximo mayor
+            if not tf15.get("recent_long_ok", True):
+                score -= 1
+                reasons.append("⚠ enterrado bajo máximo mayor")
             if prev >= LATE_REPEAT_COUNT:
                 score -= 1
             candidates.append({
