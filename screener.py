@@ -40,12 +40,24 @@ try:
 except json.JSONDecodeError as e:
     raise SystemExit(f"FATAL: config.json tiene JSON inválido: {e}")
 
-def _cfg(section, key):
-    """Acceso estricto: si falta una clave, abortamos para que el error sea visible."""
+def _cfg(section, key, default=None):
+    """Acceso a config. Si default está definido, lo usa cuando falta la clave (modo
+    backwards-compat). Si default es None, aborta con error explícito."""
     try:
         return CONFIG[section][key]
     except KeyError:
+        if default is not None:
+            return default
         raise SystemExit(f"FATAL: config.json no tiene {section}.{key}")
+
+def _cfg_score(section, key, default):
+    """Helper específico para secciones de scoring parametrizado (scoring_breakout,
+    scoring_prebreak, etc.). Siempre tiene default — si la sección o clave no existe,
+    cae al valor hardcodeado de v3. Permite que un config v3 viejo siga funcionando."""
+    try:
+        return CONFIG[section][key]
+    except KeyError:
+        return default
 
 # ── Variables de entorno ──────────────────────────────────────────────────────
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
@@ -785,14 +797,30 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         if pre_ok and not in_cooldown(symbol, "PREBREAK", last_seen):
             prev = counts_history.get((symbol, "PREBREAK"), 0)
 
+            # ── Scoring parametrizado vía config.scoring_prebreak ─────────────
+            # Defaults coinciden con v3 hardcodeado para back-compat.
+            sp = "scoring_prebreak"
+            base_offset    = _cfg_score(sp, "BASE_OFFSET", 4)
+            base_mult      = _cfg_score(sp, "BASE_MULTIPLIER", 3)
+            vol_div        = _cfg_score(sp, "VOL_FACTOR_DIV", 2.5)
+            vol_cap        = _cfg_score(sp, "VOL_FACTOR_CAP", 3.0)
+            grow_div       = _cfg_score(sp, "GROWTH_FACTOR_DIV", 1.2)
+            grow_cap       = _cfg_score(sp, "GROWTH_FACTOR_CAP", 2.0)
+            bb_div         = _cfg_score(sp, "BB_FACTOR_DIV", 0.03)
+            bb_floor       = _cfg_score(sp, "BB_FACTOR_FLOOR", 0.3)
+            close_bonus    = _cfg_score(sp, "STRONG_CLOSE_BONUS", 1)
+            obv_up_bonus   = _cfg_score(sp, "OBV_RISING_BONUS", 2)
+            obv_dn_pen     = _cfg_score(sp, "OBV_FALLING_PENALTY", -1)
+            struct_pen     = _cfg_score(sp, "STRUCT_PENALTY", -1)
+            late_pen       = _cfg_score(sp, "LATE_REPEAT_PENALTY", -1)
+
             # Score multiplicativo: factores clave se multiplican, no se suman
-            vol_factor = min(tf5['vol_ratio'] / 2.5, 3.0)       # 1.0x a 2.5, hasta 3.0 cap
-            growth_factor = min(tf5['vol_growth'] / 1.2, 2.0)    # 1.0x a 1.2, hasta 2.0 cap
-            bb_factor = max(1.0 - (tf5['width_curr'] / 0.03), 0.3)  # más comprimida = mejor, 0.3 floor
+            vol_factor = min(tf5['vol_ratio'] / vol_div, vol_cap)
+            growth_factor = min(tf5['vol_growth'] / grow_div, grow_cap)
+            bb_factor = max(1.0 - (tf5['width_curr'] / bb_div), bb_floor)
 
             raw_score = vol_factor * growth_factor * bb_factor
-            # Normalizar a escala ~5-15
-            score = round(4 + raw_score * 3)
+            score = round(base_offset + raw_score * base_mult)
 
             reasons = []
             near_pct = ((tf5['recent_max'] - tf5['price']) / tf5['recent_max']) if tf5['recent_max'] else 0.0
@@ -801,35 +829,28 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             reasons.append(f"volumen creciendo {tf5['vol_growth']:.2f}x (factor {growth_factor:.2f})")
             reasons.append(f"BB 5m {tf5['width_curr']:.2%} (factor {bb_factor:.2f})")
             if tf5['strong_close']:
-                score += 1
+                score += close_bonus
                 reasons.append("ultima vela 5m cerro fuerte")
             if tf1h['dist_to_res'] > 0.04:
                 reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
             # Bonus por OBV ascendente en 15m (acumulación real, no solo volumen aislado).
-            # OBV bonus subido de +1 a +2 — los datos del backtest muestran que OBV es
-            # el predictor más fuerte (+4.5 puntos vs neutral).
             if tf15.get("obv_rising"):
-                score += 2
+                score += obv_up_bonus
                 reasons.append(f"OBV 15m subiendo ({tf15['obv_slope']:+.1%}) — acumulación real")
             elif tf15.get("obv_slope", 0) < -OBV_RISING_MIN:
                 # OBV bajando con precio cerca del máx → divergencia bajista, fakeout probable
-                score -= 1
+                score += obv_dn_pen
                 reasons.append(f"⚠ OBV 15m bajando ({tf15['obv_slope']:+.1%}) — divergencia")
             # NOTA: el bonus/penalty de CVD se removió de PREBREAK porque el backtest mostró
             # que en PREBREAK CVD bullish rinde PEOR (+2.22%) que neutral/bearish (+5.5%).
-            # Posible explicación: en pre-breakout el CVD positivo puede indicar que las
-            # ballenas ya están saliendo a quien quiera comprar — distribución temprana.
             # CVD se mantiene activo en BREAKOUT donde sí funciona como confirmación.
-            # Bonus si está cerca/arriba del máximo extendido (estructura real).
             if tf15.get("recent_long_ok"):
                 reasons.append("rompe nivel estructural (lookback extendido)")
             else:
-                # Penalty bajado de -2 a -1 — la diferencia real es 1.6 puntos
-                # entre recent_long_ok=True (+8.03%) y False (+6.45%), no justifica -2.
-                score -= 1
+                score += struct_pen
                 reasons.append("⚠ enterrado bajo máximo mayor — posible bounce")
             if prev >= LATE_REPEAT_COUNT:
-                score -= 1
+                score += late_pen
             candidates.append({
                 "symbol": symbol,
                 "label": "PRE-BREAK",
@@ -843,9 +864,6 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "immediate": prev < LATE_REPEAT_COUNT and score >= IMMEDIATE_MIN_SCORE,
                 "price": tf5["price"],
                 "ref_price": tf5["recent_max"],
-                # Snapshots de indicadores nuevos para tracking de outcomes.
-                # PREBREAK detecta en 5m pero el OBV/CVD que importa es 15m
-                # (donde se va a producir el breakout que estamos anticipando).
                 "obv_slope": tf15.get("obv_slope"),
                 "cvd_ratio": tf15.get("cvd_ratio"),
                 "recent_long_ok": tf15.get("recent_long_ok"),
@@ -853,6 +871,8 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
 
     # ── BREAKOUT ───────────────────────────────────────────────────────────────
     if ACTIVE_SIGNALS_BREAKOUT:
+        # Filtro OBV>=0 ahora opcional vía config. En v3 era hardcoded True.
+        require_obv_nonneg = _cfg("breakout", "BREAKOUT_REQUIRE_OBV_NON_NEGATIVE", default=True)
         breakout_ok = (
             tf15.get("breakout")
             and tf15.get("vol_ratio", 0) >= BREAKOUT_MIN_VOL_RATIO
@@ -862,104 +882,115 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             and tf15.get("candle_body_pct", 0) >= BREAKOUT_MIN_BODY_PCT
             and tf5.get("vol_ratio", 0) >= BREAKOUT_5M_MIN_VOL_RATIO
             and tf5.get("strong_close", False)
-            # FILTRO ESTRICTO: OBV no debe estar bajando en una ruptura legítima.
-            # Backtest data: BREAKOUT con OBV rising rinde +14.72% (n=45),
-            # neutral +4.49% (n=7), falling 0 alertas. Exigir obv_slope >= 0
-            # filtra los casos más débiles sin descartar muchos válidos.
-            # Si en producción esto descarta demasiadas alertas (ej en bear market),
-            # cambiar el >= 0 por >= -0.05 para ser más permisivo.
-            and tf15.get("obv_slope", 0) >= 0
+            and (not require_obv_nonneg or tf15.get("obv_slope", 0) >= 0)
         )
         if breakout_ok and not in_cooldown(symbol, "BREAKOUT", last_seen):
             prev = counts_history.get((symbol, "BREAKOUT"), 0)
 
-            # ─────────────────────────────────────────────────────────────────
-            # SCORING REDISEÑADO — basado en evidencia del backtest.
-            # ─────────────────────────────────────────────────────────────────
-            # El scoring multiplicativo anterior tenía correlación -0.206 con
-            # outcomes (¡invertida!). Score 15 BEST rendía +8.6%, score 12 STRONG
-            # rendía +26.2%. Causa: factores muy altos (vol >5x, BB exp >40%)
-            # son señal de CLIMAX TARDÍO, no de "breakout perfecto".
-            #
-            # Nueva fórmula (correlación +0.426 con outcomes):
-            #   - base 8
-            #   - peso fuerte a OBV (predictor #1: top 25% OBV → +15.8% vs bottom +4.4%)
-            #   - peso medio a CVD (CVD bullish en BREAKOUT → +15.1% vs +10.2% bearish)
-            #   - PENALTY si factores son extremos (señal de climax)
-            #   - bonus moderado si breakout es temprano
-            # ─────────────────────────────────────────────────────────────────
-            score = 8
+            # ── Scoring parametrizado vía config.scoring_breakout ─────────────
+            # Defaults coinciden con v3 hardcodeado para back-compat.
+            sb = "scoring_breakout"
+            base_score        = _cfg_score(sb, "BASE_SCORE", 8)
+            obv_explosive_min = _cfg_score(sb, "OBV_TIER_EXPLOSIVE_MIN", 0.3)
+            obv_explosive_b   = _cfg_score(sb, "OBV_TIER_EXPLOSIVE_BONUS", 4)
+            obv_strong_min    = _cfg_score(sb, "OBV_TIER_STRONG_MIN", 0.1)
+            obv_strong_b      = _cfg_score(sb, "OBV_TIER_STRONG_BONUS", 3)
+            obv_rising_min    = _cfg_score(sb, "OBV_TIER_RISING_MIN", 0.05)
+            obv_rising_b      = _cfg_score(sb, "OBV_TIER_RISING_BONUS", 2)
+            obv_neutral_min   = _cfg_score(sb, "OBV_TIER_NEUTRAL_MIN", 0)
+            obv_neutral_b     = _cfg_score(sb, "OBV_TIER_NEUTRAL_BONUS", 0)
+            obv_falling_pen   = _cfg_score(sb, "OBV_TIER_FALLING_PENALTY", -2)
+            cvd_vbull_min     = _cfg_score(sb, "CVD_TIER_VERY_BULLISH_MIN", 0.1)
+            cvd_vbull_b       = _cfg_score(sb, "CVD_TIER_VERY_BULLISH_BONUS", 2)
+            cvd_bull_min      = _cfg_score(sb, "CVD_TIER_BULLISH_MIN", 0.05)
+            cvd_bull_b        = _cfg_score(sb, "CVD_TIER_BULLISH_BONUS", 1)
+            cvd_neutral_min   = _cfg_score(sb, "CVD_TIER_NEUTRAL_MIN", -0.05)
+            cvd_neutral_b     = _cfg_score(sb, "CVD_TIER_NEUTRAL_BONUS", 0)
+            cvd_bear_pen      = _cfg_score(sb, "CVD_TIER_BEARISH_PENALTY", -1)
+            climax_vol_min    = _cfg_score(sb, "CLIMAX_VOL_MIN", 5.0)
+            climax_bb_min     = _cfg_score(sb, "CLIMAX_BB_EXP_MIN", 0.4)
+            climax_body_min   = _cfg_score(sb, "CLIMAX_BODY_MIN", 0.85)
+            climax_thresh     = _cfg_score(sb, "CLIMAX_THRESHOLD", 2)
+            climax_pen        = _cfg_score(sb, "CLIMAX_PENALTY", -2)
+            early_max         = _cfg_score(sb, "EARLY_ENTRY_MAX", 0.015)
+            early_bonus       = _cfg_score(sb, "EARLY_ENTRY_BONUS", 2)
+            late_min          = _cfg_score(sb, "LATE_ENTRY_MIN", 0.025)
+            late_pen_entry    = _cfg_score(sb, "LATE_ENTRY_PENALTY", -1)
+            struct_pen        = _cfg_score(sb, "STRUCT_PENALTY", -1)
+            late_repeat_pen   = _cfg_score(sb, "LATE_REPEAT_PENALTY", -1)
+
+            score = base_score
 
             obv_v = tf15.get("obv_slope", 0)
             cvd_v = tf15.get("cvd_ratio", 0)
 
-            # OBV — predictor más fuerte
-            if obv_v >= 0.3:
-                score += 4
+            # OBV — predictor más fuerte (tiers parametrizados)
+            if obv_v >= obv_explosive_min:
+                score += obv_explosive_b
                 obv_label = "OBV explosivo"
-            elif obv_v >= 0.1:
-                score += 3
+            elif obv_v >= obv_strong_min:
+                score += obv_strong_b
                 obv_label = "OBV fuerte"
-            elif obv_v >= 0.05:
-                score += 2
+            elif obv_v >= obv_rising_min:
+                score += obv_rising_b
                 obv_label = "OBV subiendo"
-            elif obv_v >= 0:
-                score += 0
+            elif obv_v >= obv_neutral_min:
+                score += obv_neutral_b
                 obv_label = "OBV plano"
             else:
-                score -= 2
+                score += obv_falling_pen
                 obv_label = "⚠ OBV bajando"
 
-            # CVD — peso medio
-            if cvd_v >= 0.1:
-                score += 2
+            # CVD — peso medio (tiers parametrizados)
+            if cvd_v >= cvd_vbull_min:
+                score += cvd_vbull_b
                 cvd_label = "CVD muy bullish"
-            elif cvd_v >= 0.05:
-                score += 1
+            elif cvd_v >= cvd_bull_min:
+                score += cvd_bull_b
                 cvd_label = "CVD bullish"
-            elif cvd_v >= -0.05:
+            elif cvd_v >= cvd_neutral_min:
+                score += cvd_neutral_b
                 cvd_label = "CVD neutral"
             else:
-                score -= 1
+                score += cvd_bear_pen
                 cvd_label = "⚠ CVD bearish"
 
-            # Climax penalty: si los factores son EXTREMOS, el move ya está casi consumido.
-            # Detectamos climax con 2+ de estos: vol_ratio>5x, bb_expansion>0.4, body>0.85
+            # Climax penalty parametrizado
             climax_signals = 0
-            if tf15.get("vol_ratio", 0) >= 5.0:
+            if tf15.get("vol_ratio", 0) >= climax_vol_min:
                 climax_signals += 1
-            if tf15.get("width_expansion", 0) >= 0.4:
+            if tf15.get("width_expansion", 0) >= climax_bb_min:
                 climax_signals += 1
-            if tf15.get("candle_body_pct", 0) >= 0.85:
+            if tf15.get("candle_body_pct", 0) >= climax_body_min:
                 climax_signals += 1
-            if climax_signals >= 2:
-                score -= 2
+            if climax_signals >= climax_thresh:
+                score += climax_pen
                 climax_note = f"⚠ posible climax ({climax_signals} factores extremos)"
             else:
                 climax_note = None
 
-            # Entrada temprana vs tardía
-            if tf15["breakout_distance"] <= 0.015:
-                score += 2
+            # Entrada temprana / tardía
+            if tf15["breakout_distance"] <= early_max:
+                score += early_bonus
                 entry_note = "entrada temprana"
-            elif tf15["breakout_distance"] >= 0.025:
-                score -= 1
+            elif tf15["breakout_distance"] >= late_min:
+                score += late_pen_entry
                 entry_note = "breakout extendido — entrada tardía"
             else:
                 entry_note = None
 
-            # recent_long_ok — 1.6 puntos de diferencia en backtest
+            # recent_long_ok — UNA sola aplicación (v3 lo aplicaba dos veces, bug fix)
             if not tf15.get("recent_long_ok", True):
-                score -= 1
+                score += struct_pen
                 struct_note = "⚠ enterrado bajo máximo mayor"
             else:
                 struct_note = None
 
-            # Late repeat penalty
+            # Late repeat penalty — UNA sola aplicación (v3 lo aplicaba dos veces, bug fix)
             if prev >= LATE_REPEAT_COUNT:
-                score -= 1
+                score += late_repeat_pen
 
-            # Cap (configurado a 18 ahora)
+            # Cap final
             score = min(score, SCORE_CAP)
 
             # Reasons (visualmente)
@@ -975,18 +1006,10 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 reasons.append(entry_note)
             if struct_note:
                 reasons.append(struct_note)
+            else:
+                reasons.append("rompe nivel estructural (lookback 25)")
             if tf1h.get("dist_to_res", 0) > 0.04:
                 reasons.append(f"1h con espacio ({tf1h['dist_to_res']:.2%})")
-            # Validación de estructura: el breakout debe ser contra el nivel extendido también.
-            # Penalty bajado de -3 a -1 — la diferencia real entre recent_long_ok=True/False
-            # es 1.6 puntos en avg_max_24h, no justifica -3.
-            if tf15.get("recent_long_ok"):
-                reasons.append("rompe nivel estructural (lookback 25)")
-            else:
-                score -= 1
-                reasons.append("⚠ enterrado bajo máximo mayor (lookback 25) — posible bounce")
-            if prev >= LATE_REPEAT_COUNT:
-                score -= 1
             candidates.append({
                 "symbol": symbol,
                 "label": "BREAKOUT",
@@ -1000,7 +1023,6 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "immediate": prev < LATE_REPEAT_COUNT and score >= IMMEDIATE_MIN_SCORE,
                 "price": tf15["price"],
                 "ref_price": tf15["recent_max"],
-                # Snapshots de indicadores nuevos para tracking de outcomes.
                 "obv_slope": tf15.get("obv_slope"),
                 "cvd_ratio": tf15.get("cvd_ratio"),
                 "recent_long_ok": tf15.get("recent_long_ok"),
@@ -1020,55 +1042,70 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         )
         if riding_ok and not in_cooldown(symbol, "RIDING", last_seen):
             prev = counts_history.get((symbol, "RIDING"), 0)
-            # Score base bajado de 6 a 4 — RIDING tiene drawdown alto inherente.
-            # En el backtest, RIDING en BEST tenía R/R 1.30 vs BREAKOUT 4.83.
-            # Bajando la base, RIDING llega a STRONG/BEST solo con momentum confirmado
-            # (OBV+CVD bullish + ganancia fuerte).
-            score = 4
+
+            # ── Scoring parametrizado vía config.scoring_riding ───────────────
+            # Defaults coinciden con v3 hardcodeado para back-compat.
+            sr = "scoring_riding"
+            base_score      = _cfg_score(sr, "BASE_SCORE", 4)
+            gain_strong_min = _cfg_score(sr, "GAIN_TIER_STRONG_MIN", 0.05)
+            gain_strong_b   = _cfg_score(sr, "GAIN_TIER_STRONG_BONUS", 3)
+            gain_solid_min  = _cfg_score(sr, "GAIN_TIER_SOLID_MIN", 0.02)
+            gain_solid_b    = _cfg_score(sr, "GAIN_TIER_SOLID_BONUS", 2)
+            gain_initial_b  = _cfg_score(sr, "GAIN_TIER_INITIAL_BONUS", 1)
+            vol_ok_b        = _cfg_score(sr, "VOL_OK_BONUS", 1)
+            close_b         = _cfg_score(sr, "STRONG_CLOSE_BONUS", 1)
+            ema_b           = _cfg_score(sr, "EMA_TREND_BONUS", 1)
+            dist_high_min   = _cfg_score(sr, "DIST_RES_HIGH_MIN", 0.04)
+            dist_high_b     = _cfg_score(sr, "DIST_RES_HIGH_BONUS", 2)
+            dist_low_b      = _cfg_score(sr, "DIST_RES_LOW_BONUS", 1)
+            obv_up_b        = _cfg_score(sr, "OBV_RISING_BONUS", 1)
+            obv_dn_pen      = _cfg_score(sr, "OBV_FALLING_PENALTY", -2)
+            cvd_up_b        = _cfg_score(sr, "CVD_BULLISH_BONUS", 1)
+            cvd_dn_pen      = _cfg_score(sr, "CVD_BEARISH_PENALTY", -2)
+
+            score = base_score
             reasons = [
                 f"sigue subiendo desde el breakout (+{riding_gain:.2%}, "
                 f"{tf15['riding_bars_since']} velas atras)"
             ]
-            if riding_gain >= 0.05:
-                score += 3
+            if riding_gain >= gain_strong_min:
+                score += gain_strong_b
                 reasons.append(f"movimiento fuerte (+{riding_gain:.2%} total)")
-            elif riding_gain >= 0.02:
-                score += 2
+            elif riding_gain >= gain_solid_min:
+                score += gain_solid_b
                 reasons.append(f"ganancia solida (+{riding_gain:.2%} total)")
             else:
-                score += 1
+                score += gain_initial_b
                 reasons.append(f"ganancia inicial (+{riding_gain:.2%} total)")
             if tf15.get("riding_vol_ok"):
-                score += 1
+                score += vol_ok_b
                 reasons.append("volumen sostenido — no hay colapso de momentum")
             if tf15.get("strong_close"):
-                score += 1
+                score += close_b
                 reasons.append("ultima vela 15m cierra fuerte")
             if tf1h.get("ema_trend_up"):
-                score += 1
+                score += ema_b
                 reasons.append("1h EMA sigue alcista")
-            if tf1h.get("dist_to_res", 0) > 0.04:
-                score += 2
+            if tf1h.get("dist_to_res", 0) > dist_high_min:
+                score += dist_high_b
                 reasons.append(f"1h con espacio real ({tf1h['dist_to_res']:.2%})")
             else:
-                score += 1
+                score += dist_low_b
                 reasons.append("1h alcista")
-            # Bonus OBV/CVD para diferenciar RIDING entre sí.
-            # Sin estos bonuses, todos los RIDING aterrizaban en el mismo score (~11).
-            # Con esto, los RIDING con momentum confirmado (OBV+CVD subiendo) suben a 13-14
-            # y los que el momentum se les agota se quedan en 9-10.
+            # OBV/CVD bonuses para diferenciar RIDING entre sí
             if tf15.get("obv_rising"):
-                score += 1
+                score += obv_up_b
                 reasons.append(f"OBV 15m sigue subiendo ({tf15['obv_slope']:+.1%})")
             elif tf15.get("obv_slope", 0) < 0:
-                score -= 2
+                score += obv_dn_pen
                 reasons.append(f"⚠ OBV 15m bajando ({tf15['obv_slope']:+.1%}) — momentum se agota")
             if tf15.get("cvd_bullish"):
-                score += 1
+                score += cvd_up_b
                 reasons.append("compradores agresivos siguen dominando")
             elif tf15.get("cvd_ratio", 0) < -CVD_BULLISH_MIN:
-                score -= 2
+                score += cvd_dn_pen
                 reasons.append(f"⚠ CVD bajista — vendedores tomando control")
+            score = min(score, SCORE_CAP)
             candidates.append({
                 "symbol": symbol,
                 "label": "RIDING",
@@ -1102,16 +1139,21 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             and not tf15.get("breakout")
         )
         if fading_ok and not in_cooldown(symbol, "FADING", last_seen):
-            score = 5
+            sf = "scoring_fading"
+            base       = _cfg_score(sf, "BASE_SCORE", 5)
+            below_b    = _cfg_score(sf, "BELOW_ZONE_BONUS", 2)
+            pullback_b = _cfg_score(sf, "PULLBACK_SIGNIFICANT_BONUS", 1)
+            voldead_b  = _cfg_score(sf, "VOL_DEAD_BONUS", 1)
+            score = base
             reasons = [f"devolviendo {abs(fading_reversal):.2%} desde el maximo post-break"]
             if tf15.get("fading_below_zone"):
-                score += 2
+                score += below_b
                 reasons.append("precio perforo la zona de soporte rota — senal de salida")
             else:
-                score += 1
+                score += pullback_b
                 reasons.append("pullback significativo — monitoreá zona de soporte")
             if not tf15.get("riding_vol_ok"):
-                score += 1
+                score += voldead_b
                 reasons.append("volumen tambien cayo — momentum perdido")
             candidates.append({
                 "symbol": symbol,
@@ -1141,42 +1183,55 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         )
         if hold_ok and not in_cooldown(symbol, "HOLD", last_seen):
             prev = counts_history.get((symbol, "HOLD"), 0)
-            score = 5
+            sh = "scoring_hold"
+            base          = _cfg_score(sh, "BASE_SCORE", 5)
+            above_b       = _cfg_score(sh, "ABOVE_RESIST_BONUS", 2)
+            pullback_b    = _cfg_score(sh, "PULLBACK_BONUS", 1)
+            close_b       = _cfg_score(sh, "STRONG_CLOSE_BONUS", 1)
+            dist_high_min = _cfg_score(sh, "DIST_RES_HIGH_MIN", 0.04)
+            dist_high_b   = _cfg_score(sh, "DIST_RES_HIGH_BONUS", 2)
+            dist_low_b    = _cfg_score(sh, "DIST_RES_LOW_BONUS", 1)
+            obv_up_b      = _cfg_score(sh, "OBV_RISING_BONUS", 1)
+            obv_dn_pen    = _cfg_score(sh, "OBV_FALLING_PENALTY", -2)
+            cvd_up_b      = _cfg_score(sh, "CVD_BULLISH_BONUS", 1)
+            cvd_dn_pen    = _cfg_score(sh, "CVD_BEARISH_PENALTY", -2)
+            struct_pen    = _cfg_score(sh, "STRUCT_PENALTY", -1)
+            late_pen      = _cfg_score(sh, "LATE_REPEAT_PENALTY", -1)
+
+            score = base
             reasons = [f"ruptura reciente en 15m hace {tf15['bars_since_break']} velas"]
-            score += 2
+            score += above_b
             reasons.append("sigue arriba de la resistencia rota")
-            score += 1
+            score += pullback_b
             reasons.append("pullback sano")
-            score += 1
+            score += close_b
             reasons.append("ultima vela post-break cierra fuerte")
-            if tf1h['dist_to_res'] > 0.04:
-                score += 2
+            if tf1h['dist_to_res'] > dist_high_min:
+                score += dist_high_b
                 reasons.append(f"1h con buen espacio arriba ({tf1h['dist_to_res']:.2%})")
             else:
-                score += 1
+                score += dist_low_b
                 reasons.append("1h acompaña")
-            # Bonus OBV/CVD para diferenciar HOLD entre sí.
-            # Sin estos bonuses, todos los HOLD aterrizaban en el mismo score (~10).
-            # HOLD con OBV+CVD positivos = consolidación con compradores activos = sube a 12-13.
-            # HOLD con OBV bajando = la zona se está debilitando = baja a 8-9.
+            # Bonus OBV/CVD para diferenciar HOLD entre sí
             if tf15.get("obv_rising"):
-                score += 1
+                score += obv_up_b
                 reasons.append(f"OBV sigue subiendo ({tf15['obv_slope']:+.1%}) — zona fortalecida")
             elif tf15.get("obv_slope", 0) < -OBV_RISING_MIN:
-                score -= 2
+                score += obv_dn_pen
                 reasons.append(f"⚠ OBV bajando ({tf15['obv_slope']:+.1%}) — zona debilitada")
             if tf15.get("cvd_bullish"):
-                score += 1
+                score += cvd_up_b
                 reasons.append("compradores siguen activos en la zona")
             elif tf15.get("cvd_ratio", 0) < -CVD_BULLISH_MIN:
-                score -= 2
+                score += cvd_dn_pen
                 reasons.append(f"⚠ vendedores ganando — zona en riesgo")
             # Penalty si está enterrado bajo máximo mayor
             if not tf15.get("recent_long_ok", True):
-                score -= 1
+                score += struct_pen
                 reasons.append("⚠ enterrado bajo máximo mayor")
             if prev >= LATE_REPEAT_COUNT:
-                score -= 1
+                score += late_pen
+            score = min(score, SCORE_CAP)
             candidates.append({
                 "symbol": symbol,
                 "label": "HOLD",
