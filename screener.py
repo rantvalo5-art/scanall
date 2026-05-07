@@ -1062,6 +1062,9 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             obv_dn_pen      = _cfg_score(sr, "OBV_FALLING_PENALTY", -2)
             cvd_up_b        = _cfg_score(sr, "CVD_BULLISH_BONUS", 1)
             cvd_dn_pen      = _cfg_score(sr, "CVD_BEARISH_PENALTY", -2)
+            # Variante G: bonus por gain excepcional (default 0 = inactivo)
+            strong_gain_b   = _cfg_score(sr, "STRONG_GAIN_BONUS", 0)
+            strong_gain_min = _cfg_score(sr, "STRONG_GAIN_MIN", 0.08)
 
             score = base_score
             reasons = [
@@ -1077,6 +1080,10 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             else:
                 score += gain_initial_b
                 reasons.append(f"ganancia inicial (+{riding_gain:.2%} total)")
+            # Bonus extra por gain excepcional (>=8% por defecto)
+            if riding_gain >= strong_gain_min and strong_gain_b > 0:
+                score += strong_gain_b
+                reasons.append(f"🚀 gain excepcional (>={strong_gain_min:.0%})")
             if tf15.get("riding_vol_ok"):
                 score += vol_ok_b
                 reasons.append("volumen sostenido — no hay colapso de momentum")
@@ -1197,6 +1204,10 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             cvd_dn_pen    = _cfg_score(sh, "CVD_BEARISH_PENALTY", -2)
             struct_pen    = _cfg_score(sh, "STRUCT_PENALTY", -1)
             late_pen      = _cfg_score(sh, "LATE_REPEAT_PENALTY", -1)
+            # Variante G: bonus por momentum extremo (default 0 = inactivo)
+            momentum_b    = _cfg_score(sh, "STRONG_MOMENTUM_BONUS", 0)
+            momentum_obv  = _cfg_score(sh, "STRONG_MOMENTUM_OBV_MIN", 0.2)
+            momentum_dist = _cfg_score(sh, "STRONG_MOMENTUM_DIST_MIN", 0.05)
 
             score = base
             reasons = [f"ruptura reciente en 15m hace {tf15['bars_since_break']} velas"]
@@ -1229,6 +1240,13 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             if not tf15.get("recent_long_ok", True):
                 score += struct_pen
                 reasons.append("⚠ enterrado bajo máximo mayor")
+            # Bonus por momentum extremo: OBV explosivo + CVD bullish + lejos de resistencia
+            if (momentum_b > 0
+                and tf15.get("obv_slope", 0) >= momentum_obv
+                and tf15.get("cvd_bullish")
+                and tf1h.get("dist_to_res", 0) >= momentum_dist):
+                score += momentum_b
+                reasons.append(f"🚀 momentum extremo (OBV {tf15['obv_slope']:+.1%} + CVD bullish + dist {tf1h['dist_to_res']:.2%})")
             if prev >= LATE_REPEAT_COUNT:
                 score += late_pen
             score = min(score, SCORE_CAP)
