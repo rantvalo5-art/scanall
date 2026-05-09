@@ -51,3 +51,18 @@ Python 3.11, `pandas==2.2.3`, `ta`, `requests`, `mplfinance` (optional, for char
 - Comments in Spanish — match style if adding any.
 - Don't touch the hardcoded Supabase URL or Telegram secrets.
 - `screener.py` and `backtest.py` share scoring semantics — changes to one usually need changes in the other.
+
+
+## Token Efficiency
+- Prefer targeted Read with line ranges and Grep over full-file reads
+- Avoid spawning Explore/Task agents for codebase analysis unless explicitly requested
+- Ask before doing broad exploration; default to minimal context gathering
+
+## Workflow
+- Wait for explicit confirmation before editing or reviewing files; do not start work on the second turn until the user clarifies scope
+- When the user is in plan mode or asking meta questions, do not invoke tools
+
+## Project Context
+- This is a Python crypto screener / backtesting project (backtest.py is central)
+- Common tasks: bug fixes in backtest.py, config variant experiments, indicator precomputation, performance tuning
+- Prefer vectorized pandas/numpy operations and disk caching for expensive computations
