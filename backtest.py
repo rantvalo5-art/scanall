@@ -19,12 +19,14 @@ valor hardcodeado de v3 como default (gracias al método g() del Config).
 import argparse
 import json
 import os
+import pickle
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import requests
 import ta
@@ -46,6 +48,9 @@ MAX_PAIRS = 200
 BINANCE_DATA_URL = "https://data-api.binance.vision/api/v3"
 BINANCE_FALLBACK_URL = "https://api.binance.com/api/v3"
 BINANCE_FAPI_URL = "https://fapi.binance.com"
+
+CACHE_DIR = Path(".backtest_cache")
+_NO_CACHE = False  # override con --no-cache en CLI
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ecgdswroygkfckkaguxp.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
@@ -206,7 +211,14 @@ def download_all_klines(symbols, start_dt, end_dt):
     completed = 0
 
     def fetch(sym, tf):
-        return sym, tf, get_klines_range(sym, tf, start_ms, end_ms)
+        p = _cache_path("klines", sym, tf, start_ms, end_ms)
+        cached = _cache_get(p)
+        if cached is not None:
+            return sym, tf, cached
+        result = get_klines_range(sym, tf, start_ms, end_ms)
+        if result is not None:
+            _cache_put(p, result)
+        return sym, tf, result
 
     with ThreadPoolExecutor(max_workers=MAX_DOWNLOAD_WORKERS) as ex:
         futures = [ex.submit(fetch, s, tf) for s in symbols for tf in intervals]
@@ -325,8 +337,18 @@ def download_all_derivatives(symbols, start_dt, end_dt):
     data = {}
 
     def fetch(sym):
-        oi = get_oi_history_range(sym, start_ms, end_ms)
-        fr = get_funding_history_range(sym, start_ms, end_ms)
+        p_oi = _cache_path("oi", sym, "5m", start_ms, end_ms)
+        p_fr = _cache_path("fr", sym, "8h", start_ms, end_ms)
+        oi = _cache_get(p_oi)
+        fr = _cache_get(p_fr)
+        if oi is None:
+            oi = get_oi_history_range(sym, start_ms, end_ms)
+            if oi is not None:
+                _cache_put(p_oi, oi)
+        if fr is None:
+            fr = get_funding_history_range(sym, start_ms, end_ms)
+            if fr is not None:
+                _cache_put(p_fr, fr)
         return sym, oi, fr
 
     with ThreadPoolExecutor(max_workers=MAX_DOWNLOAD_WORKERS) as ex:
@@ -373,6 +395,37 @@ def lookup_derivatives_at(deriv_for_symbol, ts_ms, oi_lookback_min=30):
             funding_rate = float(fr_df["funding_rate"].iloc[idx])
 
     return oi_delta, funding_rate
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# CACHE DE DISCO (evita re-descargar klines/derivatives entre runs)
+# ════════════════════════════════════════════════════════════════════════════
+
+def _cache_path(kind, symbol, tf_or_tag, start_ms, end_ms):
+    CACHE_DIR.mkdir(exist_ok=True)
+    return CACHE_DIR / f"{kind}_{symbol}_{tf_or_tag}_{start_ms}_{end_ms}.pkl"
+
+
+def _cache_get(p):
+    if _NO_CACHE or not p.exists():
+        return None
+    try:
+        with open(p, "rb") as f:
+            return pickle.load(f)
+    except Exception:
+        return None
+
+
+def _cache_put(p, obj):
+    if _NO_CACHE:
+        return
+    try:
+        tmp = p.with_suffix(".tmp")
+        with open(tmp, "wb") as f:
+            pickle.dump(obj, f)
+        tmp.replace(p)
+    except Exception:
+        pass
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -599,6 +652,307 @@ def analyze_at_time(df_full, end_idx, cfg):
         # Mantenemos el campo para que el bloque FORMING_CANDLE_PENALTY de classify()
         # tenga un dato consistente con el screener (donde candle_status también es "closed"
         # post-truncation-fix).
+        "candle_status": "closed",
+    }
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# PRECOMPUTE — calcula columnas de indicadores una sola vez por (símbolo, TF)
+# ════════════════════════════════════════════════════════════════════════════
+
+def _indicator_key(cfg):
+    """Hash para identificar si dos cfgs comparten los mismos parámetros de indicadores.
+    Si la clave coincide, se pueden compartir los DataFrames precomputados."""
+    return json.dumps({
+        "EMA_SLOW": cfg.g("indicators", "EMA_SLOW"),
+        "RECENT_LOOKBACK": cfg.g("indicators", "RECENT_LOOKBACK"),
+        "RECENT_LOOKBACK_LONG": cfg.g("indicators", "RECENT_LOOKBACK_LONG", default=25),
+        "CVD_LOOKBACK": cfg.g("indicators", "CVD_LOOKBACK", default=10),
+        "OBV_SLOPE_LOOKBACK": cfg.g("indicators", "OBV_SLOPE_LOOKBACK", default=10),
+        "ONE_H_RESIST_LOOKBACK": cfg.g("hold", "ONE_H_RESIST_LOOKBACK"),
+        "MAJOR_STRUCT_LOOKBACK": cfg.g("hold", "MAJOR_STRUCT_LOOKBACK"),
+        "HOLD_LOOKBACK_BARS": cfg.g("hold", "HOLD_LOOKBACK_BARS"),
+        "RIDING_LOOKBACK_BARS": cfg.g("riding", "RIDING_LOOKBACK_BARS"),
+    }, sort_keys=True)
+
+
+def precompute_indicators(df, cfg):
+    """Precalcula columnas de indicadores sobre el df completo (una sola vez por símbolo/TF).
+    analyze_at_index() lee desde estas columnas en O(1) por barra."""
+    RECENT_LOOKBACK = cfg.g("indicators", "RECENT_LOOKBACK")
+    RECENT_LOOKBACK_LONG = cfg.g("indicators", "RECENT_LOOKBACK_LONG", default=25)
+    CVD_LOOKBACK = cfg.g("indicators", "CVD_LOOKBACK", default=10)
+    EMA_SLOW = cfg.g("indicators", "EMA_SLOW")
+    ONE_H_RESIST_LOOKBACK = cfg.g("hold", "ONE_H_RESIST_LOOKBACK")
+    MAJOR_STRUCT_LOOKBACK = cfg.g("hold", "MAJOR_STRUCT_LOOKBACK")
+
+    df = df.copy()
+    close = df["close"]
+    high = df["high"]
+    low = df["low"]
+    volume = df["volume"]
+
+    df["_ema_slow"] = ta.trend.EMAIndicator(close, window=EMA_SLOW).ema_indicator()
+
+    bb = ta.volatility.BollingerBands(close, window=20, window_dev=2)
+    df["_bb_hband"] = bb.bollinger_hband()
+    df["_bb_lband"] = bb.bollinger_lband()
+    df["_bb_mavg"] = bb.bollinger_mavg()
+    mavg_s = df["_bb_mavg"].replace(0, np.nan)
+    df["_bb_width"] = (df["_bb_hband"] - df["_bb_lband"]) / mavg_s
+    df["_bb_width"] = df["_bb_width"].fillna(0.0)
+
+    df["_atr"] = ta.volatility.AverageTrueRange(high, low, close, window=14).average_true_range()
+
+    df["_vol_mean20"] = volume.rolling(20).mean().shift(1)
+    df["_vol_recent3"] = volume.rolling(3).mean()
+    df["_vol_prev3"] = volume.rolling(3).mean().shift(3)
+
+    df["_obv"] = ta.volume.OnBalanceVolumeIndicator(close, volume).on_balance_volume()
+
+    if "taker_buy_base" in df.columns:
+        taker_buy = df["taker_buy_base"].astype(float)
+        df["_cvd"] = (2 * taker_buy - volume).cumsum()
+    else:
+        df["_cvd"] = 0.0
+    df["_cvd_vol_sum"] = volume.rolling(CVD_LOOKBACK).sum()
+
+    candle_range = (high - low).clip(lower=1e-12)
+    df["_candle_body_pct"] = (close - df["open"]).abs() / candle_range
+    df["_close_pos"] = (close - low) / candle_range
+
+    # shift(2): excluye la barra actual y la anterior, igual que analyze_at_time
+    df["_recent_max_short"] = high.rolling(RECENT_LOOKBACK).max().shift(2)
+    df["_recent_max_long"] = high.rolling(RECENT_LOOKBACK_LONG).max().shift(2)
+    df["_one_h_resist"] = high.rolling(ONE_H_RESIST_LOOKBACK).max().shift(2)
+    df["_major_max"] = high.rolling(MAJOR_STRUCT_LOOKBACK).max().shift(2)
+    # shift(1): para los loops internos de HOLD/RIDING (ref = max antes de la barra idx)
+    df["_recent_max_shift1"] = high.rolling(RECENT_LOOKBACK).max().shift(1)
+
+    return df
+
+
+def analyze_at_index(df, end_idx, cfg):
+    """Lee indicadores precomputados en O(1). df debe venir de precompute_indicators()."""
+    if end_idx < 80:
+        return None
+
+    RECENT_LOOKBACK = cfg.g("indicators", "RECENT_LOOKBACK")
+    RECENT_LOOKBACK_LONG = cfg.g("indicators", "RECENT_LOOKBACK_LONG", default=25)
+    RECENT_LONG_PROXIMITY = cfg.g("indicators", "RECENT_LONG_PROXIMITY", default=0.01)
+    OBV_SLOPE_LOOKBACK = cfg.g("indicators", "OBV_SLOPE_LOOKBACK", default=10)
+    OBV_RISING_MIN = cfg.g("indicators", "OBV_RISING_MIN", default=0.05)
+    CVD_LOOKBACK = cfg.g("indicators", "CVD_LOOKBACK", default=10)
+    CVD_BULLISH_MIN = cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05)
+    BREAKOUT_BUFFER = cfg.g("breakout", "BREAKOUT_BUFFER")
+    PREBREAK_NEAR_MAX = cfg.g("prebreak", "PREBREAK_NEAR_MAX")
+    ONE_H_RESIST_BUFFER = cfg.g("hold", "ONE_H_RESIST_BUFFER")
+    MAJOR_STRUCT_LOOKBACK = cfg.g("hold", "MAJOR_STRUCT_LOOKBACK")
+    MAJOR_STRUCT_MAX_DIST = cfg.g("hold", "MAJOR_STRUCT_MAX_DIST")
+    HOLD_LOOKBACK_BARS = cfg.g("hold", "HOLD_LOOKBACK_BARS")
+    HOLD_RECENT_BREAK_MAX_BARS = cfg.g("hold", "HOLD_RECENT_BREAK_MAX_BARS")
+    HOLD_ZONE_BUFFER = cfg.g("hold", "HOLD_ZONE_BUFFER")
+    HOLD_PULLBACK_MAX = cfg.g("hold", "HOLD_PULLBACK_MAX")
+    STRONG_CLOSE_MIN = cfg.g("hold", "STRONG_CLOSE_MIN")
+    RIDING_LOOKBACK_BARS = cfg.g("riding", "RIDING_LOOKBACK_BARS")
+    RIDING_ZONE_BUFFER = cfg.g("riding", "RIDING_ZONE_BUFFER")
+    RIDING_MIN_VOL_RATIO = cfg.g("riding", "RIDING_MIN_VOL_RATIO")
+    FADING_BELOW_ZONE = cfg.g("fading", "FADING_BELOW_ZONE")
+
+    price = float(df["close"].iat[end_idx])
+
+    # EMA
+    ema_val = df["_ema_slow"].iat[end_idx]
+    ema_val_prev = df["_ema_slow"].iat[end_idx - 3] if end_idx >= 3 else np.nan
+    ema_trend_up = (bool(price > ema_val and ema_val > ema_val_prev)
+                    if pd.notna(ema_val) and pd.notna(ema_val_prev) else False)
+
+    # BB
+    width_curr_raw = df["_bb_width"].iat[end_idx]
+    width_curr = float(width_curr_raw) if pd.notna(width_curr_raw) else 0.0
+    width_prev_raw = df["_bb_width"].iat[end_idx - 1] if end_idx >= 1 else np.nan
+    width_prev = float(width_prev_raw) if pd.notna(width_prev_raw) and width_prev_raw != 0 else 0.0
+    width_expansion = safe_pct(width_curr, width_prev) if width_prev != 0 else 0.0
+
+    # ATR
+    atr_raw = df["_atr"].iat[end_idx]
+    atr = float(atr_raw) if pd.notna(atr_raw) else 0.0
+    atr_pct = (atr / price * 100) if price > 0 else 0.0
+
+    # Volume
+    vol_mean_raw = df["_vol_mean20"].iat[end_idx]
+    vol_mean = float(vol_mean_raw) if pd.notna(vol_mean_raw) and vol_mean_raw > 0 else 0.0
+    vol_curr = float(df["volume"].iat[end_idx])
+    vol_ratio = (vol_curr / vol_mean) if vol_mean > 0 else 0.0
+    vol_recent_raw = df["_vol_recent3"].iat[end_idx]
+    vol_prev_raw = df["_vol_prev3"].iat[end_idx]
+    vol_recent = float(vol_recent_raw) if pd.notna(vol_recent_raw) else 0.0
+    vol_prev = float(vol_prev_raw) if pd.notna(vol_prev_raw) and vol_prev_raw > 0 else 0.0
+    vol_growth = (vol_recent / vol_prev) if vol_prev > 0 else 0.0
+
+    # Candle
+    close_pos = float(df["_close_pos"].iat[end_idx])
+    strong_close = close_pos >= STRONG_CLOSE_MIN
+    candle_body_pct = float(df["_candle_body_pct"].iat[end_idx])
+
+    # OBV
+    try:
+        obv_now = float(df["_obv"].iat[end_idx])
+        obv_ref_idx = max(0, end_idx - OBV_SLOPE_LOOKBACK + 1)
+        obv_ref = float(df["_obv"].iat[obv_ref_idx])
+        obv_slope = (obv_now - obv_ref) / abs(obv_now) if abs(obv_now) > 1e-12 else 0.0
+        obv_rising = obv_slope >= OBV_RISING_MIN
+    except Exception:
+        obv_slope = 0.0
+        obv_rising = False
+
+    # CVD
+    try:
+        cvd_now = float(df["_cvd"].iat[end_idx])
+        cvd_ref_idx = max(0, end_idx - CVD_LOOKBACK + 1)
+        cvd_ref = float(df["_cvd"].iat[cvd_ref_idx])
+        vol_window = float(df["_cvd_vol_sum"].iat[end_idx])
+        cvd_ratio = (cvd_now - cvd_ref) / vol_window if vol_window > 0 else 0.0
+        cvd_bullish = cvd_ratio >= CVD_BULLISH_MIN
+    except Exception:
+        cvd_ratio = 0.0
+        cvd_bullish = False
+
+    # Recent max (shift 2 — excluye barra actual y anterior)
+    rm_raw = df["_recent_max_short"].iat[end_idx]
+    recent_max = float(rm_raw) if pd.notna(rm_raw) and rm_raw > 0 else 0.0
+    near_recent_max = recent_max > 0 and 0 <= (recent_max - price) / recent_max <= PREBREAK_NEAR_MAX
+    breakout = recent_max > 0 and price > recent_max * (1 + BREAKOUT_BUFFER)
+    breakout_distance = safe_pct(price, recent_max)
+
+    # Recent max long
+    rml_raw = df["_recent_max_long"].iat[end_idx]
+    if pd.notna(rml_raw) and end_idx >= RECENT_LOOKBACK_LONG + 1:
+        recent_max_long = float(rml_raw)
+        if recent_max_long > 0:
+            dist_to_long = (recent_max_long - price) / recent_max_long
+            recent_long_ok = (price > recent_max_long * (1 + BREAKOUT_BUFFER)
+                              or dist_to_long <= RECENT_LONG_PROXIMITY)
+        else:
+            recent_long_ok = True
+    else:
+        recent_max_long = recent_max
+        recent_long_ok = True
+
+    # Resistance
+    oh_raw = df["_one_h_resist"].iat[end_idx]
+    one_h_resist = float(oh_raw) if pd.notna(oh_raw) else price
+    dist_to_res = (one_h_resist - price) / price if price > 0 else 0.0
+    not_near_resistance = dist_to_res > ONE_H_RESIST_BUFFER or breakout
+
+    # Major structure
+    mm_raw = df["_major_max"].iat[end_idx]
+    if pd.notna(mm_raw) and end_idx >= MAJOR_STRUCT_LOOKBACK + 1:
+        major_dist = (float(mm_raw) - price) / price if price > 0 else 0.0
+        major_struct_ok = major_dist <= MAJOR_STRUCT_MAX_DIST
+    else:
+        major_struct_ok = True
+
+    # HOLD lookback (loop acotado, O(HOLD_LOOKBACK_BARS))
+    hold_recent_break = False
+    hold_kept_zone = False
+    hold_pullback_ok = False
+    hold_strong = False
+    bars_since_break = None
+    hold_start = max(25, end_idx - HOLD_LOOKBACK_BARS - 1)
+    for idx in range(hold_start, end_idx):
+        rm1 = df["_recent_max_shift1"].iat[idx]
+        if pd.isna(rm1) or rm1 <= 0:
+            continue
+        ref = float(rm1)
+        if float(df["close"].iat[idx]) > ref * (1 + BREAKOUT_BUFFER):
+            bsb = end_idx - idx
+            if 1 <= bsb <= HOLD_RECENT_BREAK_MAX_BARS:
+                post_low = df["low"].iloc[idx + 1:end_idx + 1]
+                post_close = df["close"].iloc[idx + 1:end_idx + 1]
+                if len(post_low) == 0:
+                    continue
+                bars_since_break = bsb
+                hold_recent_break = True
+                hold_kept_zone = float(post_low.min()) >= ref * (1 - HOLD_ZONE_BUFFER)
+                brk_close = float(df["close"].iat[idx])
+                pullback = (brk_close - float(post_close.min())) / brk_close
+                hold_pullback_ok = pullback <= HOLD_PULLBACK_MAX
+                hold_strong = (close_position(float(df["close"].iat[end_idx]),
+                                               float(df["high"].iat[end_idx]),
+                                               float(df["low"].iat[end_idx])) >= STRONG_CLOSE_MIN)
+
+    # RIDING lookback (loop acotado, O(RIDING_LOOKBACK_BARS))
+    riding_break_idx = None
+    riding_break_close = None
+    riding_break_ref = None
+    riding_start = max(25, end_idx - RIDING_LOOKBACK_BARS - 1)
+    for idx in range(riding_start, end_idx):
+        rm1 = df["_recent_max_shift1"].iat[idx]
+        if pd.isna(rm1) or rm1 <= 0:
+            continue
+        ref = float(rm1)
+        if float(df["close"].iat[idx]) > ref * (1 + BREAKOUT_BUFFER):
+            riding_break_idx = idx
+            riding_break_ref = ref
+            riding_break_close = float(df["close"].iat[idx])
+
+    riding_bars_since = None
+    riding_gain = None
+    riding_above_zone = None
+    riding_vol_ok = None
+    post_break_high = None
+    fading_reversal = None
+    fading_below_zone = None
+    if riding_break_idx is not None and riding_break_ref:
+        riding_bars_since = end_idx - riding_break_idx
+        riding_gain = safe_pct(price, riding_break_close)
+        post_highs = df["high"].iloc[riding_break_idx + 1:end_idx + 1]
+        post_break_high = float(post_highs.max()) if len(post_highs) > 0 else price
+        riding_above_zone = price >= riding_break_ref * (1 - RIDING_ZONE_BUFFER)
+        vm = float(df["_vol_mean20"].iat[end_idx]) if pd.notna(df["_vol_mean20"].iat[end_idx]) else 0.0
+        vr3 = float(df["_vol_recent3"].iat[end_idx]) if pd.notna(df["_vol_recent3"].iat[end_idx]) else 0.0
+        riding_vol_ok = vm > 0 and (vr3 / vm) >= RIDING_MIN_VOL_RATIO
+        fading_reversal = safe_pct(price, post_break_high) if post_break_high else 0.0
+        fading_below_zone = price < riding_break_ref * (1 - FADING_BELOW_ZONE)
+
+    return {
+        "price": price,
+        "ema_trend_up": ema_trend_up,
+        "width_curr": width_curr,
+        "width_expansion": width_expansion,
+        "atr_pct": atr_pct,
+        "vol_ratio": vol_ratio,
+        "vol_growth": vol_growth,
+        "strong_close": strong_close,
+        "candle_body_pct": candle_body_pct,
+        "recent_max": recent_max,
+        "near_recent_max": near_recent_max,
+        "breakout": breakout,
+        "breakout_distance": breakout_distance,
+        "recent_max_long": recent_max_long,
+        "recent_long_ok": recent_long_ok,
+        "obv_slope": obv_slope,
+        "obv_rising": obv_rising,
+        "cvd_ratio": cvd_ratio,
+        "cvd_bullish": cvd_bullish,
+        "not_near_resistance": not_near_resistance,
+        "dist_to_res": dist_to_res,
+        "major_struct_ok": major_struct_ok,
+        "hold_recent_break": hold_recent_break,
+        "hold_kept_zone": hold_kept_zone,
+        "hold_pullback_ok": hold_pullback_ok,
+        "hold_strong": hold_strong,
+        "bars_since_break": bars_since_break,
+        "riding_bars_since": riding_bars_since,
+        "riding_gain": riding_gain,
+        "riding_above_zone": riding_above_zone,
+        "riding_vol_ok": riding_vol_ok,
+        "riding_break_close": riding_break_close,
+        "riding_break_ref": riding_break_ref,
+        "post_break_high": post_break_high,
+        "fading_reversal": fading_reversal,
+        "fading_below_zone": fading_below_zone,
         "candle_status": "closed",
     }
 
@@ -1035,7 +1389,7 @@ def calculate_outcomes(df_15m, alert_idx, alert_price):
 
 
 def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None,
-             scan_interval_min=SCAN_INTERVAL_MIN, derivatives=None):
+             scan_interval_min=SCAN_INTERVAL_MIN, derivatives=None, prepared=None):
     print(f"\n  Simulando {(end_dt - start_dt).total_seconds() / 3600:.0f}h con scans cada {scan_interval_min}min...")
     deriv_enabled = bool(derivatives) and cfg.g("derivatives", "ENABLED", default=False)
     deriv_lookback = cfg.g("derivatives", "OI_LOOKBACK_MIN", default=30)
@@ -1092,16 +1446,19 @@ def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None,
             tf_data = {}
             valid = True
             for tf in ("5m", "15m", "1h"):
-                if tf not in klines.get(sym, {}):
+                sym_prepared = prepared.get(sym) if prepared else None
+                _prep = sym_prepared.get(tf) if sym_prepared else None
+                df = _prep if _prep is not None else klines.get(sym, {}).get(tf)
+                if df is None:
                     valid = False
                     break
-                df = klines[sym][tf]
                 idx = find_idx_at_or_before(df, ts_ms)
                 if idx < 0 or idx < 80:
                     valid = False
                     break
-                tf_data[tf] = analyze_at_time(df, idx, cfg)
-                if tf_data[tf] is None:
+                result = analyze_at_index(df, idx, cfg) if sym_prepared else analyze_at_time(df, idx, cfg)
+                tf_data[tf] = result
+                if result is None:
                     valid = False
                     break
             if not valid:
@@ -1378,10 +1735,24 @@ def compare_runs(alerts_a, label_a, alerts_b, label_b, period_days=7):
 # ════════════════════════════════════════════════════════════════════════════
 
 def run_backtest(cfg, weeks, klines, start_dt, end_dt, snapshot_pairs=None,
-                 label="run", scan_interval_min=SCAN_INTERVAL_MIN, derivatives=None):
+                 label="run", scan_interval_min=SCAN_INTERVAL_MIN, derivatives=None,
+                 prepared_cache=None):
     print(f"\n  >>> Corriendo backtest: {label}")
+    key = _indicator_key(cfg)
+    if prepared_cache is not None and key in prepared_cache:
+        print(f"    [precompute] Reutilizando indicadores cacheados ({len(prepared_cache[key])} pares)")
+        prepared = prepared_cache[key]
+    else:
+        print(f"    [precompute] Calculando indicadores para {len(klines)} pares...")
+        prepared = {
+            sym: {tf: precompute_indicators(tfs[tf], cfg) for tf in ("5m", "15m", "1h") if tf in tfs}
+            for sym, tfs in klines.items()
+        }
+        if prepared_cache is not None:
+            prepared_cache[key] = prepared
     alerts = simulate(cfg, klines, start_dt, end_dt, snapshot_pairs,
-                      scan_interval_min=scan_interval_min, derivatives=derivatives)
+                      scan_interval_min=scan_interval_min, derivatives=derivatives,
+                      prepared=prepared)
     summarize(alerts, label=label)
     return alerts
 
@@ -1399,7 +1770,14 @@ def main():
     parser.add_argument("--scan-interval-min", type=int, default=SCAN_INTERVAL_MIN,
                         help=f"Minutos entre scans simulados (default {SCAN_INTERVAL_MIN}, "
                              f"production cron usa 5min)")
+    parser.add_argument("--no-cache", action="store_true",
+                        help="Ignora y no escribe caché de disco de klines/derivatives")
     args = parser.parse_args()
+
+    global _NO_CACHE
+    _NO_CACHE = args.no_cache
+    if _NO_CACHE:
+        print("  [cache] Desactivado por --no-cache")
 
     end_dt = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     start_dt = end_dt - timedelta(weeks=args.weeks)
@@ -1453,6 +1831,7 @@ def main():
 
     print(f"\n[3/4] Ejecutando simulación...")
     all_results = {}
+    prepared_cache = {}  # compartido entre cfgs con mismos parámetros de indicadores
 
     if args.variants:
         # Modo nuevo: --variants base.json A.json B.json C.json
@@ -1465,14 +1844,14 @@ def main():
         alerts_base = run_backtest(cfg_base, args.weeks, klines, start_dt, end_dt,
                                    snapshot_pairs, label=f"BASE ({Path(base_path).stem})",
                                    scan_interval_min=args.scan_interval_min,
-                                   derivatives=derivatives)
+                                   derivatives=derivatives, prepared_cache=prepared_cache)
         all_results[Path(base_path).stem] = alerts_base
         for vp in variant_paths:
             cfg_v = Config(vp)
             alerts_v = run_backtest(cfg_v, args.weeks, klines, start_dt, end_dt,
                                     snapshot_pairs, label=f"VARIANT ({Path(vp).stem})",
                                     scan_interval_min=args.scan_interval_min,
-                                    derivatives=derivatives)
+                                    derivatives=derivatives, prepared_cache=prepared_cache)
             all_results[Path(vp).stem] = alerts_v
             compare_runs(alerts_base, Path(base_path).stem, alerts_v, Path(vp).stem,
                          period_days=period_days)
@@ -1483,11 +1862,11 @@ def main():
         alerts_old = run_backtest(cfg_old, args.weeks, klines, start_dt, end_dt,
                                   snapshot_pairs, label=f"OLD ({args.compare[0]})",
                                   scan_interval_min=args.scan_interval_min,
-                                  derivatives=derivatives)
+                                  derivatives=derivatives, prepared_cache=prepared_cache)
         alerts_new = run_backtest(cfg_new, args.weeks, klines, start_dt, end_dt,
                                   snapshot_pairs, label=f"NEW ({args.compare[1]})",
                                   scan_interval_min=args.scan_interval_min,
-                                  derivatives=derivatives)
+                                  derivatives=derivatives, prepared_cache=prepared_cache)
         compare_runs(alerts_old, args.compare[0], alerts_new, args.compare[1],
                      period_days=period_days)
         all_results = {"old": alerts_old, "new": alerts_new}
@@ -1512,7 +1891,7 @@ def main():
             alerts = run_backtest(tmp_cfg, args.weeks, klines, start_dt, end_dt,
                                   snapshot_pairs, label=name,
                                   scan_interval_min=args.scan_interval_min,
-                                  derivatives=derivatives)
+                                  derivatives=derivatives, prepared_cache=prepared_cache)
             all_results[name] = alerts
         if "full (todo activo)" in all_results:
             for name, alerts in all_results.items():
@@ -1523,7 +1902,7 @@ def main():
         alerts = run_backtest(cfg_main, args.weeks, klines, start_dt, end_dt,
                               snapshot_pairs, label=f"config: {args.config}",
                               scan_interval_min=args.scan_interval_min,
-                              derivatives=derivatives)
+                              derivatives=derivatives, prepared_cache=prepared_cache)
         all_results = {"main": alerts}
 
     if args.out:
