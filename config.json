@@ -1,6 +1,10 @@
 {
   "general": {
-    "INTERVALS": ["5m", "15m", "1h"],
+    "INTERVALS": [
+      "5m",
+      "15m",
+      "1h"
+    ],
     "LIMIT": 180,
     "TOP_N": 9999,
     "MAX_WORKERS": 20,
@@ -80,9 +84,9 @@
     "FADING_BELOW_ZONE": 0.008
   },
   "scoring": {
-    "BEST_MIN_SCORE": 14,
-    "STRONG_MIN_SCORE": 13,
-    "IMMEDIATE_MIN_SCORE": 14,
+    "BEST_MIN_SCORE": 13,
+    "STRONG_MIN_SCORE": 11,
+    "IMMEDIATE_MIN_SCORE": 13,
     "FORMING_CANDLE_PENALTY": 3,
     "SCORE_CAP": 15
   },
@@ -147,7 +151,9 @@
     "OBV_RISING_BONUS": 1,
     "OBV_FALLING_PENALTY": -2,
     "CVD_BULLISH_BONUS": 1,
-    "CVD_BEARISH_PENALTY": -2
+    "CVD_BEARISH_PENALTY": -2,
+    "STRONG_GAIN_BONUS": 2,
+    "STRONG_GAIN_MIN": 0.08
   },
   "scoring_hold": {
     "BASE_SCORE": 5,
@@ -162,7 +168,10 @@
     "CVD_BULLISH_BONUS": 1,
     "CVD_BEARISH_PENALTY": -2,
     "STRUCT_PENALTY": -1,
-    "LATE_REPEAT_PENALTY": -1
+    "LATE_REPEAT_PENALTY": -1,
+    "STRONG_MOMENTUM_BONUS": 2,
+    "STRONG_MOMENTUM_OBV_MIN": 0.2,
+    "STRONG_MOMENTUM_DIST_MIN": 0.05
   },
   "scoring_fading": {
     "BASE_SCORE": 5,
