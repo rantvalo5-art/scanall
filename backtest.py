@@ -34,7 +34,10 @@ import ta
 # CONFIGURACIÓN GENERAL
 # ════════════════════════════════════════════════════════════════════════════
 
-SCAN_INTERVAL_MIN = 30
+# Scan cadence simulado. Production usa cron */5min, pero GH Actions delays + cooldowns
+# 15-120min hacen que la cadencia efectiva ronde 7-15min. 15 es buen balance entre
+# fidelidad a producción y runtime del backtest. Override por CLI con --scan-interval-min.
+SCAN_INTERVAL_MIN = 15
 OUTCOME_OFFSETS_MIN = [15, 60, 240, 1440]
 OUTCOME_NAMES = ["price_15m", "price_1h", "price_4h", "price_24h"]
 MAX_DOWNLOAD_WORKERS = 8
@@ -439,6 +442,11 @@ def analyze_at_time(df_full, end_idx, cfg):
         "post_break_high": post_break_high,
         "fading_reversal": fading_reversal,
         "fading_below_zone": fading_below_zone,
+        # En backtest todas las velas son históricas y por ende cerradas.
+        # Mantenemos el campo para que el bloque FORMING_CANDLE_PENALTY de classify()
+        # tenga un dato consistente con el screener (donde candle_status también es "closed"
+        # post-truncation-fix).
+        "candle_status": "closed",
     }
 
 
@@ -454,9 +462,13 @@ def final_bucket(score, cfg):
     return "WATCH"
 
 
-def classify(symbol, tf_data, cfg):
+def classify(symbol, tf_data, cfg, counts_history=None):
     """Replica classify_symbol del screener con scoring totalmente parametrizado.
-    tf_data = {'5m': dict, '15m': dict, '1h': dict}"""
+    tf_data = {'5m': dict, '15m': dict, '1h': dict}
+    counts_history: dict {(symbol, history_tf): n_alertas_recientes} — usado para
+    aplicar LATE_REPEAT_PENALTY igual que en producción. None = sin late penalty."""
+    if counts_history is None:
+        counts_history = {}
     tf5 = tf_data.get("5m") or {}
     tf15 = tf_data.get("15m") or {}
     tf1h = tf_data.get("1h") or {}
@@ -472,6 +484,7 @@ def classify(symbol, tf_data, cfg):
 
     candidates = []
     SCORE_CAP = cfg.g("scoring", "SCORE_CAP")
+    LATE_REPEAT_COUNT = cfg.g("history", "LATE_REPEAT_COUNT", default=1)
 
     # ── PREBREAK ──────────────────────────────────────────────────────────
     if cfg.g("active_signals", "PREBREAK"):
@@ -506,6 +519,12 @@ def classify(symbol, tf_data, cfg):
                 score += obv_dn_pen
             if not tf15.get("recent_long_ok", True):
                 score += struct_pen
+
+            # LATE_REPEAT_PENALTY (mismo comportamiento que screener.py)
+            late_repeat_pen = cfg.g("scoring_prebreak", "LATE_REPEAT_PENALTY", default=-1)
+            prev_pb = counts_history.get((symbol, "PREBREAK"), 0)
+            if prev_pb >= LATE_REPEAT_COUNT:
+                score += late_repeat_pen
 
             score = min(score, SCORE_CAP)
             candidates.append({
@@ -600,6 +619,12 @@ def classify(symbol, tf_data, cfg):
 
             if not tf15.get("recent_long_ok", True):
                 score += struct_pen
+
+            # LATE_REPEAT_PENALTY (mismo comportamiento que screener.py)
+            late_repeat_pen = cfg.g("scoring_breakout", "LATE_REPEAT_PENALTY", default=-1)
+            prev_bo = counts_history.get((symbol, "BREAKOUT"), 0)
+            if prev_bo >= LATE_REPEAT_COUNT:
+                score += late_repeat_pen
 
             score = min(score, SCORE_CAP)
             candidates.append({
@@ -726,6 +751,12 @@ def classify(symbol, tf_data, cfg):
                 and tf1h.get("dist_to_res", 0) >= momentum_dist):
                 score += momentum_b
 
+            # LATE_REPEAT_PENALTY (mismo comportamiento que screener.py)
+            late_repeat_pen = cfg.g("scoring_hold", "LATE_REPEAT_PENALTY", default=-1)
+            prev_hold = counts_history.get((symbol, "HOLD"), 0)
+            if prev_hold >= LATE_REPEAT_COUNT:
+                score += late_repeat_pen
+
             score = min(score, SCORE_CAP)
             candidates.append({
                 "label": "HOLD", "history_tf": "HOLD", "score": score,
@@ -739,6 +770,28 @@ def classify(symbol, tf_data, cfg):
 
     if not candidates:
         return None
+
+    # FORMING_CANDLE_PENALTY (mismo comportamiento que screener.py:1279-1288).
+    # En backtest todas las velas son históricas (candle_status="closed"), así que el
+    # penalty no se dispara — pero el cableado es idéntico al screener para fidelidad.
+    FORMING_CANDLE_PENALTY = cfg.g("scoring", "FORMING_CANDLE_PENALTY", default=3)
+    IMMEDIATE_MIN_SCORE = cfg.g("scoring", "IMMEDIATE_MIN_SCORE", default=13)
+    for c in candidates:
+        cs = (tf_data.get(c["timeframe"]) or {}).get("candle_status", "closed")
+        c["candle_status"] = cs
+        if cs == "forming":
+            c["score"] = max(0, c["score"] - FORMING_CANDLE_PENALTY)
+            c["bucket"] = final_bucket(c["score"], cfg)
+            if c.get("immediate") and c["score"] < IMMEDIATE_MIN_SCORE:
+                c["immediate"] = False
+
+    # Final cap loop (mismo screener.py:1293-1296). Redundante porque cada bloque ya
+    # aplicó min(score, SCORE_CAP), pero se mantiene para que la simulación sea espejo.
+    for c in candidates:
+        if c["score"] > SCORE_CAP:
+            c["score"] = SCORE_CAP
+            c["bucket"] = final_bucket(c["score"], cfg)
+
     candidates.sort(key=lambda x: (x["score"], x["priority"]), reverse=True)
     return candidates[0]
 
@@ -798,17 +851,24 @@ def calculate_outcomes(df_15m, alert_idx, alert_price):
     return outcomes
 
 
-def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None):
-    print(f"\n  Simulando {(end_dt - start_dt).total_seconds() / 3600:.0f}h con scans cada {SCAN_INTERVAL_MIN}min...")
+def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None, scan_interval_min=SCAN_INTERVAL_MIN):
+    print(f"\n  Simulando {(end_dt - start_dt).total_seconds() / 3600:.0f}h con scans cada {scan_interval_min}min...")
 
     cooldown_min_by_state = cfg.g("cooldowns_minutes")
+    HISTORY_HOURS = cfg.g("history", "HISTORY_HOURS", default=8)
+    history_window_ms = HISTORY_HOURS * 3600 * 1000
     last_alert_ts = {}
+    # sim_alert_history: lista (ts_ms, symbol, history_tf) para simular fetch_history()
+    # del screener. Cada scan recomputa counts_history a partir de las alertas emitidas
+    # en las últimas HISTORY_HOURS, y se la pasa a classify() para aplicar
+    # LATE_REPEAT_PENALTY igual que en producción.
+    sim_alert_history = []
 
     scan_ts = []
     cur = start_dt
     while cur <= end_dt:
         scan_ts.append(int(cur.timestamp() * 1000))
-        cur += timedelta(minutes=SCAN_INTERVAL_MIN)
+        cur += timedelta(minutes=scan_interval_min)
 
     snap_runs_sorted = sorted(snapshot_pairs.keys()) if snapshot_pairs else []
 
@@ -831,6 +891,16 @@ def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None):
     for i, ts_ms in enumerate(scan_ts):
         if i % 20 == 0:
             print(f"    scan {i}/{total_scans} ({i*100//max(total_scans,1)}%) — {len(alerts)} alertas hasta ahora")
+
+        # Ventana móvil: descartar alertas más viejas que HISTORY_HOURS para que counts_history
+        # refleje sólo lo que el screener real vería en su fetch_history().
+        cutoff_ms = ts_ms - history_window_ms
+        if sim_alert_history and sim_alert_history[0][0] < cutoff_ms:
+            sim_alert_history = [h for h in sim_alert_history if h[0] >= cutoff_ms]
+        counts_history = {}
+        for (_, s, h) in sim_alert_history:
+            counts_history[(s, h)] = counts_history.get((s, h), 0) + 1
+
         active_pairs = pairs_for_scan(ts_ms)
         for sym in active_pairs:
             tf_data = {}
@@ -851,7 +921,7 @@ def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None):
             if not valid:
                 continue
 
-            alert = classify(sym, tf_data, cfg)
+            alert = classify(sym, tf_data, cfg, counts_history)
             if alert is None:
                 continue
 
@@ -860,6 +930,9 @@ def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None):
             if key in last_alert_ts and (ts_ms - last_alert_ts[key]) < cooldown_ms:
                 continue
             last_alert_ts[key] = ts_ms
+
+            # Registrar en historia simulada para la próxima scan (LATE_REPEAT)
+            sim_alert_history.append((ts_ms, sym, alert["history_tf"]))
 
             df_15m = klines[sym]["15m"]
             alert_idx_15m = find_idx_at_or_before(df_15m, ts_ms)
@@ -874,6 +947,7 @@ def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None):
                 "obv_slope": alert.get("obv_slope"),
                 "cvd_ratio": alert.get("cvd_ratio"),
                 "recent_long_ok": alert.get("recent_long_ok"),
+                "candle_status": alert.get("candle_status"),
                 **outcomes,
             }
             alerts.append(alert_record)
@@ -1009,10 +1083,10 @@ def summarize(alerts, label="resultados"):
     print(f"  Move promedio top 30: +{avg_move_top30:.2f}%")
 
 
-def compare_runs(alerts_a, label_a, alerts_b, label_b):
+def compare_runs(alerts_a, label_a, alerts_b, label_b, period_days=7):
     print()
     print("═" * 70)
-    print(f" COMPARACIÓN: {label_a}  vs  {label_b}")
+    print(f" COMPARACIÓN: {label_a}  vs  {label_b}  ({period_days} días)")
     print("═" * 70)
 
     def stats(alerts):
@@ -1067,7 +1141,7 @@ def compare_runs(alerts_a, label_a, alerts_b, label_b):
             "best_max": best_avg_max,
             "strong_max": sum(strong_moves) / len(strong_moves) if strong_moves else 0,
             "explosivos_n": len(explosivos),
-            "best_per_day": len(best) / 7,  # asumiendo 1 semana
+            "best_per_day": (len(best) / period_days) if period_days > 0 else 0,
             "best_win_5pct": best_win_5,
             "best_win_10pct": best_win_10,
             "top30_in_best": top30_best,
@@ -1110,9 +1184,11 @@ def compare_runs(alerts_a, label_a, alerts_b, label_b):
 # MAIN
 # ════════════════════════════════════════════════════════════════════════════
 
-def run_backtest(cfg, weeks, klines, start_dt, end_dt, snapshot_pairs=None, label="run"):
+def run_backtest(cfg, weeks, klines, start_dt, end_dt, snapshot_pairs=None,
+                 label="run", scan_interval_min=SCAN_INTERVAL_MIN):
     print(f"\n  >>> Corriendo backtest: {label}")
-    alerts = simulate(cfg, klines, start_dt, end_dt, snapshot_pairs)
+    alerts = simulate(cfg, klines, start_dt, end_dt, snapshot_pairs,
+                      scan_interval_min=scan_interval_min)
     summarize(alerts, label=label)
     return alerts
 
@@ -1127,11 +1203,16 @@ def main():
     parser.add_argument("--ablation", action="store_true")
     parser.add_argument("--out", default=None, help="Path opcional para guardar JSON con resultados")
     parser.add_argument("--max-pairs", type=int, default=MAX_PAIRS)
+    parser.add_argument("--scan-interval-min", type=int, default=SCAN_INTERVAL_MIN,
+                        help=f"Minutos entre scans simulados (default {SCAN_INTERVAL_MIN}, "
+                             f"production cron usa 5min)")
     args = parser.parse_args()
 
     end_dt = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     start_dt = end_dt - timedelta(weeks=args.weeks)
-    print(f"Período backtest: {start_dt} → {end_dt} ({args.weeks} semana(s))")
+    period_days = args.weeks * 7
+    print(f"Período backtest: {start_dt} → {end_dt} ({args.weeks} semana(s), {period_days}d)")
+    print(f"Scan interval simulado: {args.scan_interval_min} min")
 
     cfg_main = Config(args.config)
     min_vol = cfg_main.g("general", "MIN_QUOTE_VOLUME")
@@ -1168,23 +1249,29 @@ def main():
             sys.exit(1)
         cfg_base = Config(base_path)
         alerts_base = run_backtest(cfg_base, args.weeks, klines, start_dt, end_dt,
-                                   snapshot_pairs, label=f"BASE ({Path(base_path).stem})")
+                                   snapshot_pairs, label=f"BASE ({Path(base_path).stem})",
+                                   scan_interval_min=args.scan_interval_min)
         all_results[Path(base_path).stem] = alerts_base
         for vp in variant_paths:
             cfg_v = Config(vp)
             alerts_v = run_backtest(cfg_v, args.weeks, klines, start_dt, end_dt,
-                                    snapshot_pairs, label=f"VARIANT ({Path(vp).stem})")
+                                    snapshot_pairs, label=f"VARIANT ({Path(vp).stem})",
+                                    scan_interval_min=args.scan_interval_min)
             all_results[Path(vp).stem] = alerts_v
-            compare_runs(alerts_base, Path(base_path).stem, alerts_v, Path(vp).stem)
+            compare_runs(alerts_base, Path(base_path).stem, alerts_v, Path(vp).stem,
+                         period_days=period_days)
 
     elif args.compare:
         cfg_old = Config(args.compare[0])
         cfg_new = Config(args.compare[1])
         alerts_old = run_backtest(cfg_old, args.weeks, klines, start_dt, end_dt,
-                                  snapshot_pairs, label=f"OLD ({args.compare[0]})")
+                                  snapshot_pairs, label=f"OLD ({args.compare[0]})",
+                                  scan_interval_min=args.scan_interval_min)
         alerts_new = run_backtest(cfg_new, args.weeks, klines, start_dt, end_dt,
-                                  snapshot_pairs, label=f"NEW ({args.compare[1]})")
-        compare_runs(alerts_old, args.compare[0], alerts_new, args.compare[1])
+                                  snapshot_pairs, label=f"NEW ({args.compare[1]})",
+                                  scan_interval_min=args.scan_interval_min)
+        compare_runs(alerts_old, args.compare[0], alerts_new, args.compare[1],
+                     period_days=period_days)
         all_results = {"old": alerts_old, "new": alerts_new}
 
     elif args.ablation:
@@ -1205,15 +1292,18 @@ def main():
             tmp_cfg.raw = raw_cfg
             tmp_cfg.path = f"<{name}>"
             alerts = run_backtest(tmp_cfg, args.weeks, klines, start_dt, end_dt,
-                                  snapshot_pairs, label=name)
+                                  snapshot_pairs, label=name,
+                                  scan_interval_min=args.scan_interval_min)
             all_results[name] = alerts
         if "full (todo activo)" in all_results:
             for name, alerts in all_results.items():
                 if name != "full (todo activo)":
-                    compare_runs(all_results["full (todo activo)"], "full", alerts, name)
+                    compare_runs(all_results["full (todo activo)"], "full", alerts, name,
+                                 period_days=period_days)
     else:
         alerts = run_backtest(cfg_main, args.weeks, klines, start_dt, end_dt,
-                              snapshot_pairs, label=f"config: {args.config}")
+                              snapshot_pairs, label=f"config: {args.config}",
+                              scan_interval_min=args.scan_interval_min)
         all_results = {"main": alerts}
 
     if args.out:
