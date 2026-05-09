@@ -1,13 +1,21 @@
-"""Dump screener_outcomes a JSON local para analizar offline."""
+"""Dump screener_outcomes a JSON local para analizar offline.
+
+Requiere SUPABASE_KEY en el entorno (anon o service_role — anon alcanza para SELECT).
+En PowerShell: $env:SUPABASE_KEY = "eyJ..."
+"""
 import json
+import os
+import sys
 import requests
 
 SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
-ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjZ2Rzd3JveWdrZmNra2FndXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MTUyNzEsImV4cCI6MjA4OTA5MTI3MX0.N_qJsJWTJaqRHpugzlnRTpoZI84mUoctt3RKmUshIrU"
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
+if not SUPABASE_KEY:
+    sys.exit("FATAL: definí SUPABASE_KEY (o SUPABASE_ANON_KEY) en el entorno antes de correr.")
 
 headers = {
-    "apikey": ANON_KEY,
-    "Authorization": f"Bearer {ANON_KEY}",
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
 }
 
 all_rows = []

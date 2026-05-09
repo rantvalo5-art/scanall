@@ -308,12 +308,12 @@ input:focus, select:focus { border-color: var(--accent); }
       <div class="field-group cols-1">
         <div class="field">
           <label>MIN_QUOTE_VOLUME <em>USD 24h</em></label>
-          <input type="number" id="MIN_QUOTE_VOLUME" value="300000" min="0" step="10000">
+          <input type="number" id="MIN_QUOTE_VOLUME" value="600000" min="0" step="10000">
           <div class="field-desc">Excluye pares con menos volumen diario</div>
         </div>
         <div class="field">
           <label>TOP_ALERT_COUNT <em>alertas en el batch</em></label>
-          <input type="number" id="TOP_ALERT_COUNT" value="3" min="1" max="20">
+          <input type="number" id="TOP_ALERT_COUNT" value="5" min="1" max="20">
         </div>
       </div>
     </div>
@@ -330,8 +330,8 @@ input:focus, select:focus { border-color: var(--accent); }
         Tiempo mínimo entre alertas del mismo símbolo y tipo. 0 = sin cooldown.
       </p>
       <div class="field-group cols-3">
-        <div class="field"><label>PREBREAK</label><input type="number" id="cd-PREBREAK" value="15" min="0" max="1440"></div>
-        <div class="field"><label>BREAKOUT</label><input type="number" id="cd-BREAKOUT" value="15" min="0" max="1440"></div>
+        <div class="field"><label>PREBREAK</label><input type="number" id="cd-PREBREAK" value="30" min="0" max="1440"></div>
+        <div class="field"><label>BREAKOUT</label><input type="number" id="cd-BREAKOUT" value="20" min="0" max="1440"></div>
         <div class="field"><label>RIDING</label><input type="number" id="cd-RIDING" value="15" min="0" max="1440"></div>
         <div class="field"><label>FADING</label><input type="number" id="cd-FADING" value="120" min="0" max="1440"></div>
         <div class="field"><label>HOLD</label><input type="number" id="cd-HOLD" value="45" min="0" max="1440"></div>
@@ -349,7 +349,7 @@ input:focus, select:focus { border-color: var(--accent); }
       <div class="field-group">
         <div class="field">
           <label>MAX_IMMEDIATE_PER_RUN <em>tope</em></label>
-          <input type="number" id="MAX_IMMEDIATE_PER_RUN" value="2" min="0" max="20">
+          <input type="number" id="MAX_IMMEDIATE_PER_RUN" value="3" min="0" max="20">
           <div class="field-desc">Máximo de alertas inmediatas (urgentes) por run. El resto va al batch normal.</div>
         </div>
         <div class="field">

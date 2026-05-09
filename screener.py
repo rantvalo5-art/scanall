@@ -136,8 +136,10 @@ RIDING_ZONE_BUFFER      = _cfg("riding", "RIDING_ZONE_BUFFER")
 RIDING_MIN_VOL_RATIO    = _cfg("riding", "RIDING_MIN_VOL_RATIO")
 RIDING_EMA_MUST_TREND   = _cfg("riding", "RIDING_EMA_MUST_TREND")
 
-FADING_REVERSAL_MIN = _cfg("fading", "FADING_REVERSAL_MIN")
-FADING_BELOW_ZONE   = _cfg("fading", "FADING_BELOW_ZONE")
+FADING_REVERSAL_MIN  = _cfg("fading", "FADING_REVERSAL_MIN")
+FADING_BELOW_ZONE    = _cfg("fading", "FADING_BELOW_ZONE")
+# Pullback "duro" que dispara FADING aunque no haya perforado la zona. Antes hardcoded -0.03.
+FADING_PULLBACK_HARD = _cfg("fading", "FADING_PULLBACK_HARD", default=0.03)
 
 BEST_MIN_SCORE      = _cfg("scoring", "BEST_MIN_SCORE")
 STRONG_MIN_SCORE    = _cfg("scoring", "STRONG_MIN_SCORE")
@@ -1141,7 +1143,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             and fading_reversal <= -FADING_REVERSAL_MIN
             and (
                 tf15.get("fading_below_zone")
-                or fading_reversal <= -0.03
+                or fading_reversal <= -FADING_PULLBACK_HARD
             )
             and not tf15.get("breakout")
         )

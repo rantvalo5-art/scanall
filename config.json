@@ -81,7 +81,8 @@
   },
   "fading": {
     "FADING_REVERSAL_MIN": 0.015,
-    "FADING_BELOW_ZONE": 0.008
+    "FADING_BELOW_ZONE": 0.008,
+    "FADING_PULLBACK_HARD": 0.03
   },
   "scoring": {
     "BEST_MIN_SCORE": 13,

@@ -183,8 +183,15 @@ def compute_outcomes(row):
         update["max_high_24h"] = max(float(k[2]) for k in klines_24h)
         update["min_low_24h"]  = min(float(k[3]) for k in klines_24h)
 
-    # ¿Está completo? (pasaron 24h)
-    if elapsed >= timedelta(hours=24):
+    # Completo cuando: (a) los 4 checkpoints están llenos (combinando lo que ya estaba
+    # con lo que esta corrida acaba de calcular), o (b) ya pasaron 24h y nos rendimos.
+    # Bug fix: antes solo chequeaba (b), lo que dejaba filas con todos los precios llenos
+    # pero outcomes_complete=false invisibles para el query (que filtra rows con algún null),
+    # y a la vez marcaba complete=true con precios faltantes apenas pasaban 24h.
+    price_cols = ["price_15m", "price_1h", "price_4h", "price_24h"]
+    final_prices = {c: update.get(c, row.get(c)) for c in price_cols}
+    all_filled = all(v is not None for v in final_prices.values())
+    if all_filled or elapsed >= timedelta(hours=24):
         update["outcomes_complete"] = True
 
     update["last_updated"] = now.isoformat()
