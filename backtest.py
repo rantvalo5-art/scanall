@@ -45,6 +45,7 @@ MAX_PAIRS = 200
 
 BINANCE_DATA_URL = "https://data-api.binance.vision/api/v3"
 BINANCE_FALLBACK_URL = "https://api.binance.com/api/v3"
+BINANCE_FAPI_URL = "https://fapi.binance.com"
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ecgdswroygkfckkaguxp.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
@@ -220,6 +221,158 @@ def download_all_klines(symbols, start_dt, end_dt):
     valid = {s: tfs for s, tfs in data.items() if len(tfs) == 3}
     print(f"  {len(valid)}/{len(symbols)} pares con data completa en los 3 TF")
     return valid
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# FETCH DE DERIVATIVES (Binance Futures USDT-M)
+# ════════════════════════════════════════════════════════════════════════════
+
+def _fapi_get(path, params, retries=3):
+    for attempt in range(retries):
+        try:
+            r = requests.get(f"{BINANCE_FAPI_URL}{path}", params=params, timeout=20)
+            if r.status_code == 200:
+                return r.json()
+            if r.status_code == 429:
+                time.sleep(2 ** attempt)
+                continue
+            return None
+        except requests.exceptions.RequestException:
+            time.sleep(1)
+    return None
+
+
+def get_futures_perp_symbols():
+    """Set de pares USDT-M perp activos en Binance Futures."""
+    data = _fapi_get("/fapi/v1/exchangeInfo", {})
+    if not data:
+        return set()
+    return {
+        s["symbol"]
+        for s in data.get("symbols", [])
+        if s.get("contractType") == "PERPETUAL"
+        and s.get("quoteAsset") == "USDT"
+        and s.get("status") == "TRADING"
+    }
+
+
+def get_oi_history_range(symbol, start_ms, end_ms):
+    """OI 5m granularity. Paginado (max 500 por request).
+    Retorna DataFrame [timestamp_ms, oi] o None si falla."""
+    rows = []
+    cursor = start_ms
+    while cursor < end_ms:
+        data = _fapi_get(
+            "/futures/data/openInterestHist",
+            {"symbol": symbol, "period": "5m",
+             "startTime": cursor, "endTime": end_ms, "limit": 500},
+        )
+        if not data:
+            break
+        rows.extend(data)
+        last_ts = int(data[-1]["timestamp"])
+        if len(data) < 500 or last_ts <= cursor:
+            break
+        cursor = last_ts + 1
+    if not rows:
+        return None
+    df = pd.DataFrame([{"timestamp": int(r["timestamp"]),
+                        "oi": float(r["sumOpenInterest"])} for r in rows])
+    return df.drop_duplicates("timestamp").sort_values("timestamp").reset_index(drop=True)
+
+
+def get_funding_history_range(symbol, start_ms, end_ms):
+    """Funding rate (cada 8h). Paginado (max 1000).
+    Retorna DataFrame [funding_time_ms, funding_rate] o None si falla."""
+    rows = []
+    cursor = start_ms
+    while cursor < end_ms:
+        data = _fapi_get(
+            "/fapi/v1/fundingRate",
+            {"symbol": symbol, "startTime": cursor, "endTime": end_ms, "limit": 1000},
+        )
+        if not data:
+            break
+        rows.extend(data)
+        last_ts = int(data[-1]["fundingTime"])
+        if len(data) < 1000 or last_ts <= cursor:
+            break
+        cursor = last_ts + 1
+    if not rows:
+        return None
+    df = pd.DataFrame([{"funding_time": int(r["fundingTime"]),
+                        "funding_rate": float(r["fundingRate"])} for r in rows])
+    return df.drop_duplicates("funding_time").sort_values("funding_time").reset_index(drop=True)
+
+
+def download_all_derivatives(symbols, start_dt, end_dt):
+    """Bulk-fetch OI history + funding history para todos los pares con perp.
+    Retorna {symbol: {"oi": df, "fr": df}}. Pares sin perp se omiten."""
+    perp_set = get_futures_perp_symbols()
+    if not perp_set:
+        print("  [deriv] no se obtuvo lista de futuros perp; omitiendo derivatives")
+        return {}
+    targets = [s for s in symbols if s in perp_set]
+    print(f"  [deriv] {len(targets)}/{len(symbols)} pares tienen perp USDT-M")
+    if not targets:
+        return {}
+
+    # OI 5m necesita un buffer hacia atrás para el lookback de 30min.
+    fetch_start = start_dt - timedelta(hours=2)
+    start_ms = int(fetch_start.timestamp() * 1000)
+    end_ms = int(end_dt.timestamp() * 1000)
+
+    data = {}
+
+    def fetch(sym):
+        oi = get_oi_history_range(sym, start_ms, end_ms)
+        fr = get_funding_history_range(sym, start_ms, end_ms)
+        return sym, oi, fr
+
+    with ThreadPoolExecutor(max_workers=MAX_DOWNLOAD_WORKERS) as ex:
+        futures = [ex.submit(fetch, s) for s in targets]
+        completed = 0
+        for fut in as_completed(futures):
+            sym, oi, fr = fut.result()
+            if oi is not None or fr is not None:
+                data[sym] = {"oi": oi, "fr": fr}
+            completed += 1
+            if completed % 50 == 0:
+                print(f"    [deriv] {completed}/{len(targets)}...")
+    print(f"  [deriv] {len(data)}/{len(targets)} pares con data de derivatives")
+    return data
+
+
+def lookup_derivatives_at(deriv_for_symbol, ts_ms, oi_lookback_min=30):
+    """Dado el dict {oi: df, fr: df} de UN símbolo y un timestamp, retorna
+    (oi_delta, funding_rate). Cualquiera puede ser None si no hay data suficiente."""
+    oi_delta = None
+    funding_rate = None
+    if not deriv_for_symbol:
+        return None, None
+
+    oi_df = deriv_for_symbol.get("oi")
+    if oi_df is not None and len(oi_df) >= 2:
+        ts_arr = oi_df["timestamp"].values
+        # Valor "ahora": el último <= ts_ms
+        idx_now = ts_arr.searchsorted(ts_ms, side="right") - 1
+        # Valor "lookback atrás": el último <= ts_ms - lookback
+        target_then = ts_ms - oi_lookback_min * 60 * 1000
+        idx_then = ts_arr.searchsorted(target_then, side="right") - 1
+        if idx_now >= 0 and idx_then >= 0 and idx_then != idx_now:
+            oi_now = float(oi_df["oi"].iloc[idx_now])
+            oi_then = float(oi_df["oi"].iloc[idx_then])
+            if oi_then > 0:
+                oi_delta = (oi_now - oi_then) / oi_then
+
+    fr_df = deriv_for_symbol.get("fr")
+    if fr_df is not None and len(fr_df) >= 1:
+        ts_arr = fr_df["funding_time"].values
+        idx = ts_arr.searchsorted(ts_ms, side="right") - 1
+        if idx >= 0:
+            funding_rate = float(fr_df["funding_rate"].iloc[idx])
+
+    return oi_delta, funding_rate
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -626,6 +779,21 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             if prev_bo >= LATE_REPEAT_COUNT:
                 score += late_repeat_pen
 
+            # Derivatives: OI delta + funding rate (mismo bloque que screener.py)
+            if cfg.g("derivatives", "ENABLED", default=False):
+                oi = tf15.get("oi_delta_30m")
+                fr = tf15.get("funding_rate")
+                if oi is not None:
+                    if oi >= cfg.g("scoring_breakout", "OI_RISING_MIN", default=0.02):
+                        score += cfg.g("scoring_breakout", "OI_RISING_BONUS", default=2)
+                    elif oi <= cfg.g("scoring_breakout", "OI_FALLING_MAX", default=-0.01):
+                        score += cfg.g("scoring_breakout", "OI_FALLING_PENALTY", default=-2)
+                if fr is not None:
+                    if fr <= cfg.g("scoring_breakout", "FUNDING_HEALTHY_MAX", default=0.0003):
+                        score += cfg.g("scoring_breakout", "FUNDING_HEALTHY_BONUS", default=1)
+                    elif fr >= cfg.g("scoring_breakout", "FUNDING_HOT_MIN", default=0.0008):
+                        score += cfg.g("scoring_breakout", "FUNDING_HOT_PENALTY", default=-2)
+
             score = min(score, SCORE_CAP)
             candidates.append({
                 "label": "BREAKOUT", "history_tf": "BREAKOUT", "score": score,
@@ -696,6 +864,21 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 score += cvd_up_b
             elif tf15.get("cvd_ratio", 0) < -cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05):
                 score += cvd_dn_pen
+
+            # Derivatives: OI delta + funding rate (mismo bloque que screener.py)
+            if cfg.g("derivatives", "ENABLED", default=False):
+                oi = tf15.get("oi_delta_30m")
+                fr = tf15.get("funding_rate")
+                if oi is not None:
+                    if oi >= cfg.g("scoring_riding", "OI_RISING_MIN", default=0.02):
+                        score += cfg.g("scoring_riding", "OI_RISING_BONUS", default=1)
+                    elif oi <= cfg.g("scoring_riding", "OI_FALLING_MAX", default=-0.01):
+                        score += cfg.g("scoring_riding", "OI_FALLING_PENALTY", default=-1)
+                if fr is not None:
+                    if fr <= cfg.g("scoring_riding", "FUNDING_HEALTHY_MAX", default=0.0003):
+                        score += cfg.g("scoring_riding", "FUNDING_HEALTHY_BONUS", default=1)
+                    elif fr >= cfg.g("scoring_riding", "FUNDING_HOT_MIN", default=0.0008):
+                        score += cfg.g("scoring_riding", "FUNDING_HOT_PENALTY", default=-1)
 
             score = min(score, SCORE_CAP)
             candidates.append({
@@ -851,8 +1034,11 @@ def calculate_outcomes(df_15m, alert_idx, alert_price):
     return outcomes
 
 
-def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None, scan_interval_min=SCAN_INTERVAL_MIN):
+def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None,
+             scan_interval_min=SCAN_INTERVAL_MIN, derivatives=None):
     print(f"\n  Simulando {(end_dt - start_dt).total_seconds() / 3600:.0f}h con scans cada {scan_interval_min}min...")
+    deriv_enabled = bool(derivatives) and cfg.g("derivatives", "ENABLED", default=False)
+    deriv_lookback = cfg.g("derivatives", "OI_LOOKBACK_MIN", default=30)
 
     cooldown_min_by_state = cfg.g("cooldowns_minutes")
     HISTORY_HOURS = cfg.g("history", "HISTORY_HOURS", default=8)
@@ -920,6 +1106,13 @@ def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None, scan_interval_m
                     break
             if not valid:
                 continue
+
+            # Inyectar features de derivatives en el 15m TF (mismo patrón que screener.py)
+            if deriv_enabled:
+                oi_delta, funding_rate = lookup_derivatives_at(
+                    derivatives.get(sym), ts_ms, oi_lookback_min=deriv_lookback)
+                tf_data["15m"]["oi_delta_30m"] = oi_delta
+                tf_data["15m"]["funding_rate"] = funding_rate
 
             alert = classify(sym, tf_data, cfg, counts_history)
             if alert is None:
@@ -1185,10 +1378,10 @@ def compare_runs(alerts_a, label_a, alerts_b, label_b, period_days=7):
 # ════════════════════════════════════════════════════════════════════════════
 
 def run_backtest(cfg, weeks, klines, start_dt, end_dt, snapshot_pairs=None,
-                 label="run", scan_interval_min=SCAN_INTERVAL_MIN):
+                 label="run", scan_interval_min=SCAN_INTERVAL_MIN, derivatives=None):
     print(f"\n  >>> Corriendo backtest: {label}")
     alerts = simulate(cfg, klines, start_dt, end_dt, snapshot_pairs,
-                      scan_interval_min=scan_interval_min)
+                      scan_interval_min=scan_interval_min, derivatives=derivatives)
     summarize(alerts, label=label)
     return alerts
 
@@ -1237,6 +1430,27 @@ def main():
         print("ERROR: no se pudo descargar data.")
         sys.exit(1)
 
+    # Determinar si algún cfg que vamos a correr necesita derivatives
+    cfg_paths_for_run = [args.config]
+    if args.variants:
+        cfg_paths_for_run = list(args.variants)
+    elif args.compare:
+        cfg_paths_for_run = list(args.compare)
+    need_deriv = False
+    for p in cfg_paths_for_run:
+        try:
+            if Config(p).g("derivatives", "ENABLED", default=False):
+                need_deriv = True
+                break
+        except Exception:
+            pass
+
+    derivatives = None
+    if need_deriv:
+        print(f"\n[2b/4] Descargando derivatives (OI + funding) — al menos un cfg los pide...")
+        deriv_symbols = list(klines.keys())
+        derivatives = download_all_derivatives(deriv_symbols, start_dt, end_dt)
+
     print(f"\n[3/4] Ejecutando simulación...")
     all_results = {}
 
@@ -1250,13 +1464,15 @@ def main():
         cfg_base = Config(base_path)
         alerts_base = run_backtest(cfg_base, args.weeks, klines, start_dt, end_dt,
                                    snapshot_pairs, label=f"BASE ({Path(base_path).stem})",
-                                   scan_interval_min=args.scan_interval_min)
+                                   scan_interval_min=args.scan_interval_min,
+                                   derivatives=derivatives)
         all_results[Path(base_path).stem] = alerts_base
         for vp in variant_paths:
             cfg_v = Config(vp)
             alerts_v = run_backtest(cfg_v, args.weeks, klines, start_dt, end_dt,
                                     snapshot_pairs, label=f"VARIANT ({Path(vp).stem})",
-                                    scan_interval_min=args.scan_interval_min)
+                                    scan_interval_min=args.scan_interval_min,
+                                    derivatives=derivatives)
             all_results[Path(vp).stem] = alerts_v
             compare_runs(alerts_base, Path(base_path).stem, alerts_v, Path(vp).stem,
                          period_days=period_days)
@@ -1266,10 +1482,12 @@ def main():
         cfg_new = Config(args.compare[1])
         alerts_old = run_backtest(cfg_old, args.weeks, klines, start_dt, end_dt,
                                   snapshot_pairs, label=f"OLD ({args.compare[0]})",
-                                  scan_interval_min=args.scan_interval_min)
+                                  scan_interval_min=args.scan_interval_min,
+                                  derivatives=derivatives)
         alerts_new = run_backtest(cfg_new, args.weeks, klines, start_dt, end_dt,
                                   snapshot_pairs, label=f"NEW ({args.compare[1]})",
-                                  scan_interval_min=args.scan_interval_min)
+                                  scan_interval_min=args.scan_interval_min,
+                                  derivatives=derivatives)
         compare_runs(alerts_old, args.compare[0], alerts_new, args.compare[1],
                      period_days=period_days)
         all_results = {"old": alerts_old, "new": alerts_new}
@@ -1293,7 +1511,8 @@ def main():
             tmp_cfg.path = f"<{name}>"
             alerts = run_backtest(tmp_cfg, args.weeks, klines, start_dt, end_dt,
                                   snapshot_pairs, label=name,
-                                  scan_interval_min=args.scan_interval_min)
+                                  scan_interval_min=args.scan_interval_min,
+                                  derivatives=derivatives)
             all_results[name] = alerts
         if "full (todo activo)" in all_results:
             for name, alerts in all_results.items():
@@ -1303,7 +1522,8 @@ def main():
     else:
         alerts = run_backtest(cfg_main, args.weeks, klines, start_dt, end_dt,
                               snapshot_pairs, label=f"config: {args.config}",
-                              scan_interval_min=args.scan_interval_min)
+                              scan_interval_min=args.scan_interval_min,
+                              derivatives=derivatives)
         all_results = {"main": alerts}
 
     if args.out:

@@ -84,6 +84,11 @@
     "FADING_BELOW_ZONE": 0.008,
     "FADING_PULLBACK_HARD": 0.03
   },
+  "derivatives": {
+    "ENABLED": false,
+    "FUTURES_FETCH_TIMEOUT": 10,
+    "OI_LOOKBACK_MIN": 30
+  },
   "scoring": {
     "BEST_MIN_SCORE": 13,
     "STRONG_MIN_SCORE": 11,
@@ -134,7 +139,15 @@
     "LATE_ENTRY_MIN": 0.025,
     "LATE_ENTRY_PENALTY": -1,
     "STRUCT_PENALTY": -1,
-    "LATE_REPEAT_PENALTY": -1
+    "LATE_REPEAT_PENALTY": -1,
+    "OI_RISING_MIN": 0.02,
+    "OI_RISING_BONUS": 2,
+    "OI_FALLING_MAX": -0.01,
+    "OI_FALLING_PENALTY": -2,
+    "FUNDING_HEALTHY_MAX": 0.0003,
+    "FUNDING_HEALTHY_BONUS": 1,
+    "FUNDING_HOT_MIN": 0.0008,
+    "FUNDING_HOT_PENALTY": -2
   },
   "scoring_riding": {
     "BASE_SCORE": 4,
@@ -154,7 +167,15 @@
     "CVD_BULLISH_BONUS": 1,
     "CVD_BEARISH_PENALTY": -2,
     "STRONG_GAIN_BONUS": 2,
-    "STRONG_GAIN_MIN": 0.08
+    "STRONG_GAIN_MIN": 0.08,
+    "OI_RISING_MIN": 0.02,
+    "OI_RISING_BONUS": 1,
+    "OI_FALLING_MAX": -0.01,
+    "OI_FALLING_PENALTY": -1,
+    "FUNDING_HEALTHY_MAX": 0.0003,
+    "FUNDING_HEALTHY_BONUS": 1,
+    "FUNDING_HOT_MIN": 0.0008,
+    "FUNDING_HOT_PENALTY": -1
   },
   "scoring_hold": {
     "BASE_SCORE": 5,

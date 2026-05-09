@@ -156,6 +156,12 @@ CHART_STYLE   = _cfg("chart", "STYLE")
 OUTCOMES_ENABLED              = _cfg("outcomes", "ENABLED")
 OUTCOMES_TRACK_ALL_CANDIDATES = _cfg("outcomes", "TRACK_ALL_CANDIDATES")
 
+# Derivatives (futures OI + funding rate). Off por default — requiere backtest A/B antes
+# de prender en prod. Cuando OFF, no se hace ningún request a fapi.binance.com.
+DERIV_ENABLED         = _cfg("derivatives", "ENABLED", default=False)
+DERIV_FETCH_TIMEOUT   = _cfg("derivatives", "FUTURES_FETCH_TIMEOUT", default=10)
+DERIV_OI_LOOKBACK_MIN = _cfg("derivatives", "OI_LOOKBACK_MIN", default=30)
+
 
 # ── Supabase ───────────────────────────────────────────────────────────────────
 def _sb_headers():
@@ -335,6 +341,78 @@ def get_klines(symbol, interval):
     df["close_time"] = df["close_time"].astype("int64")
     df["open_time"] = df["open_time"].astype("int64")
     return df
+
+
+# ── Derivatives (Binance Futures USDT-M) ──────────────────────────────────────
+# Solo se usan si DERIV_ENABLED=true. Endpoints públicos (sin auth).
+def get_futures_usdt_symbols():
+    """Set de símbolos USDT-M perpetuos en Binance Futures. Usado para gatear que
+    NO pidamos OI/funding de un par sin perp (404 garantizado)."""
+    r = requests.get(
+        "https://fapi.binance.com/fapi/v1/exchangeInfo",
+        timeout=DERIV_FETCH_TIMEOUT,
+    )
+    r.raise_for_status()
+    return {
+        s["symbol"]
+        for s in r.json().get("symbols", [])
+        if s.get("contractType") == "PERPETUAL"
+        and s.get("quoteAsset") == "USDT"
+        and s.get("status") == "TRADING"
+    }
+
+
+def get_oi_delta(symbol):
+    """% change de Open Interest en los últimos OI_LOOKBACK_MIN minutos.
+    Usa /fapi/v1/openInterestHist con period=5m. Retorna float o None si falla
+    o no hay suficiente historia."""
+    # Pedimos lookback/5 + 1 puntos (ej: 30/5 + 1 = 7) para tener un valor "now" y otro "lookback atrás".
+    limit = max(2, DERIV_OI_LOOKBACK_MIN // 5 + 1)
+    try:
+        r = requests.get(
+            "https://fapi.binance.com/futures/data/openInterestHist",
+            params={"symbol": symbol, "period": "5m", "limit": limit},
+            timeout=DERIV_FETCH_TIMEOUT,
+        )
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        if not data or len(data) < 2:
+            return None
+        oi_now = float(data[-1]["sumOpenInterest"])
+        oi_then = float(data[0]["sumOpenInterest"])
+        if oi_then <= 0:
+            return None
+        return (oi_now - oi_then) / oi_then
+    except Exception:
+        return None
+
+
+def get_funding_rate(symbol):
+    """Funding rate actual (último valor publicado, refresca cada 8h).
+    Retorna float o None si falla."""
+    try:
+        r = requests.get(
+            "https://fapi.binance.com/fapi/v1/premiumIndex",
+            params={"symbol": symbol},
+            timeout=DERIV_FETCH_TIMEOUT,
+        )
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        fr = data.get("lastFundingRate")
+        return float(fr) if fr is not None else None
+    except Exception:
+        return None
+
+
+def fetch_derivatives(symbol):
+    """Combina OI delta + funding en un dict {oi_delta_30m, funding_rate}.
+    Si una pata falla, queda None en esa clave (el scoring la ignora)."""
+    return {
+        "oi_delta_30m": get_oi_delta(symbol),
+        "funding_rate": get_funding_rate(symbol),
+    }
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -992,6 +1070,24 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             if prev >= LATE_REPEAT_COUNT:
                 score += late_repeat_pen
 
+            # Derivatives: OI delta + funding rate (sólo si DERIV_ENABLED y el par tiene perp)
+            deriv_note = None
+            if DERIV_ENABLED:
+                oi = tf15.get("oi_delta_30m")
+                fr = tf15.get("funding_rate")
+                if oi is not None:
+                    if oi >= _cfg_score(sb, "OI_RISING_MIN", 0.02):
+                        score += _cfg_score(sb, "OI_RISING_BONUS", 2)
+                        deriv_note = f"OI +{oi:.1%} ({DERIV_OI_LOOKBACK_MIN}m) — convicción real"
+                    elif oi <= _cfg_score(sb, "OI_FALLING_MAX", -0.01):
+                        score += _cfg_score(sb, "OI_FALLING_PENALTY", -2)
+                        deriv_note = f"⚠ OI {oi:.1%} ({DERIV_OI_LOOKBACK_MIN}m) — short cover"
+                if fr is not None:
+                    if fr <= _cfg_score(sb, "FUNDING_HEALTHY_MAX", 0.0003):
+                        score += _cfg_score(sb, "FUNDING_HEALTHY_BONUS", 1)
+                    elif fr >= _cfg_score(sb, "FUNDING_HOT_MIN", 0.0008):
+                        score += _cfg_score(sb, "FUNDING_HOT_PENALTY", -2)
+
             # Cap final
             score = min(score, SCORE_CAP)
 
@@ -1010,6 +1106,8 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 reasons.append(struct_note)
             else:
                 reasons.append("rompe nivel estructural (lookback 25)")
+            if deriv_note:
+                reasons.append(deriv_note)
             if tf1h.get("dist_to_res", 0) > 0.04:
                 reasons.append(f"1h con espacio ({tf1h['dist_to_res']:.2%})")
             candidates.append({
@@ -1114,6 +1212,23 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             elif tf15.get("cvd_ratio", 0) < -CVD_BULLISH_MIN:
                 score += cvd_dn_pen
                 reasons.append(f"⚠ CVD bajista — vendedores tomando control")
+            # Derivatives: OI delta + funding rate
+            if DERIV_ENABLED:
+                oi = tf15.get("oi_delta_30m")
+                fr = tf15.get("funding_rate")
+                if oi is not None:
+                    if oi >= _cfg_score(sr, "OI_RISING_MIN", 0.02):
+                        score += _cfg_score(sr, "OI_RISING_BONUS", 1)
+                        reasons.append(f"OI +{oi:.1%} ({DERIV_OI_LOOKBACK_MIN}m) — flujo entrando")
+                    elif oi <= _cfg_score(sr, "OI_FALLING_MAX", -0.01):
+                        score += _cfg_score(sr, "OI_FALLING_PENALTY", -1)
+                        reasons.append(f"⚠ OI {oi:.1%} — flujo saliendo")
+                if fr is not None:
+                    if fr <= _cfg_score(sr, "FUNDING_HEALTHY_MAX", 0.0003):
+                        score += _cfg_score(sr, "FUNDING_HEALTHY_BONUS", 1)
+                    elif fr >= _cfg_score(sr, "FUNDING_HOT_MIN", 0.0008):
+                        score += _cfg_score(sr, "FUNDING_HOT_PENALTY", -1)
+                        reasons.append("⚠ funding caliente — long crowded")
             score = min(score, SCORE_CAP)
             candidates.append({
                 "symbol": symbol,
@@ -1420,14 +1535,49 @@ def main():
     immediate_sent_alerts = []  # alertas inmediatas que sí se enviaron, para trackearlas
     immediate_skipped = 0  # Anti-spam: cuántas inmediatas saltamos por tope
 
+    # Derivatives: pre-fetch en paralelo, en su propio pool para que corra
+    # concurrentemente con el scan de klines. Si DERIV_ENABLED=false, no se hace
+    # ningún request a fapi.binance.com.
+    deriv_map = {}  # symbol -> {"oi_delta_30m", "funding_rate"}
+    deriv_executor = None
+    deriv_futures = {}
+    if DERIV_ENABLED:
+        try:
+            futures_set = get_futures_usdt_symbols()
+        except Exception as e:
+            print(f"  [deriv] error fetching futures exchangeInfo: {e}")
+            futures_set = set()
+        if futures_set:
+            deriv_executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+            deriv_futures = {
+                deriv_executor.submit(fetch_derivatives, sym): sym
+                for sym in pairs if sym in futures_set
+            }
+
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {executor.submit(analyze, sym, tf): (sym, tf) for sym, tf in tasks}
+
+        # Recolectar derivatives mientras los klines corren en paralelo.
+        for fut, sym in deriv_futures.items():
+            try:
+                deriv_map[sym] = fut.result()
+            except Exception:
+                deriv_map[sym] = {"oi_delta_30m": None, "funding_rate": None}
+        if deriv_executor is not None:
+            deriv_executor.shutdown(wait=False)
+
         for future in as_completed(futures):
             symbol, interval, data = future.result()
             per_symbol[symbol][interval] = data or {}
             ready = all(tf in per_symbol[symbol] for tf in INTERVALS)
             if not ready or symbol in processed:
                 continue
+
+            # Inyectar features de derivatives en el 15m TF antes de classify
+            if DERIV_ENABLED and per_symbol[symbol].get("15m"):
+                d = deriv_map.get(symbol, {})
+                per_symbol[symbol]["15m"]["oi_delta_30m"] = d.get("oi_delta_30m")
+                per_symbol[symbol]["15m"]["funding_rate"] = d.get("funding_rate")
 
             alert = classify_symbol(symbol, per_symbol[symbol], counts_history, last_seen)
             processed.add(symbol)
