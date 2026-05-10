@@ -1588,7 +1588,7 @@ def main():
             print(f"  {alert['label']} {symbol} score={alert['score']} bucket={alert['bucket']}")
 
             key = (alert["symbol"], alert["history_tf"])
-            if alert.get("immediate") and alert.get("bucket") == "BEST" and key not in immediate_sent_keys:
+            if alert.get("bucket") == "BEST" and key not in immediate_sent_keys:
                 # Anti-spam: tope de inmediatas por run
                 if len(immediate_sent_keys) >= MAX_IMMEDIATE_PER_RUN:
                     immediate_skipped += 1
@@ -1617,52 +1617,8 @@ def main():
                         if (a["symbol"], a["history_tf"]) not in selected_keys]
     insert_outcomes(selected + extra_immediates)
 
-    summary_lines = []
-    for idx, alert in enumerate(selected, start=1):
-        if alert["history_tf"] == "FADING":
-            prefix = "⚠️ SALIDA"
-        elif alert["history_tf"] == "RIDING":
-            prefix = f"🚀 RIDING #{idx}"
-        elif idx == 1:
-            prefix = "👑 BEST"
-        else:
-            prefix = "💪 STRONG"
-        summary_lines.append(f"{prefix}\n{format_alert(alert, counts_history)}")
-
-    body = "\n\n".join(summary_lines)
-
     riding_count = sum(1 for a in candidates if a["history_tf"] == "RIDING")
     fading_count = sum(1 for a in candidates if a["history_tf"] == "FADING")
-    extra = ""
-    if riding_count:
-        extra += f"| 🚀 {riding_count} riding "
-    if fading_count:
-        extra += f"| ⚠️ {fading_count} fading "
-
-    # Anti-spam: flag de burst si hay muchos candidates
-    burst_line = ""
-    if len(candidates) >= BURST_THRESHOLD:
-        burst_line = f"🌊 BURST: {len(candidates)} setups detectados — movimiento de mercado\n"
-
-    # Anti-spam: avisar si saltamos inmediatas
-    skipped_line = ""
-    if immediate_skipped > 0:
-        skipped_line = f"ℹ️ {immediate_skipped} alertas inmediatas saltadas (tope: {MAX_IMMEDIATE_PER_RUN})\n"
-
-    active_tag = " • ".join(active_names) if active_names else "ninguna"
-    btc_ctx = get_btc_context()
-    btc_line = f"{btc_ctx}\n" if btc_ctx else ""
-
-    header = (
-        f"🎯 TOP SETUPS • {now}\n"
-        f"{btc_line}"
-        f"{burst_line}"
-        f"{skipped_line}"
-        f"top {TOP_ALERT_COUNT} {extra}• {len(pairs)} pares\n"
-        f"señales: {active_tag}\n"
-    )
-    send_telegram(header + "\n" + body)
-
     print(f"Total candidatos: {len(candidates)} (RIDING: {riding_count}, FADING: {fading_count})")
     print(f"Inmediatos enviados: {len(immediate_sent_keys)} | saltados: {immediate_skipped}")
     print(f"Top final: {len(selected)}")
