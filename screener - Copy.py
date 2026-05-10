@@ -1588,7 +1588,7 @@ def main():
             print(f"  {alert['label']} {symbol} score={alert['score']} bucket={alert['bucket']}")
 
             key = (alert["symbol"], alert["history_tf"])
-            if alert.get("immediate") and alert.get("bucket") == "BEST" and key not in immediate_sent_keys:
+            if alert.get("immediate") and key not in immediate_sent_keys:
                 # Anti-spam: tope de inmediatas por run
                 if len(immediate_sent_keys) >= MAX_IMMEDIATE_PER_RUN:
                     immediate_skipped += 1

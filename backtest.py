@@ -676,6 +676,36 @@ def _indicator_key(cfg):
     }, sort_keys=True)
 
 
+def _analyze_key(cfg):
+    """Hash para identificar si dos cfgs producen el mismo output de analyze_at_index().
+    Cfgs con la misma clave comparten el primer pase del scan (candidate building)."""
+    return json.dumps({
+        "RECENT_LOOKBACK":         cfg.g("indicators", "RECENT_LOOKBACK"),
+        "RECENT_LOOKBACK_LONG":    cfg.g("indicators", "RECENT_LOOKBACK_LONG", default=25),
+        "RECENT_LONG_PROXIMITY":   cfg.g("indicators", "RECENT_LONG_PROXIMITY", default=0.01),
+        "OBV_SLOPE_LOOKBACK":      cfg.g("indicators", "OBV_SLOPE_LOOKBACK", default=10),
+        "OBV_RISING_MIN":          cfg.g("indicators", "OBV_RISING_MIN", default=0.05),
+        "CVD_LOOKBACK":            cfg.g("indicators", "CVD_LOOKBACK", default=10),
+        "CVD_BULLISH_MIN":         cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05),
+        "BREAKOUT_BUFFER":         cfg.g("breakout", "BREAKOUT_BUFFER"),
+        "PREBREAK_NEAR_MAX":       cfg.g("prebreak", "PREBREAK_NEAR_MAX"),
+        "ONE_H_RESIST_BUFFER":     cfg.g("hold", "ONE_H_RESIST_BUFFER"),
+        "MAJOR_STRUCT_LOOKBACK":   cfg.g("hold", "MAJOR_STRUCT_LOOKBACK"),
+        "MAJOR_STRUCT_MAX_DIST":   cfg.g("hold", "MAJOR_STRUCT_MAX_DIST"),
+        "HOLD_LOOKBACK_BARS":      cfg.g("hold", "HOLD_LOOKBACK_BARS"),
+        "HOLD_RECENT_BREAK_MAX_BARS": cfg.g("hold", "HOLD_RECENT_BREAK_MAX_BARS"),
+        "HOLD_ZONE_BUFFER":        cfg.g("hold", "HOLD_ZONE_BUFFER"),
+        "HOLD_PULLBACK_MAX":       cfg.g("hold", "HOLD_PULLBACK_MAX"),
+        "STRONG_CLOSE_MIN":        cfg.g("hold", "STRONG_CLOSE_MIN"),
+        "RIDING_LOOKBACK_BARS":    cfg.g("riding", "RIDING_LOOKBACK_BARS"),
+        "RIDING_ZONE_BUFFER":      cfg.g("riding", "RIDING_ZONE_BUFFER"),
+        "RIDING_MIN_VOL_RATIO":    cfg.g("riding", "RIDING_MIN_VOL_RATIO"),
+        "FADING_BELOW_ZONE":       cfg.g("fading", "FADING_BELOW_ZONE"),
+        "DERIV_ENABLED":           cfg.g("derivatives", "ENABLED", default=False),
+        "DERIV_OI_LOOKBACK_MIN":   cfg.g("derivatives", "OI_LOOKBACK_MIN", default=30),
+    }, sort_keys=True)
+
+
 def precompute_indicators(df, cfg):
     """Precalcula columnas de indicadores sobre el df completo (una sola vez por símbolo/TF).
     analyze_at_index() lee desde estas columnas en O(1) por barra."""
@@ -853,49 +883,55 @@ def analyze_at_index(df, end_idx, cfg):
     else:
         major_struct_ok = True
 
-    # HOLD lookback (loop acotado, O(HOLD_LOOKBACK_BARS))
+    # HOLD lookback (vectorizado sobre slice de arrays numpy)
     hold_recent_break = False
     hold_kept_zone = False
     hold_pullback_ok = False
     hold_strong = False
     bars_since_break = None
     hold_start = max(25, end_idx - HOLD_LOOKBACK_BARS - 1)
-    for idx in range(hold_start, end_idx):
-        rm1 = df["_recent_max_shift1"].iat[idx]
-        if pd.isna(rm1) or rm1 <= 0:
-            continue
-        ref = float(rm1)
-        if float(df["close"].iat[idx]) > ref * (1 + BREAKOUT_BUFFER):
-            bsb = end_idx - idx
-            if 1 <= bsb <= HOLD_RECENT_BREAK_MAX_BARS:
-                post_low = df["low"].iloc[idx + 1:end_idx + 1]
-                post_close = df["close"].iloc[idx + 1:end_idx + 1]
-                if len(post_low) == 0:
-                    continue
-                bars_since_break = bsb
-                hold_recent_break = True
-                hold_kept_zone = float(post_low.min()) >= ref * (1 - HOLD_ZONE_BUFFER)
-                brk_close = float(df["close"].iat[idx])
-                pullback = (brk_close - float(post_close.min())) / brk_close
-                hold_pullback_ok = pullback <= HOLD_PULLBACK_MAX
-                hold_strong = (close_position(float(df["close"].iat[end_idx]),
-                                               float(df["high"].iat[end_idx]),
-                                               float(df["low"].iat[end_idx])) >= STRONG_CLOSE_MIN)
+    _sl_close_h = df["close"].values[hold_start:end_idx]
+    _sl_rm1_h   = df["_recent_max_shift1"].values[hold_start:end_idx]
+    _sl_local   = np.arange(len(_sl_close_h))
+    _bsb_arr    = end_idx - (hold_start + _sl_local)
+    _mask_h = (
+        np.isfinite(_sl_rm1_h) & (_sl_rm1_h > 0)
+        & (_sl_close_h > _sl_rm1_h * (1 + BREAKOUT_BUFFER))
+        & (_bsb_arr >= 1) & (_bsb_arr <= HOLD_RECENT_BREAK_MAX_BARS)
+    )
+    if _mask_h.any():
+        _hit_local = int(np.flatnonzero(_mask_h)[-1])
+        _hit_abs   = hold_start + _hit_local
+        bars_since_break = int(_bsb_arr[_hit_local])
+        _ref_h     = float(_sl_rm1_h[_hit_local])
+        _brk_close = float(_sl_close_h[_hit_local])
+        _post_low  = df["low"].values[_hit_abs + 1:end_idx + 1]
+        _post_cls  = df["close"].values[_hit_abs + 1:end_idx + 1]
+        if len(_post_low) > 0:
+            hold_recent_break = True
+            hold_kept_zone    = float(_post_low.min()) >= _ref_h * (1 - HOLD_ZONE_BUFFER)
+            pullback          = (_brk_close - float(_post_cls.min())) / _brk_close
+            hold_pullback_ok  = pullback <= HOLD_PULLBACK_MAX
+            hold_strong       = (close_position(float(df["close"].iat[end_idx]),
+                                                float(df["high"].iat[end_idx]),
+                                                float(df["low"].iat[end_idx])) >= STRONG_CLOSE_MIN)
 
-    # RIDING lookback (loop acotado, O(RIDING_LOOKBACK_BARS))
+    # RIDING lookback (vectorizado sobre slice de arrays numpy)
     riding_break_idx = None
     riding_break_close = None
     riding_break_ref = None
     riding_start = max(25, end_idx - RIDING_LOOKBACK_BARS - 1)
-    for idx in range(riding_start, end_idx):
-        rm1 = df["_recent_max_shift1"].iat[idx]
-        if pd.isna(rm1) or rm1 <= 0:
-            continue
-        ref = float(rm1)
-        if float(df["close"].iat[idx]) > ref * (1 + BREAKOUT_BUFFER):
-            riding_break_idx = idx
-            riding_break_ref = ref
-            riding_break_close = float(df["close"].iat[idx])
+    _sl_close_r = df["close"].values[riding_start:end_idx]
+    _sl_rm1_r   = df["_recent_max_shift1"].values[riding_start:end_idx]
+    _mask_r = (
+        np.isfinite(_sl_rm1_r) & (_sl_rm1_r > 0)
+        & (_sl_close_r > _sl_rm1_r * (1 + BREAKOUT_BUFFER))
+    )
+    if _mask_r.any():
+        _hit_local_r   = int(np.flatnonzero(_mask_r)[-1])
+        riding_break_idx   = riding_start + _hit_local_r
+        riding_break_ref   = float(_sl_rm1_r[_hit_local_r])
+        riding_break_close = float(_sl_close_r[_hit_local_r])
 
     riding_bars_since = None
     riding_gain = None
@@ -1388,34 +1424,38 @@ def calculate_outcomes(df_15m, alert_idx, alert_price):
     return outcomes
 
 
-def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None,
-             scan_interval_min=SCAN_INTERVAL_MIN, derivatives=None, prepared=None):
-    print(f"\n  Simulando {(end_dt - start_dt).total_seconds() / 3600:.0f}h con scans cada {scan_interval_min}min...")
+def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivatives):
+    """Primer pase del scan: construye la lista de candidatos (sym, ts, tf_data, idx_15m)
+    que pasan validación de datos. Variant-independiente para cfgs con el mismo _analyze_key.
+    Cada elemento: (scan_i, ts_ms, sym, tf_data, idx_15m)."""
     deriv_enabled = bool(derivatives) and cfg.g("derivatives", "ENABLED", default=False)
     deriv_lookback = cfg.g("derivatives", "OI_LOOKBACK_MIN", default=30)
 
-    cooldown_min_by_state = cfg.g("cooldowns_minutes")
-    HISTORY_HOURS = cfg.g("history", "HISTORY_HOURS", default=8)
-    history_window_ms = HISTORY_HOURS * 3600 * 1000
-    last_alert_ts = {}
-    # sim_alert_history: lista (ts_ms, symbol, history_tf) para simular fetch_history()
-    # del screener. Cada scan recomputa counts_history a partir de las alertas emitidas
-    # en las últimas HISTORY_HOURS, y se la pasa a classify() para aplicar
-    # LATE_REPEAT_PENALTY igual que en producción.
-    sim_alert_history = []
-
-    scan_ts = []
-    cur = start_dt
-    while cur <= end_dt:
-        scan_ts.append(int(cur.timestamp() * 1000))
-        cur += timedelta(minutes=scan_interval_min)
+    # Precalcular índices de barras por (sym, TF) con searchsorted vectorizado.
+    # Elimina O(Nscans × Npairs × 3) búsquedas binarias por variante.
+    scan_ts_arr = np.asarray(scan_ts, dtype=np.int64)
+    bar_idx_cache = {}
+    for sym, tfs in klines.items():
+        by_tf = {}
+        for tf in ("5m", "15m", "1h"):
+            sym_prep = (prepared.get(sym) or {}) if prepared else {}
+            df = sym_prep.get(tf)
+            if df is None:
+                df = tfs.get(tf)
+            if df is None:
+                continue
+            ct = df["close_time"].values.astype(np.int64)
+            idxs = np.searchsorted(ct, scan_ts_arr, side="right") - 1
+            idxs[scan_ts_arr < ct[0]] = -1
+            by_tf[tf] = idxs
+        bar_idx_cache[sym] = by_tf
 
     snap_runs_sorted = sorted(snapshot_pairs.keys()) if snapshot_pairs else []
 
-    def pairs_for_scan(scan_ts_ms):
+    def pairs_for_scan(ts_ms):
         if not snapshot_pairs:
             return list(klines.keys())
-        scan_iso = datetime.fromtimestamp(scan_ts_ms / 1000, tz=timezone.utc).isoformat()
+        scan_iso = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat()
         best = None
         for run_iso in snap_runs_sorted:
             if run_iso <= scan_iso:
@@ -1426,12 +1466,56 @@ def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None,
             return list(klines.keys())
         return [s for s in snapshot_pairs[best] if s in klines]
 
-    alerts = []
     total_scans = len(scan_ts)
+    candidates = []
     for i, ts_ms in enumerate(scan_ts):
         if i % 20 == 0:
-            print(f"    scan {i}/{total_scans} ({i*100//max(total_scans,1)}%) — {len(alerts)} alertas hasta ahora")
+            print(f"    [analyze] scan {i}/{total_scans} ({i*100//max(total_scans,1)}%) — {len(candidates)} candidatos")
+        active_pairs = pairs_for_scan(ts_ms)
+        for sym in active_pairs:
+            by_tf = bar_idx_cache.get(sym, {})
+            tf_data = {}
+            valid = True
+            for tf in ("5m", "15m", "1h"):
+                idxs = by_tf.get(tf)
+                if idxs is None:
+                    valid = False; break
+                idx = int(idxs[i])
+                if idx < 80:
+                    valid = False; break
+                sym_prep = (prepared.get(sym) or {}) if prepared else {}
+                prep_df = sym_prep.get(tf)
+                df = prep_df if prep_df is not None else klines.get(sym, {}).get(tf)
+                result = analyze_at_index(df, idx, cfg) if prep_df is not None \
+                         else analyze_at_time(df, idx, cfg)
+                if result is None:
+                    valid = False; break
+                tf_data[tf] = result
+            if not valid:
+                continue
+            if deriv_enabled:
+                oi_delta, funding_rate = lookup_derivatives_at(
+                    derivatives.get(sym), ts_ms, oi_lookback_min=deriv_lookback)
+                tf_data["15m"]["oi_delta_30m"] = oi_delta
+                tf_data["15m"]["funding_rate"] = funding_rate
+            idx_15m = int(by_tf["15m"][i])
+            candidates.append((i, ts_ms, sym, tf_data, idx_15m))
+    return candidates
 
+
+def _classify_pass(candidates, cfg, cooldown_min_by_state, history_window_ms,
+                   klines, outcomes_cache):
+    """Segundo pase del scan: classify + cooldowns + outcomes sobre candidatos pre-extraídos.
+    outcomes_cache[(sym, idx_15m)] permite reutilizar outcomes entre variantes."""
+    last_alert_ts = {}
+    # sim_alert_history: lista (ts_ms, symbol, history_tf) para simular fetch_history()
+    # del screener. Cada scan recomputa counts_history a partir de las alertas emitidas
+    # en las últimas HISTORY_HOURS, y se la pasa a classify() para aplicar
+    # LATE_REPEAT_PENALTY igual que en producción.
+    sim_alert_history = []
+    alerts = []
+
+    for (i, ts_ms, sym, tf_data, idx_15m) in candidates:
         # Ventana móvil: descartar alertas más viejas que HISTORY_HOURS para que counts_history
         # refleje sólo lo que el screener real vería en su fetch_history().
         cutoff_ms = ts_ms - history_window_ms
@@ -1441,66 +1525,72 @@ def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None,
         for (_, s, h) in sim_alert_history:
             counts_history[(s, h)] = counts_history.get((s, h), 0) + 1
 
-        active_pairs = pairs_for_scan(ts_ms)
-        for sym in active_pairs:
-            tf_data = {}
-            valid = True
-            for tf in ("5m", "15m", "1h"):
-                sym_prepared = prepared.get(sym) if prepared else None
-                _prep = sym_prepared.get(tf) if sym_prepared else None
-                df = _prep if _prep is not None else klines.get(sym, {}).get(tf)
-                if df is None:
-                    valid = False
-                    break
-                idx = find_idx_at_or_before(df, ts_ms)
-                if idx < 0 or idx < 80:
-                    valid = False
-                    break
-                result = analyze_at_index(df, idx, cfg) if sym_prepared else analyze_at_time(df, idx, cfg)
-                tf_data[tf] = result
-                if result is None:
-                    valid = False
-                    break
-            if not valid:
-                continue
+        alert = classify(sym, tf_data, cfg, counts_history)
+        if alert is None:
+            continue
 
-            # Inyectar features de derivatives en el 15m TF (mismo patrón que screener.py)
-            if deriv_enabled:
-                oi_delta, funding_rate = lookup_derivatives_at(
-                    derivatives.get(sym), ts_ms, oi_lookback_min=deriv_lookback)
-                tf_data["15m"]["oi_delta_30m"] = oi_delta
-                tf_data["15m"]["funding_rate"] = funding_rate
+        key = (sym, alert["history_tf"])
+        cooldown_ms = cooldown_min_by_state.get(alert["history_tf"], 60) * 60 * 1000
+        if key in last_alert_ts and (ts_ms - last_alert_ts[key]) < cooldown_ms:
+            continue
+        last_alert_ts[key] = ts_ms
 
-            alert = classify(sym, tf_data, cfg, counts_history)
-            if alert is None:
-                continue
+        # Registrar en historia simulada para la próxima scan (LATE_REPEAT)
+        sim_alert_history.append((ts_ms, sym, alert["history_tf"]))
 
-            key = (sym, alert["history_tf"])
-            cooldown_ms = cooldown_min_by_state.get(alert["history_tf"], 60) * 60 * 1000
-            if key in last_alert_ts and (ts_ms - last_alert_ts[key]) < cooldown_ms:
-                continue
-            last_alert_ts[key] = ts_ms
-
-            # Registrar en historia simulada para la próxima scan (LATE_REPEAT)
-            sim_alert_history.append((ts_ms, sym, alert["history_tf"]))
-
+        oc_key = (sym, idx_15m)
+        if outcomes_cache is not None and oc_key in outcomes_cache:
+            outcomes = outcomes_cache[oc_key]
+        else:
             df_15m = klines[sym]["15m"]
-            alert_idx_15m = find_idx_at_or_before(df_15m, ts_ms)
-            outcomes = calculate_outcomes(df_15m, alert_idx_15m, alert["price"])
+            outcomes = calculate_outcomes(df_15m, idx_15m, alert["price"])
+            if outcomes_cache is not None:
+                outcomes_cache[oc_key] = outcomes
 
-            alert_record = {
-                "alerted_at": datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat(),
-                "symbol": sym, "signal_type": alert["history_tf"],
-                "label": alert["label"], "score": alert["score"],
-                "bucket": alert["bucket"], "timeframe": alert["timeframe"],
-                "entry_price": alert["price"], "ref_price": alert["ref_price"],
-                "obv_slope": alert.get("obv_slope"),
-                "cvd_ratio": alert.get("cvd_ratio"),
-                "recent_long_ok": alert.get("recent_long_ok"),
-                "candle_status": alert.get("candle_status"),
-                **outcomes,
-            }
-            alerts.append(alert_record)
+        alert_record = {
+            "alerted_at": datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat(),
+            "symbol": sym, "signal_type": alert["history_tf"],
+            "label": alert["label"], "score": alert["score"],
+            "bucket": alert["bucket"], "timeframe": alert["timeframe"],
+            "entry_price": alert["price"], "ref_price": alert["ref_price"],
+            "obv_slope": alert.get("obv_slope"),
+            "cvd_ratio": alert.get("cvd_ratio"),
+            "recent_long_ok": alert.get("recent_long_ok"),
+            "candle_status": alert.get("candle_status"),
+            **outcomes,
+        }
+        alerts.append(alert_record)
+    return alerts
+
+
+def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None,
+             scan_interval_min=SCAN_INTERVAL_MIN, derivatives=None, prepared=None,
+             analyze_cache=None, outcomes_cache=None):
+    print(f"\n  Simulando {(end_dt - start_dt).total_seconds() / 3600:.0f}h con scans cada {scan_interval_min}min...")
+
+    cooldown_min_by_state = cfg.g("cooldowns_minutes")
+    HISTORY_HOURS = cfg.g("history", "HISTORY_HOURS", default=8)
+    history_window_ms = HISTORY_HOURS * 3600 * 1000
+
+    scan_ts = []
+    cur = start_dt
+    while cur <= end_dt:
+        scan_ts.append(int(cur.timestamp() * 1000))
+        cur += timedelta(minutes=scan_interval_min)
+
+    akey = _analyze_key(cfg)
+    if analyze_cache is not None and akey in analyze_cache:
+        candidates = analyze_cache[akey]
+        print(f"    [analyze] Reutilizando {len(candidates)} candidatos cacheados ({len(scan_ts)} scans)")
+    else:
+        print(f"    [analyze] Extrayendo candidatos ({len(scan_ts)} scans × {len(klines)} pares)...")
+        candidates = _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivatives)
+        print(f"    [analyze] {len(candidates)} candidatos encontrados")
+        if analyze_cache is not None:
+            analyze_cache[akey] = candidates
+
+    alerts = _classify_pass(candidates, cfg, cooldown_min_by_state, history_window_ms,
+                            klines, outcomes_cache)
     print(f"    Total alertas simuladas: {len(alerts)}")
     return alerts
 
@@ -1736,7 +1826,7 @@ def compare_runs(alerts_a, label_a, alerts_b, label_b, period_days=7):
 
 def run_backtest(cfg, weeks, klines, start_dt, end_dt, snapshot_pairs=None,
                  label="run", scan_interval_min=SCAN_INTERVAL_MIN, derivatives=None,
-                 prepared_cache=None):
+                 prepared_cache=None, analyze_cache=None, outcomes_cache=None):
     print(f"\n  >>> Corriendo backtest: {label}")
     key = _indicator_key(cfg)
     if prepared_cache is not None and key in prepared_cache:
@@ -1752,7 +1842,8 @@ def run_backtest(cfg, weeks, klines, start_dt, end_dt, snapshot_pairs=None,
             prepared_cache[key] = prepared
     alerts = simulate(cfg, klines, start_dt, end_dt, snapshot_pairs,
                       scan_interval_min=scan_interval_min, derivatives=derivatives,
-                      prepared=prepared)
+                      prepared=prepared, analyze_cache=analyze_cache,
+                      outcomes_cache=outcomes_cache)
     summarize(alerts, label=label)
     return alerts
 
@@ -1772,6 +1863,9 @@ def main():
                              f"production cron usa 5min)")
     parser.add_argument("--no-cache", action="store_true",
                         help="Ignora y no escribe caché de disco de klines/derivatives")
+    parser.add_argument("--workers", type=int, default=1,
+                        help="Procesos paralelos para candidate building (default 1; "
+                             "no usar cuando sweep.py ya paraleliza ventanas)")
     parser.add_argument("--end-date", default=None,
                         help="YYYY-MM-DD: fin del backtest (default: ahora). Útil para validación multi-ventana.")
     args = parser.parse_args()
@@ -1837,6 +1931,8 @@ def main():
     print(f"\n[3/4] Ejecutando simulación...")
     all_results = {}
     prepared_cache = {}  # compartido entre cfgs con mismos parámetros de indicadores
+    analyze_cache  = {}  # compartido entre cfgs con mismo _analyze_key (variant-independent)
+    outcomes_cache = {}  # compartido entre cfgs: outcomes(sym, idx_15m) son variant-independent
 
     if args.variants:
         # Modo nuevo: --variants base.json A.json B.json C.json
@@ -1849,14 +1945,16 @@ def main():
         alerts_base = run_backtest(cfg_base, args.weeks, klines, start_dt, end_dt,
                                    snapshot_pairs, label=f"BASE ({Path(base_path).stem})",
                                    scan_interval_min=args.scan_interval_min,
-                                   derivatives=derivatives, prepared_cache=prepared_cache)
+                                   derivatives=derivatives, prepared_cache=prepared_cache,
+                                   analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
         all_results[Path(base_path).stem] = alerts_base
         for vp in variant_paths:
             cfg_v = Config(vp)
             alerts_v = run_backtest(cfg_v, args.weeks, klines, start_dt, end_dt,
                                     snapshot_pairs, label=f"VARIANT ({Path(vp).stem})",
                                     scan_interval_min=args.scan_interval_min,
-                                    derivatives=derivatives, prepared_cache=prepared_cache)
+                                    derivatives=derivatives, prepared_cache=prepared_cache,
+                                    analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
             all_results[Path(vp).stem] = alerts_v
             compare_runs(alerts_base, Path(base_path).stem, alerts_v, Path(vp).stem,
                          period_days=period_days)
@@ -1867,11 +1965,13 @@ def main():
         alerts_old = run_backtest(cfg_old, args.weeks, klines, start_dt, end_dt,
                                   snapshot_pairs, label=f"OLD ({args.compare[0]})",
                                   scan_interval_min=args.scan_interval_min,
-                                  derivatives=derivatives, prepared_cache=prepared_cache)
+                                  derivatives=derivatives, prepared_cache=prepared_cache,
+                                  analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
         alerts_new = run_backtest(cfg_new, args.weeks, klines, start_dt, end_dt,
                                   snapshot_pairs, label=f"NEW ({args.compare[1]})",
                                   scan_interval_min=args.scan_interval_min,
-                                  derivatives=derivatives, prepared_cache=prepared_cache)
+                                  derivatives=derivatives, prepared_cache=prepared_cache,
+                                  analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
         compare_runs(alerts_old, args.compare[0], alerts_new, args.compare[1],
                      period_days=period_days)
         all_results = {"old": alerts_old, "new": alerts_new}
@@ -1896,7 +1996,8 @@ def main():
             alerts = run_backtest(tmp_cfg, args.weeks, klines, start_dt, end_dt,
                                   snapshot_pairs, label=name,
                                   scan_interval_min=args.scan_interval_min,
-                                  derivatives=derivatives, prepared_cache=prepared_cache)
+                                  derivatives=derivatives, prepared_cache=prepared_cache,
+                                  analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
             all_results[name] = alerts
         if "full (todo activo)" in all_results:
             for name, alerts in all_results.items():
@@ -1907,7 +2008,8 @@ def main():
         alerts = run_backtest(cfg_main, args.weeks, klines, start_dt, end_dt,
                               snapshot_pairs, label=f"config: {args.config}",
                               scan_interval_min=args.scan_interval_min,
-                              derivatives=derivatives, prepared_cache=prepared_cache)
+                              derivatives=derivatives, prepared_cache=prepared_cache,
+                              analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
         all_results = {"main": alerts}
 
     if args.out:

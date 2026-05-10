@@ -89,7 +89,8 @@ def score_stats(stats, weights):
     quality  = (stats["best_win_10pct"] / 100) * sample
     volume   = min(1.0, stats["best_per_day"] / 15)
     rr       = min(1.0, stats["best_rr"] / 4) * min(1.0, stats["best_n"] / 5)
-    overflow = max(0.0, stats["best_per_day"] - 25) / 25
+    overflow_thresh = max(1, w.get("volume_overflow_threshold", 25))
+    overflow = max(0.0, stats["best_per_day"] - overflow_thresh) / overflow_thresh
 
     return (w.get("catch",   0.40) * catch
           + w.get("quality", 0.30) * quality
