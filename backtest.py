@@ -1772,6 +1772,8 @@ def main():
                              f"production cron usa 5min)")
     parser.add_argument("--no-cache", action="store_true",
                         help="Ignora y no escribe caché de disco de klines/derivatives")
+    parser.add_argument("--end-date", default=None,
+                        help="YYYY-MM-DD: fin del backtest (default: ahora). Útil para validación multi-ventana.")
     args = parser.parse_args()
 
     global _NO_CACHE
@@ -1779,7 +1781,10 @@ def main():
     if _NO_CACHE:
         print("  [cache] Desactivado por --no-cache")
 
-    end_dt = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
+    if args.end_date:
+        end_dt = datetime.strptime(args.end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
+    else:
+        end_dt = datetime.now(timezone.utc).replace(minute=0, second=0, microsecond=0)
     start_dt = end_dt - timedelta(weeks=args.weeks)
     period_days = args.weeks * 7
     print(f"Período backtest: {start_dt} → {end_dt} ({args.weeks} semana(s), {period_days}d)")

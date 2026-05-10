@@ -1,0 +1,32 @@
+{
+  "base": "config.json",
+  "weeks": 4,
+  "max_pairs": 200,
+  "scan_interval_min": 15,
+
+  "windows": [
+    "2026-05-09",
+    "2026-04-11",
+    "2026-03-14"
+  ],
+
+  "params": {
+    "scoring.BEST_MIN_SCORE":          [12, 13, 14],
+    "scoring.STRONG_MIN_SCORE":        [10, 11, 12],
+    "indicators.ATR_MIN_PCT":          [1.0, 1.5, 2.0],
+    "scoring_breakout.STRUCT_PENALTY": [-1, 0, 1],
+    "scoring_hold.STRUCT_PENALTY":     [-1, 0, 1]
+  },
+
+  "scoring_weights": {
+    "catch":                    0.10,
+    "quality":                  0.60,
+    "volume":                   0.15,
+    "rr":                       0.15,
+    "volume_overflow_penalty":  0.40
+  },
+
+  "out_dir": ".sweep_results",
+
+  "max_parallel_windows": 3
+}

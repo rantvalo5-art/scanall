@@ -1,0 +1,1 @@
+{ "base": "config.json", "weeks": 1, "max_pairs": 30, "scan_interval_min": 30, "windows": ["2026-05-09"], "params": { "scoring.STRONG_MIN_SCORE": [11, 12] }, "out_dir": ".sweep_test" }

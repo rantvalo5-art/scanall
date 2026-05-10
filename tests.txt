@@ -1,0 +1,732 @@
+BACKTEST H
+ OLD (CONFIG.JSON)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 1684
+
+Por tipo:
+  HOLD        717  (42%)
+  RIDING      501  (29%)
+  PREBREAK    280  (16%)
+  BREAKOUT    186  (11%)
+
+Por bucket:
+  BEST    134 — max_24h: +9.38%, drawdown: -2.85%, win >2%: 78%
+  STRONG  658 — max_24h: +9.67%, drawdown: -4.17%, win >2%: 75%
+  WATCH   892 — max_24h: +8.24%, drawdown: -3.78%, win >2%: 75%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n=884  avg max 24h: +9.51%
+  CVD neutral              n=564  avg max 24h: +8.73%
+  CVD bearish (<-0.05)     n=236  avg max 24h: +6.92%
+
+OBV análisis:
+  OBV rising (>+0.05)      n=1202  avg max 24h: +9.46%
+  OBV neutral              n=432  avg max 24h: +7.31%
+  OBV falling (<-0.05)     n= 50  avg max 24h: +8.72%
+
+recent_long_ok análisis:
+  True  n=1365  avg max 24h: +8.32%, drawdown: -3.62%
+  False n=319  avg max 24h: +11.32%, drawdown: -4.90%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 NILUSDT        PREBREAK       8 WATCH   +147.97%  -0.17  -0.04   False
+    2 NILUSDT        HOLD          11 STRONG  +135.58%  -0.04  +0.25    True
+    3 DOGSUSDT       PREBREAK      10 WATCH   +132.43%  +0.19  +0.05   False
+    4 NILUSDT        BREAKOUT      11 STRONG  +131.41%  -0.01  +0.38    True
+    5 DOGSUSDT       PREBREAK       9 WATCH   +131.04%  -0.02  +0.09    True
+    6 NILUSDT        RIDING         9 WATCH   +129.75%  +0.04  +0.08   False
+    7 NILUSDT        RIDING        11 STRONG  +128.97%  +0.07  +0.36    True
+    8 NILUSDT        RIDING         9 WATCH   +127.72%  +0.03  +0.38   False
+    9 DOGSUSDT       BREAKOUT      15 BEST    +120.51%  +0.17  +0.17    True
+   10 DOGSUSDT       PREBREAK      14 BEST    +119.88%  +0.18  +0.02   False
+   11 DOGSUSDT       RIDING        10 WATCH   +112.05%  +0.09  +0.25   False
+   12 DOGSUSDT       RIDING        11 STRONG  +111.48%  +0.10  +0.27   False
+   13 DOGSUSDT       HOLD          12 STRONG  +110.33%  +0.08  +0.24    True
+   14 DOGSUSDT       RIDING        12 STRONG  +109.19%  +0.10  +0.29    True
+   15 DOGSUSDT       RIDING        12 STRONG  +108.63%  +0.10  +0.33    True
+   16 NILUSDT        RIDING        10 WATCH   +106.88%  +0.05  +0.55    True
+   17 NILUSDT        RIDING        10 WATCH   +106.65%  +0.06  +0.25   False
+   18 NILUSDT        RIDING         6 WATCH   +106.02%  +0.03  -0.64   False
+   19 NILUSDT        RIDING        11 STRONG  +105.47%  +0.06  +0.19   False
+   20 DOGSUSDT       RIDING        11 STRONG  +103.68%  +0.07  +0.33    True
+   21 DOGSUSDT       RIDING        12 STRONG  +102.09%  +0.08  +0.33    True
+   22 NILUSDT        RIDING        11 STRONG  +101.32%  +0.06  +0.22   False
+   23 DOGSUSDT       BREAKOUT      12 STRONG   +96.45%  +0.05  +0.35    True
+   24 TSTUSDT        BREAKOUT      14 BEST     +95.17%  +0.07  +0.17    True
+   25 DOGSUSDT       HOLD          12 STRONG   +93.47%  +0.10  +0.13    True
+   26 DOGSUSDT       HOLD          11 STRONG   +85.17%  +0.11  +0.56    True
+   27 IOUSDT         HOLD          11 STRONG   +77.84%  +0.10  +0.09   False
+   28 IOUSDT         RIDING        10 WATCH    +74.47%  +0.07  +0.20    True
+   29 IOUSDT         RIDING        10 WATCH    +74.19%  +0.07  +0.19    True
+   30 IOUSDT         RIDING        11 STRONG   +73.78%  +0.06  +0.20    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n=186)  8:4 9:8 10:18 11:21 12:43 13:44 14:27 15:21
+  HOLD       (n=717)  7:12 8:32 9:59 10:149 11:268 12:197
+  PREBREAK   (n=280)  4:1 5:11 6:25 7:41 8:45 9:47 10:34 11:20 12:15 13:16 14:10 15:15
+  RIDING     (n=501)  4:5 5:2 6:20 7:39 8:32 9:105 10:203 11:70 12:24 13:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=3, STRONG=16, WATCH=11
+  Tipos:   {'PREBREAK': 4, 'HOLD': 5, 'BREAKOUT': 4, 'RIDING': 17}
+  Score promedio top 30: 10.9
+  Move promedio top 30: +108.65%
+
+   NEW (CONFIG_H.JSON)
+
+
+Total alertas: 1684
+
+Por tipo:
+  HOLD        717  (42%)
+  RIDING      501  (29%)
+  PREBREAK    280  (16%)
+  BREAKOUT    186  (11%)
+
+Por bucket:
+  BEST    134 — max_24h: +9.38%, drawdown: -2.85%, win >2%: 78%
+  STRONG  279 — max_24h: +8.87%, drawdown: -3.97%, win >2%: 73%
+  WATCH  1271 — max_24h: +8.84%, drawdown: -3.94%, win >2%: 76%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n=884  avg max 24h: +9.51%
+  CVD neutral              n=564  avg max 24h: +8.73%
+  CVD bearish (<-0.05)     n=236  avg max 24h: +6.92%
+
+OBV análisis:
+  OBV rising (>+0.05)      n=1202  avg max 24h: +9.46%
+  OBV neutral              n=432  avg max 24h: +7.31%
+  OBV falling (<-0.05)     n= 50  avg max 24h: +8.72%
+
+recent_long_ok análisis:
+  True  n=1365  avg max 24h: +8.32%, drawdown: -3.62%
+  False n=319  avg max 24h: +11.32%, drawdown: -4.90%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 NILUSDT        PREBREAK       8 WATCH   +147.97%  -0.17  -0.04   False
+    2 NILUSDT        HOLD          11 WATCH   +135.58%  -0.04  +0.25    True
+    3 DOGSUSDT       PREBREAK      10 WATCH   +132.43%  +0.19  +0.05   False
+    4 NILUSDT        BREAKOUT      11 WATCH   +131.41%  -0.01  +0.38    True
+    5 DOGSUSDT       PREBREAK       9 WATCH   +131.04%  -0.02  +0.09    True
+    6 NILUSDT        RIDING         9 WATCH   +129.75%  +0.04  +0.08   False
+    7 NILUSDT        RIDING        11 WATCH   +128.97%  +0.07  +0.36    True
+    8 NILUSDT        RIDING         9 WATCH   +127.72%  +0.03  +0.38   False
+    9 DOGSUSDT       BREAKOUT      15 BEST    +120.51%  +0.17  +0.17    True
+   10 DOGSUSDT       PREBREAK      14 BEST    +119.88%  +0.18  +0.02   False
+   11 DOGSUSDT       RIDING        10 WATCH   +112.05%  +0.09  +0.25   False
+   12 DOGSUSDT       RIDING        11 WATCH   +111.48%  +0.10  +0.27   False
+   13 DOGSUSDT       HOLD          12 STRONG  +110.33%  +0.08  +0.24    True
+   14 DOGSUSDT       RIDING        12 STRONG  +109.19%  +0.10  +0.29    True
+   15 DOGSUSDT       RIDING        12 STRONG  +108.63%  +0.10  +0.33    True
+   16 NILUSDT        RIDING        10 WATCH   +106.88%  +0.05  +0.55    True
+   17 NILUSDT        RIDING        10 WATCH   +106.65%  +0.06  +0.25   False
+   18 NILUSDT        RIDING         6 WATCH   +106.02%  +0.03  -0.64   False
+   19 NILUSDT        RIDING        11 WATCH   +105.47%  +0.06  +0.19   False
+   20 DOGSUSDT       RIDING        11 WATCH   +103.68%  +0.07  +0.33    True
+   21 DOGSUSDT       RIDING        12 STRONG  +102.09%  +0.08  +0.33    True
+   22 NILUSDT        RIDING        11 WATCH   +101.32%  +0.06  +0.22   False
+   23 DOGSUSDT       BREAKOUT      12 STRONG   +96.45%  +0.05  +0.35    True
+   24 TSTUSDT        BREAKOUT      14 BEST     +95.17%  +0.07  +0.17    True
+   25 DOGSUSDT       HOLD          12 STRONG   +93.47%  +0.10  +0.13    True
+   26 DOGSUSDT       HOLD          11 WATCH    +85.17%  +0.11  +0.56    True
+   27 IOUSDT         HOLD          11 WATCH    +77.84%  +0.10  +0.09   False
+   28 IOUSDT         RIDING        10 WATCH    +74.47%  +0.07  +0.20    True
+   29 IOUSDT         RIDING        10 WATCH    +74.19%  +0.07  +0.19    True
+   30 IOUSDT         RIDING        11 WATCH    +73.78%  +0.06  +0.20    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n=186)  8:4 9:8 10:18 11:21 12:43 13:44 14:27 15:21
+  HOLD       (n=717)  7:12 8:32 9:59 10:149 11:268 12:197
+  PREBREAK   (n=280)  4:1 5:11 6:25 7:41 8:45 9:47 10:34 11:20 12:15 13:16 14:10 15:15
+  RIDING     (n=501)  4:5 5:2 6:20 7:39 8:32 9:105 10:203 11:70 12:24 13:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=3, STRONG=6, WATCH=21
+  Tipos:   {'PREBREAK': 4, 'HOLD': 5, 'BREAKOUT': 4, 'RIDING': 17}
+  Score promedio top 30: 10.9
+  Move promedio top 30: +108.65%
+
+══════════════════════════════════════════════════════════════════════
+ COMPARACIÓN: config.json  vs  config_H.json  (7 días)
+══════════════════════════════════════════════════════════════════════
+  Métrica                              config.json   config_H.json
+  -------------------------------- --------------- ---------------
+  Total alertas                               1684            1684
+  BREAKOUT count                               186             186
+  BEST count                                   134             134
+  BEST por día (target: 10-20)                19.1            19.1
+  STRONG count                                 658             279
+  Explosivos totales (>20%)                    159             159
+  -------------------------------- --------------- ---------------
+  ★ CATCH RATE (lo más importante):
+  Top 30 movers en BEST                         3/30              3/30
+  Top 30 movers en BEST+STRONG                 19/30              9/30
+  -------------------------------- --------------- ---------------
+  ★ CALIDAD del bucket BEST:
+  Avg max 24h BEST                          +9.38%          +9.38%
+  Avg drawdown BEST                         -2.85%          -2.85%
+  R/R BEST                                    3.29            3.29
+  Win >5% en BEST                              48%              48%
+  Win >10% en BEST                             22%              22%
+  -------------------------------- --------------- ---------------
+  Otros:
+  Avg max 24h global                        +8.89%          +8.89%
+  Avg max 24h STRONG                        +9.67%          +8.87%
+  Avg drawdown global                       -3.86%          -3.86%
+  Win >2% global                               75%              75%
+  Win >5% global                               46%              46%
+
+BACKTEST J
+
+OLD (CONFIG.JSON)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 1679
+
+Por tipo:
+  HOLD        717  (42%)
+  RIDING      495  (29%)
+  PREBREAK    281  (16%)
+  BREAKOUT    186  (11%)
+
+Por bucket:
+  BEST    135 — max_24h: +9.39%, drawdown: -2.83%, win >2%: 78%
+  STRONG  655 — max_24h: +9.74%, drawdown: -4.17%, win >2%: 76%
+  WATCH   889 — max_24h: +8.35%, drawdown: -3.72%, win >2%: 75%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n=880  avg max 24h: +9.58%
+  CVD neutral              n=561  avg max 24h: +8.88%
+  CVD bearish (<-0.05)     n=238  avg max 24h: +6.96%
+
+OBV análisis:
+  OBV rising (>+0.05)      n=1198  avg max 24h: +9.52%
+  OBV neutral              n=431  avg max 24h: +7.47%
+  OBV falling (<-0.05)     n= 50  avg max 24h: +8.76%
+
+recent_long_ok análisis:
+  True  n=1364  avg max 24h: +8.40%, drawdown: -3.62%
+  False n=315  avg max 24h: +11.47%, drawdown: -4.72%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 NILUSDT        PREBREAK       8 WATCH   +147.97%  -0.17  -0.04   False
+    2 NILUSDT        HOLD          11 STRONG  +135.58%  -0.04  +0.26    True
+    3 DOGSUSDT       PREBREAK      10 WATCH   +132.43%  +0.19  +0.05   False
+    4 NILUSDT        BREAKOUT      11 STRONG  +131.41%  -0.01  +0.38    True
+    5 DOGSUSDT       PREBREAK       9 WATCH   +131.04%  -0.02  +0.09    True
+    6 NILUSDT        RIDING         9 WATCH   +129.75%  +0.04  +0.08   False
+    7 NILUSDT        RIDING        11 STRONG  +128.97%  +0.07  +0.36    True
+    8 NILUSDT        RIDING         9 WATCH   +127.72%  +0.03  +0.39   False
+    9 DOGSUSDT       BREAKOUT      15 BEST    +120.51%  +0.17  +0.17    True
+   10 DOGSUSDT       PREBREAK      14 BEST    +119.88%  +0.18  +0.02   False
+   11 DOGSUSDT       RIDING        10 WATCH   +112.05%  +0.09  +0.25   False
+   12 DOGSUSDT       RIDING        11 STRONG  +111.48%  +0.10  +0.27   False
+   13 DOGSUSDT       HOLD          12 STRONG  +110.33%  +0.08  +0.24    True
+   14 DOGSUSDT       RIDING        12 STRONG  +109.19%  +0.10  +0.29    True
+   15 DOGSUSDT       RIDING        12 STRONG  +108.63%  +0.10  +0.33    True
+   16 NILUSDT        RIDING        10 WATCH   +106.88%  +0.05  +0.56    True
+   17 NILUSDT        RIDING        10 WATCH   +106.65%  +0.06  +0.25   False
+   18 NILUSDT        RIDING         6 WATCH   +106.02%  +0.03  -0.65   False
+   19 NILUSDT        RIDING        11 STRONG  +105.47%  +0.06  +0.19   False
+   20 DOGSUSDT       RIDING        11 STRONG  +103.68%  +0.07  +0.33    True
+   21 DOGSUSDT       RIDING        12 STRONG  +102.09%  +0.08  +0.33    True
+   22 NILUSDT        RIDING        11 STRONG  +101.32%  +0.06  +0.23   False
+   23 DOGSUSDT       BREAKOUT      12 STRONG   +96.45%  +0.05  +0.35    True
+   24 TSTUSDT        BREAKOUT      14 BEST     +95.17%  +0.07  +0.17    True
+   25 DOGSUSDT       HOLD          12 STRONG   +93.47%  +0.10  +0.13    True
+   26 DOGSUSDT       HOLD          11 STRONG   +85.17%  +0.11  +0.56    True
+   27 IOUSDT         HOLD          11 STRONG   +77.84%  +0.10  +0.09   False
+   28 IOUSDT         RIDING        10 WATCH    +74.47%  +0.07  +0.20    True
+   29 IOUSDT         RIDING        10 WATCH    +74.19%  +0.07  +0.19    True
+   30 IOUSDT         RIDING        11 STRONG   +73.78%  +0.06  +0.20    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n=186)  8:4 9:9 10:17 11:22 12:42 13:44 14:26 15:22
+  HOLD       (n=717)  7:12 8:33 9:58 10:150 11:266 12:198
+  PREBREAK   (n=281)  4:1 5:11 6:25 7:41 8:45 9:47 10:34 11:20 12:15 13:16 14:10 15:16
+  RIDING     (n=495)  4:5 5:2 6:21 7:38 8:31 9:104 10:201 11:68 12:24 13:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=3, STRONG=16, WATCH=11
+  Tipos:   {'PREBREAK': 4, 'HOLD': 5, 'BREAKOUT': 4, 'RIDING': 17}
+  Score promedio top 30: 10.9
+  Move promedio top 30: +108.65%
+
+
+NEW (CONFIG_J.JSON)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 786
+
+Por tipo:
+  HOLD        355  (45%)
+  RIDING      279  (35%)
+  BREAKOUT     84  (10%)
+  PREBREAK     68  (8%)
+
+Por bucket:
+  BEST     45 — max_24h: +14.41%, drawdown: -3.94%, win >2%: 91%
+  STRONG  142 — max_24h: +12.01%, drawdown: -5.47%, win >2%: 82%
+  WATCH   599 — max_24h: +11.07%, drawdown: -5.34%, win >2%: 79%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n=416  avg max 24h: +12.26%
+  CVD neutral              n=295  avg max 24h: +10.92%
+  CVD bearish (<-0.05)     n= 75  avg max 24h: +8.87%
+
+OBV análisis:
+  OBV rising (>+0.05)      n=604  avg max 24h: +12.36%
+  OBV neutral              n=163  avg max 24h: +7.78%
+  OBV falling (<-0.05)     n= 19  avg max 24h: +13.16%
+
+recent_long_ok análisis:
+  True  n=600  avg max 24h: +10.72%, drawdown: -4.96%
+  False n=186  avg max 24h: +13.75%, drawdown: -6.35%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 NILUSDT        PREBREAK       8 WATCH   +147.97%  -0.17  -0.04   False
+    2 NILUSDT        HOLD          11 WATCH   +135.58%  -0.04  +0.26    True
+    3 NILUSDT        BREAKOUT      11 WATCH   +131.41%  -0.01  +0.38    True
+    4 NILUSDT        RIDING         9 WATCH   +129.75%  +0.04  +0.08   False
+    5 NILUSDT        RIDING        11 WATCH   +128.97%  +0.07  +0.36    True
+    6 NILUSDT        RIDING         9 WATCH   +127.72%  +0.03  +0.39   False
+    7 DOGSUSDT       BREAKOUT      15 BEST    +120.51%  +0.17  +0.17    True
+    8 DOGSUSDT       RIDING        10 WATCH   +112.05%  +0.09  +0.25   False
+    9 DOGSUSDT       RIDING        11 WATCH   +111.48%  +0.10  +0.27   False
+   10 DOGSUSDT       HOLD          12 STRONG  +110.33%  +0.08  +0.24    True
+   11 DOGSUSDT       RIDING        12 STRONG  +109.19%  +0.10  +0.29    True
+   12 DOGSUSDT       RIDING        12 STRONG  +108.63%  +0.10  +0.33    True
+   13 NILUSDT        RIDING        10 WATCH   +106.88%  +0.05  +0.56    True
+   14 NILUSDT        RIDING        10 WATCH   +106.65%  +0.06  +0.25   False
+   15 NILUSDT        RIDING         6 WATCH   +106.02%  +0.03  -0.65   False
+   16 NILUSDT        RIDING        11 WATCH   +105.47%  +0.06  +0.19   False
+   17 DOGSUSDT       RIDING        11 WATCH   +103.68%  +0.07  +0.33    True
+   18 DOGSUSDT       RIDING        12 STRONG  +102.09%  +0.08  +0.33    True
+   19 NILUSDT        RIDING        11 WATCH   +101.32%  +0.06  +0.23   False
+   20 DOGSUSDT       BREAKOUT      12 STRONG   +96.45%  +0.05  +0.35    True
+   21 TSTUSDT        BREAKOUT      14 BEST     +95.17%  +0.07  +0.17    True
+   22 DOGSUSDT       HOLD          11 WATCH    +85.17%  +0.11  +0.56    True
+   23 TSTUSDT        HOLD          10 WATCH    +71.88%  +0.04  +0.02    True
+   24 TSTUSDT        HOLD          11 WATCH    +51.48%  +0.08  +0.33    True
+   25 DYMUSDT        HOLD          11 WATCH    +49.30%  +0.00  +0.08    True
+   26 DYMUSDT        HOLD          11 WATCH    +45.25%  +0.13  +0.10    True
+   27 NILUSDT        HOLD          11 WATCH    +43.12%  +0.03  +0.07    True
+   28 DOGSUSDT       HOLD          11 WATCH    +43.07%  +0.06  +0.74    True
+   29 FTTUSDT        HOLD           7 WATCH    +42.19%  +0.05  -0.60   False
+   30 ZECUSDT        HOLD          12 STRONG   +40.62%  +0.16  +0.10    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n= 84)  8:2 9:6 10:6 11:16 12:18 13:15 14:12 15:9
+  HOLD       (n=355)  7:7 8:15 9:20 10:71 11:140 12:102
+  PREBREAK   (n= 68)  5:6 6:11 7:11 8:9 9:11 10:8 11:4 13:5 14:1 15:2
+  RIDING     (n=279)  4:2 5:1 6:8 7:19 8:10 9:63 10:110 11:43 12:22 13:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=2, STRONG=6, WATCH=22
+  Tipos:   {'PREBREAK': 1, 'HOLD': 11, 'BREAKOUT': 4, 'RIDING': 14}
+  Score promedio top 30: 10.8
+  Move promedio top 30: +95.65%
+
+══════════════════════════════════════════════════════════════════════
+ COMPARACIÓN: config.json  vs  config_J.json  (7 días)
+══════════════════════════════════════════════════════════════════════
+  Métrica                              config.json   config_J.json
+  -------------------------------- --------------- ---------------
+  Total alertas                               1679             786
+  BREAKOUT count                               186              84
+  BEST count                                   135              45
+  BEST por día (target: 10-20)                19.3             6.4
+  STRONG count                                 655             142
+  Explosivos totales (>20%)                    160             111
+  -------------------------------- --------------- ---------------
+  ★ CATCH RATE (lo más importante):
+  Top 30 movers en BEST                         3/30              2/30
+  Top 30 movers en BEST+STRONG                 19/30              8/30
+  -------------------------------- --------------- ---------------
+  ★ CALIDAD del bucket BEST:
+  Avg max 24h BEST                          +9.39%         +14.41%
+  Avg drawdown BEST                         -2.83%          -3.94%
+  R/R BEST                                    3.32            3.66
+  Win >5% en BEST                              47%              71%
+  Win >10% en BEST                             22%              36%
+  -------------------------------- --------------- ---------------
+  Otros:
+  Avg max 24h global                        +8.97%         +11.43%
+  Avg max 24h STRONG                        +9.74%         +12.01%
+  Avg drawdown global                       -3.83%          -5.29%
+  Win >2% global                               76%              80%
+  Win >5% global                               47%              55%
+
+  BACKTEST M
+  
+   OLD (CONFIG.JSON)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 1679
+
+Por tipo:
+  HOLD        717  (42%)
+  RIDING      494  (29%)
+  PREBREAK    283  (16%)
+  BREAKOUT    185  (11%)
+
+Por bucket:
+  BEST    135 — max_24h: +9.35%, drawdown: -2.84%, win >2%: 77%
+  STRONG  660 — max_24h: +9.66%, drawdown: -4.16%, win >2%: 76%
+  WATCH   884 — max_24h: +8.37%, drawdown: -3.69%, win >2%: 75%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n=883  avg max 24h: +9.52%
+  CVD neutral              n=559  avg max 24h: +8.90%
+  CVD bearish (<-0.05)     n=237  avg max 24h: +6.99%
+
+OBV análisis:
+  OBV rising (>+0.05)      n=1202  avg max 24h: +9.49%
+  OBV neutral              n=425  avg max 24h: +7.47%
+  OBV falling (<-0.05)     n= 52  avg max 24h: +8.81%
+
+recent_long_ok análisis:
+  True  n=1360  avg max 24h: +8.39%, drawdown: -3.60%
+  False n=319  avg max 24h: +11.36%, drawdown: -4.67%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 NILUSDT        PREBREAK       8 WATCH   +147.97%  -0.17  -0.04   False
+    2 NILUSDT        HOLD          11 STRONG  +135.58%  -0.04  +0.26    True
+    3 DOGSUSDT       PREBREAK      10 WATCH   +132.43%  +0.19  +0.06   False
+    4 NILUSDT        BREAKOUT      11 STRONG  +131.41%  -0.01  +0.38    True
+    5 DOGSUSDT       PREBREAK       9 WATCH   +131.04%  -0.02  +0.09    True
+    6 NILUSDT        RIDING         9 WATCH   +129.75%  +0.04  +0.08   False
+    7 NILUSDT        RIDING        11 STRONG  +128.97%  +0.07  +0.36    True
+    8 NILUSDT        RIDING         9 WATCH   +127.72%  +0.03  +0.39   False
+    9 DOGSUSDT       BREAKOUT      15 BEST    +120.51%  +0.17  +0.17    True
+   10 DOGSUSDT       PREBREAK      14 BEST    +119.88%  +0.18  +0.02   False
+   11 DOGSUSDT       RIDING        10 WATCH   +112.05%  +0.09  +0.25   False
+   12 DOGSUSDT       RIDING        11 STRONG  +111.48%  +0.10  +0.28   False
+   13 DOGSUSDT       HOLD          12 STRONG  +110.33%  +0.08  +0.24    True
+   14 DOGSUSDT       RIDING        12 STRONG  +109.19%  +0.10  +0.29    True
+   15 DOGSUSDT       RIDING        12 STRONG  +108.63%  +0.10  +0.34    True
+   16 NILUSDT        RIDING        10 WATCH   +106.88%  +0.05  +0.56    True
+   17 NILUSDT        RIDING        10 WATCH   +106.65%  +0.06  +0.25   False
+   18 NILUSDT        RIDING         6 WATCH   +106.02%  +0.03  -0.65   False
+   19 NILUSDT        RIDING        11 STRONG  +105.47%  +0.06  +0.19   False
+   20 DOGSUSDT       RIDING        11 STRONG  +103.68%  +0.07  +0.34    True
+   21 DOGSUSDT       RIDING        12 STRONG  +102.09%  +0.08  +0.34    True
+   22 NILUSDT        RIDING        11 STRONG  +101.32%  +0.06  +0.23   False
+   23 DOGSUSDT       BREAKOUT      12 STRONG   +96.45%  +0.05  +0.36    True
+   24 TSTUSDT        BREAKOUT      14 BEST     +95.17%  +0.07  +0.17    True
+   25 DOGSUSDT       HOLD          12 STRONG   +93.47%  +0.10  +0.13    True
+   26 DOGSUSDT       HOLD          11 STRONG   +85.17%  +0.11  +0.57    True
+   27 IOUSDT         HOLD          11 STRONG   +77.84%  +0.10  +0.09   False
+   28 IOUSDT         RIDING        10 WATCH    +74.47%  +0.07  +0.20    True
+   29 IOUSDT         RIDING        10 WATCH    +74.19%  +0.07  +0.19    True
+   30 IOUSDT         RIDING        11 STRONG   +73.78%  +0.06  +0.20    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n=185)  8:2 9:9 10:17 11:23 12:42 13:43 14:26 15:23
+  HOLD       (n=717)  7:12 8:33 9:58 10:147 11:266 12:201
+  PREBREAK   (n=283)  4:1 5:10 6:25 7:43 8:44 9:49 10:34 11:20 12:15 13:17 14:9 15:16
+  RIDING     (n=494)  4:5 5:2 6:20 7:39 8:32 9:103 10:199 11:69 12:24 13:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=3, STRONG=16, WATCH=11
+  Tipos:   {'PREBREAK': 4, 'HOLD': 5, 'BREAKOUT': 4, 'RIDING': 17}
+  Score promedio top 30: 10.9
+  Move promedio top 30: +108.65%
+
+══════════════════════════════════════════════════════════════════════
+ NEW (CONFIG_M.JSON)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 1675
+
+Por tipo:
+  HOLD        723  (43%)
+  RIDING      483  (28%)
+  PREBREAK    283  (16%)
+  BREAKOUT    186  (11%)
+
+Por bucket:
+  BEST    166 — max_24h: +9.51%, drawdown: -2.89%, win >2%: 75%
+  STRONG  688 — max_24h: +9.50%, drawdown: -4.11%, win >2%: 76%
+  WATCH   821 — max_24h: +8.41%, drawdown: -3.71%, win >2%: 76%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n=883  avg max 24h: +9.52%
+  CVD neutral              n=555  avg max 24h: +8.93%
+  CVD bearish (<-0.05)     n=237  avg max 24h: +6.99%
+
+OBV análisis:
+  OBV rising (>+0.05)      n=1198  avg max 24h: +9.50%
+  OBV neutral              n=425  avg max 24h: +7.47%
+  OBV falling (<-0.05)     n= 52  avg max 24h: +8.81%
+
+recent_long_ok análisis:
+  True  n=1360  avg max 24h: +8.39%, drawdown: -3.60%
+  False n=315  avg max 24h: +11.44%, drawdown: -4.62%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 NILUSDT        PREBREAK      10 WATCH   +147.97%  -0.17  -0.04   False
+    2 NILUSDT        HOLD          11 STRONG  +135.58%  -0.04  +0.26    True
+    3 DOGSUSDT       PREBREAK      12 STRONG  +132.43%  +0.19  +0.06   False
+    4 NILUSDT        BREAKOUT      11 STRONG  +131.41%  -0.01  +0.38    True
+    5 DOGSUSDT       PREBREAK       9 WATCH   +131.04%  -0.02  +0.09    True
+    6 NILUSDT        RIDING         9 WATCH   +129.75%  +0.04  +0.08   False
+    7 NILUSDT        RIDING        11 STRONG  +128.97%  +0.07  +0.36    True
+    8 NILUSDT        RIDING         9 WATCH   +127.72%  +0.03  +0.39   False
+    9 DOGSUSDT       BREAKOUT      15 BEST    +120.51%  +0.17  +0.17    True
+   10 DOGSUSDT       PREBREAK      15 BEST    +119.88%  +0.18  +0.02   False
+   11 DOGSUSDT       RIDING        10 WATCH   +112.05%  +0.09  +0.25   False
+   12 DOGSUSDT       RIDING        11 STRONG  +111.48%  +0.10  +0.28   False
+   13 DOGSUSDT       HOLD          12 STRONG  +110.33%  +0.08  +0.24    True
+   14 DOGSUSDT       RIDING        12 STRONG  +109.19%  +0.10  +0.29    True
+   15 DOGSUSDT       RIDING        12 STRONG  +108.63%  +0.10  +0.34    True
+   16 NILUSDT        RIDING        10 WATCH   +106.88%  +0.05  +0.56    True
+   17 NILUSDT        RIDING        10 WATCH   +106.65%  +0.06  +0.25   False
+   18 NILUSDT        RIDING         6 WATCH   +106.02%  +0.03  -0.65   False
+   19 NILUSDT        RIDING        11 STRONG  +105.47%  +0.06  +0.19   False
+   20 DOGSUSDT       RIDING        11 STRONG  +103.68%  +0.07  +0.34    True
+   21 DOGSUSDT       RIDING        12 STRONG  +102.09%  +0.08  +0.34    True
+   22 NILUSDT        RIDING        11 STRONG  +101.32%  +0.06  +0.23   False
+   23 DOGSUSDT       BREAKOUT      12 STRONG   +96.45%  +0.05  +0.36    True
+   24 TSTUSDT        BREAKOUT      14 BEST     +95.17%  +0.07  +0.17    True
+   25 DOGSUSDT       HOLD          12 STRONG   +93.47%  +0.10  +0.13    True
+   26 DOGSUSDT       HOLD          11 STRONG   +85.17%  +0.11  +0.57    True
+   27 IOUSDT         HOLD          13 BEST     +77.84%  +0.10  +0.09   False
+   28 IOUSDT         RIDING        10 WATCH    +74.47%  +0.07  +0.20    True
+   29 IOUSDT         RIDING        10 WATCH    +74.19%  +0.07  +0.19    True
+   30 IOUSDT         RIDING        11 STRONG   +73.78%  +0.06  +0.20    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n=186)  8:2 9:8 10:16 11:23 12:44 13:43 14:26 15:24
+  HOLD       (n=723)  7:2 8:31 9:57 10:135 11:262 12:218 13:18
+  PREBREAK   (n=283)  5:2 6:10 7:25 8:41 9:59 10:38 11:28 12:26 13:18 14:8 15:28
+  RIDING     (n=483)  4:5 5:2 6:20 7:39 8:32 9:103 10:194 11:66 12:21 13:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=4, STRONG=16, WATCH=10
+  Tipos:   {'PREBREAK': 4, 'HOLD': 5, 'BREAKOUT': 4, 'RIDING': 17}
+  Score promedio top 30: 11.1
+  Move promedio top 30: +108.65%
+
+══════════════════════════════════════════════════════════════════════
+ COMPARACIÓN: config.json  vs  config_M.json  (7 días)
+══════════════════════════════════════════════════════════════════════
+  Métrica                              config.json   config_M.json
+  -------------------------------- --------------- ---------------
+  Total alertas                               1679            1675
+  BREAKOUT count                               185             186
+  BEST count                                   135             166
+  BEST por día (target: 10-20)                19.3            23.7
+  STRONG count                                 660             688
+  Explosivos totales (>20%)                    159             159
+  -------------------------------- --------------- ---------------
+  ★ CATCH RATE (lo más importante):
+  Top 30 movers en BEST                         3/30              4/30
+  Top 30 movers en BEST+STRONG                 19/30             20/30
+  -------------------------------- --------------- ---------------
+  ★ CALIDAD del bucket BEST:
+  Avg max 24h BEST                          +9.35%          +9.51%
+  Avg drawdown BEST                         -2.84%          -2.89%
+  R/R BEST                                    3.29            3.29
+  Win >5% en BEST                              47%              46%
+  Win >10% en BEST                             22%              23%
+  -------------------------------- --------------- ---------------
+  Otros:
+  Avg max 24h global                        +8.96%          +8.97%
+  Avg max 24h STRONG                        +9.66%          +9.50%
+  Avg drawdown global                       -3.81%          -3.79%
+  Win >2% global                               76%              76%
+  Win >5% global                               47%              47%
+
+
+BACKTEST K
+
+OLD (CONFIG.JSON)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 1666
+
+Por tipo:
+  HOLD        710  (42%)
+  RIDING      489  (29%)
+  PREBREAK    284  (17%)
+  BREAKOUT    183  (10%)
+
+Por bucket:
+  BEST    136 — max_24h: +9.47%, drawdown: -2.81%, win >2%: 77%
+  STRONG  656 — max_24h: +9.67%, drawdown: -4.16%, win >2%: 75%
+  WATCH   874 — max_24h: +8.40%, drawdown: -3.70%, win >2%: 75%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n=872  avg max 24h: +9.59%
+  CVD neutral              n=557  avg max 24h: +8.93%
+  CVD bearish (<-0.05)     n=237  avg max 24h: +6.90%
+
+OBV análisis:
+  OBV rising (>+0.05)      n=1192  avg max 24h: +9.54%
+  OBV neutral              n=421  avg max 24h: +7.47%
+  OBV falling (<-0.05)     n= 53  avg max 24h: +8.66%
+
+recent_long_ok análisis:
+  True  n=1348  avg max 24h: +8.44%, drawdown: -3.62%
+  False n=318  avg max 24h: +11.30%, drawdown: -4.62%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 NILUSDT        PREBREAK       8 WATCH   +147.97%  -0.17  -0.04   False
+    2 NILUSDT        HOLD          11 STRONG  +135.58%  -0.04  +0.26    True
+    3 DOGSUSDT       PREBREAK      10 WATCH   +132.43%  +0.19  +0.06   False
+    4 NILUSDT        BREAKOUT      11 STRONG  +131.41%  -0.01  +0.39    True
+    5 DOGSUSDT       PREBREAK       9 WATCH   +131.04%  -0.02  +0.09    True
+    6 NILUSDT        RIDING         9 WATCH   +129.75%  +0.04  +0.08   False
+    7 NILUSDT        RIDING        11 STRONG  +128.97%  +0.07  +0.37    True
+    8 NILUSDT        RIDING         9 WATCH   +127.72%  +0.03  +0.39   False
+    9 DOGSUSDT       BREAKOUT      15 BEST    +120.51%  +0.17  +0.17    True
+   10 DOGSUSDT       PREBREAK      14 BEST    +119.88%  +0.18  +0.02   False
+   11 DOGSUSDT       RIDING        10 WATCH   +112.05%  +0.09  +0.25   False
+   12 DOGSUSDT       RIDING        11 STRONG  +111.48%  +0.10  +0.28   False
+   13 DOGSUSDT       HOLD          12 STRONG  +110.33%  +0.08  +0.24    True
+   14 DOGSUSDT       RIDING        12 STRONG  +109.19%  +0.10  +0.29    True
+   15 DOGSUSDT       RIDING        12 STRONG  +108.63%  +0.10  +0.33    True
+   16 NILUSDT        RIDING        10 WATCH   +106.88%  +0.05  +0.56    True
+   17 NILUSDT        RIDING        10 WATCH   +106.65%  +0.06  +0.26   False
+   18 NILUSDT        RIDING         6 WATCH   +106.02%  +0.03  -0.65   False
+   19 NILUSDT        RIDING        11 STRONG  +105.47%  +0.06  +0.19   False
+   20 DOGSUSDT       RIDING        11 STRONG  +103.68%  +0.07  +0.33    True
+   21 DOGSUSDT       RIDING        12 STRONG  +102.09%  +0.08  +0.33    True
+   22 NILUSDT        RIDING        11 STRONG  +101.32%  +0.06  +0.23   False
+   23 DOGSUSDT       BREAKOUT      12 STRONG   +96.45%  +0.05  +0.35    True
+   24 TSTUSDT        BREAKOUT      14 BEST     +95.17%  +0.07  +0.17    True
+   25 DOGSUSDT       HOLD          12 STRONG   +93.47%  +0.10  +0.13    True
+   26 DOGSUSDT       HOLD          11 STRONG   +85.17%  +0.11  +0.56    True
+   27 IOUSDT         HOLD          11 STRONG   +77.84%  +0.10  +0.09   False
+   28 IOUSDT         RIDING        10 WATCH    +74.47%  +0.07  +0.20    True
+   29 IOUSDT         RIDING        10 WATCH    +74.19%  +0.07  +0.19    True
+   30 IOUSDT         RIDING        11 STRONG   +73.78%  +0.06  +0.20    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n=183)  8:2 9:9 10:17 11:22 12:41 13:44 14:26 15:22
+  HOLD       (n=710)  7:12 8:33 9:57 10:146 11:264 12:198
+  PREBREAK   (n=284)  4:1 5:10 6:25 7:42 8:43 9:48 10:34 11:21 12:17 13:17 14:8 15:18
+  RIDING     (n=489)  4:5 5:2 6:20 7:39 8:30 9:104 10:195 11:69 12:24 13:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=3, STRONG=16, WATCH=11
+  Tipos:   {'PREBREAK': 4, 'HOLD': 5, 'BREAKOUT': 4, 'RIDING': 17}
+  Score promedio top 30: 10.9
+  Move promedio top 30: +108.65%
+
+NEW (CONFIG_K.JSON)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 1572
+
+Por tipo:
+  HOLD        560  (35%)
+  RIDING      539  (34%)
+  PREBREAK    288  (18%)
+  BREAKOUT    185  (11%)
+
+Por bucket:
+  BEST    136 — max_24h: +9.47%, drawdown: -2.81%, win >2%: 77%
+  STRONG  613 — max_24h: +9.86%, drawdown: -4.24%, win >2%: 76%
+  WATCH   823 — max_24h: +8.45%, drawdown: -3.71%, win >2%: 75%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n=823  avg max 24h: +9.77%
+  CVD neutral              n=526  avg max 24h: +8.89%
+  CVD bearish (<-0.05)     n=223  avg max 24h: +7.03%
+
+OBV análisis:
+  OBV rising (>+0.05)      n=1123  avg max 24h: +9.73%
+  OBV neutral              n=402  avg max 24h: +7.35%
+  OBV falling (<-0.05)     n= 47  avg max 24h: +8.48%
+
+recent_long_ok análisis:
+  True  n=1277  avg max 24h: +8.56%, drawdown: -3.64%
+  False n=295  avg max 24h: +11.38%, drawdown: -4.70%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 NILUSDT        PREBREAK       8 WATCH   +147.97%  -0.17  -0.04   False
+    2 NILUSDT        HOLD          11 STRONG  +135.58%  -0.04  +0.26    True
+    3 DOGSUSDT       PREBREAK      10 WATCH   +132.43%  +0.19  +0.06   False
+    4 NILUSDT        BREAKOUT      11 STRONG  +131.41%  -0.01  +0.39    True
+    5 DOGSUSDT       PREBREAK       9 WATCH   +131.04%  -0.02  +0.09    True
+    6 NILUSDT        RIDING         9 WATCH   +129.75%  +0.04  +0.08   False
+    7 NILUSDT        RIDING        11 STRONG  +128.97%  +0.07  +0.37    True
+    8 NILUSDT        RIDING         9 WATCH   +127.72%  +0.03  +0.39   False
+    9 DOGSUSDT       BREAKOUT      15 BEST    +120.51%  +0.17  +0.17    True
+   10 DOGSUSDT       PREBREAK      14 BEST    +119.88%  +0.18  +0.02   False
+   11 DOGSUSDT       RIDING        10 WATCH   +112.05%  +0.09  +0.25   False
+   12 DOGSUSDT       RIDING        11 STRONG  +111.48%  +0.10  +0.28   False
+   13 DOGSUSDT       HOLD          12 STRONG  +110.33%  +0.08  +0.24    True
+   14 DOGSUSDT       RIDING        12 STRONG  +109.19%  +0.10  +0.29    True
+   15 DOGSUSDT       RIDING        12 STRONG  +108.63%  +0.10  +0.33    True
+   16 NILUSDT        RIDING        10 WATCH   +106.88%  +0.05  +0.56    True
+   17 NILUSDT        RIDING        10 WATCH   +106.65%  +0.06  +0.26   False
+   18 NILUSDT        RIDING         6 WATCH   +106.02%  +0.03  -0.65   False
+   19 NILUSDT        RIDING        11 STRONG  +105.47%  +0.06  +0.19   False
+   20 DOGSUSDT       RIDING        11 STRONG  +103.68%  +0.07  +0.33    True
+   21 DOGSUSDT       RIDING        12 STRONG  +102.09%  +0.08  +0.33    True
+   22 NILUSDT        RIDING        11 STRONG  +101.32%  +0.06  +0.23   False
+   23 DOGSUSDT       BREAKOUT      12 STRONG   +96.45%  +0.05  +0.35    True
+   24 TSTUSDT        BREAKOUT      14 BEST     +95.17%  +0.07  +0.17    True
+   25 DOGSUSDT       HOLD          12 STRONG   +93.47%  +0.10  +0.13    True
+   26 DOGSUSDT       HOLD          11 STRONG   +85.17%  +0.11  +0.56    True
+   27 IOUSDT         HOLD          11 STRONG   +77.84%  +0.10  +0.09   False
+   28 IOUSDT         RIDING        10 WATCH    +74.47%  +0.07  +0.20    True
+   29 IOUSDT         RIDING        10 WATCH    +74.19%  +0.07  +0.19    True
+   30 IOUSDT         RIDING        11 STRONG   +73.78%  +0.06  +0.20    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n=185)  8:2 9:9 10:17 11:23 12:42 13:44 14:26 15:22
+  HOLD       (n=560)  7:3 8:23 9:38 10:105 11:216 12:175
+  PREBREAK   (n=288)  4:1 5:10 6:25 7:43 8:45 9:49 10:34 11:21 12:17 13:17 14:8 15:18
+  RIDING     (n=539)  4:5 5:2 6:20 7:40 8:34 9:104 10:214 11:95 12:24 13:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=3, STRONG=16, WATCH=11
+  Tipos:   {'PREBREAK': 4, 'HOLD': 5, 'BREAKOUT': 4, 'RIDING': 17}
+  Score promedio top 30: 10.9
+  Move promedio top 30: +108.65%
+
+══════════════════════════════════════════════════════════════════════
+ COMPARACIÓN: config.json  vs  config_K.json  (7 días)
+══════════════════════════════════════════════════════════════════════
+  Métrica                              config.json   config_K.json
+  -------------------------------- --------------- ---------------
+  Total alertas                               1666            1572
+  BREAKOUT count                               183             185
+  BEST count                                   136             136
+  BEST por día (target: 10-20)                19.4            19.4
+  STRONG count                                 656             613
+  Explosivos totales (>20%)                    158             153
+  -------------------------------- --------------- ---------------
+  ★ CATCH RATE (lo más importante):
+  Top 30 movers en BEST                         3/30              3/30
+  Top 30 movers en BEST+STRONG                 19/30             19/30
+  -------------------------------- --------------- ---------------
+  ★ CALIDAD del bucket BEST:
+  Avg max 24h BEST                          +9.47%          +9.47%
+  Avg drawdown BEST                         -2.81%          -2.81%
+  R/R BEST                                    3.37            3.37
+  Win >5% en BEST                              47%              47%
+  Win >10% en BEST                             23%              23%
+  -------------------------------- --------------- ---------------
+  Otros:
+  Avg max 24h global                        +8.99%          +9.09%
+  Avg max 24h STRONG                        +9.67%          +9.86%
+  Avg drawdown global                       -3.81%          -3.84%
+  Win >2% global                               75%              75%
+  Win >5% global                               47%              47%
+
+
+

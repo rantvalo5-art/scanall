@@ -37,7 +37,7 @@
   "indicators": {
     "EMA_SLOW": 21,
     "RECENT_LOOKBACK": 15,
-    "ATR_MIN_PCT": 1.0,
+    "ATR_MIN_PCT": 1.5,
     "RECENT_LOOKBACK_LONG": 25,
     "RECENT_LONG_PROXIMITY": 0.01,
     "OBV_SLOPE_LOOKBACK": 10,
@@ -86,7 +86,7 @@
   },
   "scoring": {
     "BEST_MIN_SCORE": 13,
-    "STRONG_MIN_SCORE": 11,
+    "STRONG_MIN_SCORE": 12,
     "IMMEDIATE_MIN_SCORE": 13,
     "FORMING_CANDLE_PENALTY": 3,
     "SCORE_CAP": 15
