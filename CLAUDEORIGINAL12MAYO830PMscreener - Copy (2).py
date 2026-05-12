@@ -1299,8 +1299,6 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
 
     # ── HOLD ───────────────────────────────────────────────────────────────────
     if ACTIVE_SIGNALS_HOLD:
-        require_obv = _cfg("hold", "HOLD_REQUIRE_OBV_RISING", default=False)
-        require_cvd = _cfg("hold", "HOLD_REQUIRE_CVD_BULLISH", default=False)
         hold_ok = (
             tf15.get("hold_recent_break")
             and tf15.get("hold_kept_zone")
