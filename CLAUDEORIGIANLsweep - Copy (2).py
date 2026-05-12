@@ -47,10 +47,7 @@ def compute_stats(alerts, period_days=7):
 
     best  = [a for a in alerts if a.get("bucket") == "BEST"]
     strong = [a for a in alerts if a.get("bucket") == "STRONG"]
-    strong_moves = [pct_move(a.get("max_high_24h"), a.get("entry_price")) for a in strong]
-    strong_moves = [m for m in strong_moves if m is not None]
-    strong_win_10 = (sum(1 for m in strong_moves if m >= 10) * 100 / len(strong_moves)
-                     if strong_moves else 0)
+
     best_moves = [pct_move(a.get("max_high_24h"), a.get("entry_price")) for a in best]
     best_moves = [m for m in best_moves if m is not None]
     best_drops = [pct_move(a.get("min_low_24h"), a.get("entry_price")) for a in best]
@@ -77,39 +74,29 @@ def compute_stats(alerts, period_days=7):
         "best_win_10pct": best_win_10,
         "best_max": best_avg_max,
         "best_rr": best_rr,
-        "strong_win_10pct": strong_win_10,
     }
 
 
 def score_stats(stats, weights):
     """Calcula el score objetivo [0, 1] para un conjunto de stats."""
     w = weights
+    # catch: denominador = min(30, total alertas) — evita penalizar configs estrictos
+    # que generan pocos alerts pero muy precisos
     n_denom  = max(1, min(30, stats["n"]))
     catch    = stats["top30_in_best_strong"] / n_denom
-
+    # quality/rr: escala suave por tamaño de muestra — 1 BEST lucky no puede dar quality=1.0
     sample   = min(1.0, stats["best_n"] / 10)
     quality  = (stats["best_win_10pct"] / 100) * sample
-
     volume   = min(1.0, stats["best_per_day"] / 15)
     rr       = min(1.0, stats["best_rr"] / 4) * min(1.0, stats["best_n"] / 5)
-
     overflow_thresh = max(1, w.get("volume_overflow_threshold", 25))
     overflow = max(0.0, stats["best_per_day"] - overflow_thresh) / overflow_thresh
 
-    # ── Penalización por inversión BEST vs STRONG ─────
-    # Si STRONG tiene mejor winrate >10% que BEST, penalizamos fuerte
-    inv_penalty = 0.0
-    if stats.get("strong_win_10pct") is not None and stats["best_win_10pct"] is not None:
-        inv_penalty = max(0.0, stats["strong_win_10pct"] - stats["best_win_10pct"])
-    invers_weight = w.get("inversion_penalty", 0.5)  # 0.5 si no se define en JSON
-
-    score = (w.get("catch",   0.40) * catch
-           + w.get("quality", 0.30) * quality
-           + w.get("volume",  0.20) * volume
-           + w.get("rr",      0.10) * rr
-           - w.get("volume_overflow_penalty", 0.20) * overflow
-           - invers_weight * inv_penalty / 100)   # inversión resta directamente
-    return score
+    return (w.get("catch",   0.40) * catch
+          + w.get("quality", 0.30) * quality
+          + w.get("volume",  0.20) * volume
+          + w.get("rr",      0.10) * rr
+          - w.get("volume_overflow_penalty", 0.20) * overflow)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

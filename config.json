@@ -1,3 +1,4 @@
+
 {
   "general": {
     "INTERVALS": [
@@ -21,17 +22,17 @@
     "BURST_THRESHOLD": 10
   },
   "cooldowns_minutes": {
-    "PREBREAK": 20,
-    "BREAKOUT": 15,
-    "RIDING": 10,
-    "FADING": 60,
-    "HOLD": 30
+    "PREBREAK": 30,
+    "BREAKOUT": 20,
+    "RIDING": 15,
+    "FADING": 120,
+    "HOLD": 45
   },
   "active_signals": {
     "PREBREAK": true,
     "BREAKOUT": true,
     "RIDING": true,
-    "FADING": true,
+    "FADING": false,
     "HOLD": true
   },
   "indicators": {
@@ -41,9 +42,9 @@
     "RECENT_LOOKBACK_LONG": 25,
     "RECENT_LONG_PROXIMITY": 0.01,
     "OBV_SLOPE_LOOKBACK": 10,
-    "OBV_RISING_MIN": 0.02,
+    "OBV_RISING_MIN": 0.03,
     "CVD_LOOKBACK": 10,
-    "CVD_BULLISH_MIN": 0.02
+    "CVD_BULLISH_MIN": 0.03
   },
   "prebreak": {
     "PREBREAK_NEAR_MAX": 0.008,
@@ -58,7 +59,7 @@
     "BREAKOUT_BB_EXPANSION_MIN": 0.12,
     "BREAKOUT_5M_MIN_VOL_RATIO": 1.0,
     "BREAKOUT_MIN_BODY_PCT": 0.5,
-    "BREAKOUT_REQUIRE_OBV_NON_NEGATIVE": false
+    "BREAKOUT_REQUIRE_OBV_NON_NEGATIVE": true
   },
   "hold": {
     "HOLD_LOOKBACK_BARS": 8,
@@ -129,10 +130,10 @@
     "CLIMAX_BODY_MIN": 0.85,
     "CLIMAX_THRESHOLD": 2,
     "CLIMAX_PENALTY": -2,
-    "EARLY_ENTRY_MAX": 0.02,
-    "EARLY_ENTRY_BONUS": 3,
-    "LATE_ENTRY_MIN": 0.03,
-    "LATE_ENTRY_PENALTY": -2,
+    "EARLY_ENTRY_MAX": 0.015,
+    "EARLY_ENTRY_BONUS": 2,
+    "LATE_ENTRY_MIN": 0.025,
+    "LATE_ENTRY_PENALTY": -1,
     "STRUCT_PENALTY": 1,
     "LATE_REPEAT_PENALTY": -1
   },
@@ -179,11 +180,6 @@
     "BELOW_ZONE_BONUS": 2,
     "PULLBACK_SIGNIFICANT_BONUS": 1,
     "VOL_DEAD_BONUS": 1
-  },
-  "derivatives": {
-    "ENABLED": false,
-    "OI_LOOKBACK_MIN": 30,
-    "FUTURES_FETCH_TIMEOUT": 10
   },
   "chart": {
     "ENABLED": true,

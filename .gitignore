@@ -3,3 +3,5 @@
 .sweep_results/
 .sweep_test/
 .sweep_optimized/
+.optuna_results/
+__pycache__/
