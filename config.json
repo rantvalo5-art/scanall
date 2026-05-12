@@ -181,7 +181,7 @@
     "VOL_DEAD_BONUS": 1
   },
   "derivatives": {
-    "ENABLED": true,
+    "ENABLED": false,
     "OI_LOOKBACK_MIN": 30,
     "FUTURES_FETCH_TIMEOUT": 10
   },
