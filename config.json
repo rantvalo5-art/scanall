@@ -17,7 +17,7 @@
     "SNAPSHOT_RETENTION_DAYS": 30
   },
   "anti_spam": {
-    "MAX_IMMEDIATE_PER_RUN": 3,
+    "MAX_IMMEDIATE_PER_RUN": 5,
     "BURST_THRESHOLD": 10
   },
   "cooldowns_minutes": {
@@ -87,7 +87,7 @@
   "scoring": {
     "BEST_MIN_SCORE": 12,
     "STRONG_MIN_SCORE": 10,
-    "IMMEDIATE_MIN_SCORE": 13,
+    "IMMEDIATE_MIN_SCORE": 12,
     "FORMING_CANDLE_PENALTY": 3,
     "SCORE_CAP": 15
   },
