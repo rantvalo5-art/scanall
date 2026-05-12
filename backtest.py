@@ -684,9 +684,7 @@ def _analyze_key(cfg):
         "RECENT_LOOKBACK_LONG":    cfg.g("indicators", "RECENT_LOOKBACK_LONG", default=25),
         "RECENT_LONG_PROXIMITY":   cfg.g("indicators", "RECENT_LONG_PROXIMITY", default=0.01),
         "OBV_SLOPE_LOOKBACK":      cfg.g("indicators", "OBV_SLOPE_LOOKBACK", default=10),
-        "OBV_RISING_MIN":          cfg.g("indicators", "OBV_RISING_MIN", default=0.05),
         "CVD_LOOKBACK":            cfg.g("indicators", "CVD_LOOKBACK", default=10),
-        "CVD_BULLISH_MIN":         cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05),
         "BREAKOUT_BUFFER":         cfg.g("breakout", "BREAKOUT_BUFFER"),
         "PREBREAK_NEAR_MAX":       cfg.g("prebreak", "PREBREAK_NEAR_MAX"),
         "ONE_H_RESIST_BUFFER":     cfg.g("hold", "ONE_H_RESIST_BUFFER"),
@@ -1017,6 +1015,11 @@ def classify(symbol, tf_data, cfg, counts_history=None):
     tf1h = tf_data.get("1h") or {}
     if not tf5 or not tf15 or not tf1h:
         return None
+
+    # Los thresholds OBV/CVD varían entre variantes: se re-derivan aquí para que
+    # _build_candidates() pueda compartirse entre todas las variantes (una sola entrada en analyze_cache).
+    tf15["obv_rising"]  = tf15.get("obv_slope", 0) >= cfg.g("indicators", "OBV_RISING_MIN", default=0.05)
+    tf15["cvd_bullish"] = tf15.get("cvd_ratio", 0) >= cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05)
 
     if not (tf1h.get("ema_trend_up") and tf1h.get("not_near_resistance")):
         return None
@@ -1866,6 +1869,9 @@ def main():
     parser.add_argument("--workers", type=int, default=1,
                         help="Procesos paralelos para candidate building (default 1; "
                              "no usar cuando sweep.py ya paraleliza ventanas)")
+    parser.add_argument("--results-dir", default=None,
+                        help="Directorio para resultados incrementales por-config (usado por sweep.py). "
+                             "Cada variante se escribe al terminar y se salta si ya existe.")
     parser.add_argument("--end-date", default=None,
                         help="YYYY-MM-DD: fin del backtest (default: ahora). Útil para validación multi-ventana.")
     args = parser.parse_args()
@@ -1874,6 +1880,15 @@ def main():
     _NO_CACHE = args.no_cache
     if _NO_CACHE:
         print("  [cache] Desactivado por --no-cache")
+
+    results_dir = None
+    if args.results_dir:
+        results_dir = Path(args.results_dir)
+        results_dir.mkdir(parents=True, exist_ok=True)
+    elif args.out and args.variants:
+        results_dir = Path(args.out).parent / "results"
+        results_dir.mkdir(parents=True, exist_ok=True)
+    result_prefix = Path(args.out).stem if args.out else "run"
 
     if args.end_date:
         end_dt = datetime.strptime(args.end_date, "%Y-%m-%d").replace(tzinfo=timezone.utc)
@@ -1948,16 +1963,44 @@ def main():
                                    derivatives=derivatives, prepared_cache=prepared_cache,
                                    analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
         all_results[Path(base_path).stem] = alerts_base
-        for vp in variant_paths:
+        n_variants = len(variant_paths)
+        for vi, vp in enumerate(variant_paths, 1):
+            cfg_stem = Path(vp).stem
+            if results_dir:
+                result_file = results_dir / f"{result_prefix}__{cfg_stem}.json"
+                if result_file.exists():
+                    try:
+                        cached = json.loads(result_file.read_text(encoding="utf-8"))
+                        all_results[cfg_stem] = cached
+                        print(f"  [cfg {vi}/{n_variants}] {cfg_stem}  skip (ya guardado)")
+                        continue
+                    except Exception:
+                        pass
+            t_cfg     = time.perf_counter()
+            prev_prep = len(prepared_cache)
+            prev_ana  = len(analyze_cache)
             cfg_v = Config(vp)
             alerts_v = run_backtest(cfg_v, args.weeks, klines, start_dt, end_dt,
-                                    snapshot_pairs, label=f"VARIANT ({Path(vp).stem})",
+                                    snapshot_pairs, label=f"VARIANT ({cfg_stem})",
                                     scan_interval_min=args.scan_interval_min,
                                     derivatives=derivatives, prepared_cache=prepared_cache,
                                     analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
-            all_results[Path(vp).stem] = alerts_v
-            compare_runs(alerts_base, Path(base_path).stem, alerts_v, Path(vp).stem,
+            elapsed  = time.perf_counter() - t_cfg
+            prep_st  = "miss" if len(prepared_cache) > prev_prep else "hit"
+            ana_st   = "miss" if len(analyze_cache)  > prev_ana  else "hit"
+            print(f"  [cfg {vi}/{n_variants}] {cfg_stem}  {elapsed:.1f}s  "
+                  f"prep={prep_st} ana={ana_st}")
+            all_results[cfg_stem] = alerts_v
+            compare_runs(alerts_base, Path(base_path).stem, alerts_v, cfg_stem,
                          period_days=period_days)
+            if results_dir:
+                result_file = results_dir / f"{result_prefix}__{cfg_stem}.json"
+                tmp_file    = result_file.with_suffix(".tmp")
+                try:
+                    tmp_file.write_text(json.dumps(alerts_v, default=str), encoding="utf-8")
+                    os.replace(str(tmp_file), str(result_file))
+                except OSError:
+                    pass
 
     elif args.compare:
         cfg_old = Config(args.compare[0])

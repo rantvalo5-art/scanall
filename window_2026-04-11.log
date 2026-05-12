@@ -1,0 +1,283 @@
+Período backtest: 2026-03-14 00:00:00+00:00 → 2026-04-11 00:00:00+00:00 (4 semana(s), 28d)
+Scan interval simulado: 15 min
+
+[1/4] Sin snapshots; usando top pares actuales por volumen...
+  200 pares calificantes hoy (top 200 por volumen)
+
+[2/4] Descargando klines históricas...
+
+  Descargando 200 pares × 3 timeframes = 600 requests
+  Rango: 2026-03-11 a 2026-04-11 (3d buffer + período)
+    50/600 descargados...
+    100/600 descargados...
+    150/600 descargados...
+    200/600 descargados...
+    250/600 descargados...
+    300/600 descargados...
+    350/600 descargados...
+    400/600 descargados...
+    450/600 descargados...
+    500/600 descargados...
+    550/600 descargados...
+  197/200 pares con data completa en los 3 TF
+
+[3/4] Ejecutando simulación...
+
+  >>> Corriendo backtest: BASE (config)
+    [precompute] Calculando indicadores para 197 pares...
+
+  Simulando 672h con scans cada 15min...
+    [analyze] Extrayendo candidatos (2689 scans × 197 pares)...
+    [analyze] scan 0/2689 (0%) — 0 candidatos
+    [analyze] scan 20/2689 (0%) — 0 candidatos
+    [analyze] scan 40/2689 (1%) — 772 candidatos
+    [analyze] scan 60/2689 (2%) — 4632 candidatos
+    [analyze] scan 80/2689 (2%) — 8492 candidatos
+    [analyze] scan 100/2689 (3%) — 12356 candidatos
+    [analyze] scan 120/2689 (4%) — 16236 candidatos
+    [analyze] scan 140/2689 (5%) — 20116 candidatos
+    [analyze] scan 160/2689 (5%) — 23996 candidatos
+    [analyze] scan 180/2689 (6%) — 27876 candidatos
+    [analyze] scan 200/2689 (7%) — 31756 candidatos
+    [analyze] scan 220/2689 (8%) — 35636 candidatos
+    [analyze] scan 240/2689 (8%) — 39516 candidatos
+    [analyze] scan 260/2689 (9%) — 43396 candidatos
+    [analyze] scan 280/2689 (10%) — 47276 candidatos
+    [analyze] scan 300/2689 (11%) — 51156 candidatos
+    [analyze] scan 320/2689 (11%) — 55036 candidatos
+    [analyze] scan 340/2689 (12%) — 58916 candidatos
+    [analyze] scan 360/2689 (13%) — 62796 candidatos
+    [analyze] scan 380/2689 (14%) — 66676 candidatos
+    [analyze] scan 400/2689 (14%) — 70556 candidatos
+    [analyze] scan 420/2689 (15%) — 74436 candidatos
+    [analyze] scan 440/2689 (16%) — 78316 candidatos
+    [analyze] scan 460/2689 (17%) — 82196 candidatos
+    [analyze] scan 480/2689 (17%) — 86076 candidatos
+    [analyze] scan 500/2689 (18%) — 89956 candidatos
+    [analyze] scan 520/2689 (19%) — 93836 candidatos
+    [analyze] scan 540/2689 (20%) — 97716 candidatos
+    [analyze] scan 560/2689 (20%) — 101596 candidatos
+    [analyze] scan 580/2689 (21%) — 105488 candidatos
+    [analyze] scan 600/2689 (22%) — 109388 candidatos
+    [analyze] scan 620/2689 (23%) — 113288 candidatos
+    [analyze] scan 640/2689 (23%) — 117188 candidatos
+    [analyze] scan 660/2689 (24%) — 121088 candidatos
+    [analyze] scan 680/2689 (25%) — 124988 candidatos
+    [analyze] scan 700/2689 (26%) — 128888 candidatos
+    [analyze] scan 720/2689 (26%) — 132788 candidatos
+    [analyze] scan 740/2689 (27%) — 136688 candidatos
+    [analyze] scan 760/2689 (28%) — 140588 candidatos
+    [analyze] scan 780/2689 (29%) — 144508 candidatos
+    [analyze] scan 800/2689 (29%) — 148428 candidatos
+    [analyze] scan 820/2689 (30%) — 152348 candidatos
+    [analyze] scan 840/2689 (31%) — 156268 candidatos
+    [analyze] scan 860/2689 (31%) — 160188 candidatos
+    [analyze] scan 880/2689 (32%) — 164108 candidatos
+    [analyze] scan 900/2689 (33%) — 168028 candidatos
+    [analyze] scan 920/2689 (34%) — 171948 candidatos
+    [analyze] scan 940/2689 (34%) — 175868 candidatos
+    [analyze] scan 960/2689 (35%) — 179788 candidatos
+    [analyze] scan 980/2689 (36%) — 183708 candidatos
+    [analyze] scan 1000/2689 (37%) — 187628 candidatos
+    [analyze] scan 1020/2689 (37%) — 191548 candidatos
+    [analyze] scan 1040/2689 (38%) — 195468 candidatos
+    [analyze] scan 1060/2689 (39%) — 199388 candidatos
+    [analyze] scan 1080/2689 (40%) — 203308 candidatos
+    [analyze] scan 1100/2689 (40%) — 207228 candidatos
+    [analyze] scan 1120/2689 (41%) — 211148 candidatos
+    [analyze] scan 1140/2689 (42%) — 215068 candidatos
+    [analyze] scan 1160/2689 (43%) — 218988 candidatos
+    [analyze] scan 1180/2689 (43%) — 222908 candidatos
+    [analyze] scan 1200/2689 (44%) — 226828 candidatos
+    [analyze] scan 1220/2689 (45%) — 230748 candidatos
+    [analyze] scan 1240/2689 (46%) — 234668 candidatos
+    [analyze] scan 1260/2689 (46%) — 238588 candidatos
+    [analyze] scan 1280/2689 (47%) — 242508 candidatos
+    [analyze] scan 1300/2689 (48%) — 246428 candidatos
+    [analyze] scan 1320/2689 (49%) — 250348 candidatos
+    [analyze] scan 1340/2689 (49%) — 254268 candidatos
+    [analyze] scan 1360/2689 (50%) — 258188 candidatos
+    [analyze] scan 1380/2689 (51%) — 262108 candidatos
+    [analyze] scan 1400/2689 (52%) — 266028 candidatos
+    [analyze] scan 1420/2689 (52%) — 269948 candidatos
+    [analyze] scan 1440/2689 (53%) — 273868 candidatos
+    [analyze] scan 1460/2689 (54%) — 277788 candidatos
+    [analyze] scan 1480/2689 (55%) — 281708 candidatos
+    [analyze] scan 1500/2689 (55%) — 285628 candidatos
+    [analyze] scan 1520/2689 (56%) — 289548 candidatos
+    [analyze] scan 1540/2689 (57%) — 293476 candidatos
+    [analyze] scan 1560/2689 (58%) — 297416 candidatos
+    [analyze] scan 1580/2689 (58%) — 301356 candidatos
+    [analyze] scan 1600/2689 (59%) — 305296 candidatos
+    [analyze] scan 1620/2689 (60%) — 309236 candidatos
+    [analyze] scan 1640/2689 (60%) — 313176 candidatos
+    [analyze] scan 1660/2689 (61%) — 317116 candidatos
+    [analyze] scan 1680/2689 (62%) — 321056 candidatos
+    [analyze] scan 1700/2689 (63%) — 324996 candidatos
+    [analyze] scan 1720/2689 (63%) — 328936 candidatos
+    [analyze] scan 1740/2689 (64%) — 332876 candidatos
+    [analyze] scan 1760/2689 (65%) — 336816 candidatos
+    [analyze] scan 1780/2689 (66%) — 340756 candidatos
+    [analyze] scan 1800/2689 (66%) — 344696 candidatos
+    [analyze] scan 1820/2689 (67%) — 348636 candidatos
+    [analyze] scan 1840/2689 (68%) — 352576 candidatos
+    [analyze] scan 1860/2689 (69%) — 356516 candidatos
+    [analyze] scan 1880/2689 (69%) — 360456 candidatos
+    [analyze] scan 1900/2689 (70%) — 364396 candidatos
+    [analyze] scan 1920/2689 (71%) — 368336 candidatos
+    [analyze] scan 1940/2689 (72%) — 372276 candidatos
+    [analyze] scan 1960/2689 (72%) — 376216 candidatos
+    [analyze] scan 1980/2689 (73%) — 380156 candidatos
+    [analyze] scan 2000/2689 (74%) — 384096 candidatos
+    [analyze] scan 2020/2689 (75%) — 388036 candidatos
+    [analyze] scan 2040/2689 (75%) — 391976 candidatos
+    [analyze] scan 2060/2689 (76%) — 395916 candidatos
+    [analyze] scan 2080/2689 (77%) — 399856 candidatos
+    [analyze] scan 2100/2689 (78%) — 403796 candidatos
+    [analyze] scan 2120/2689 (78%) — 407736 candidatos
+    [analyze] scan 2140/2689 (79%) — 411676 candidatos
+    [analyze] scan 2160/2689 (80%) — 415616 candidatos
+    [analyze] scan 2180/2689 (81%) — 419556 candidatos
+    [analyze] scan 2200/2689 (81%) — 423496 candidatos
+    [analyze] scan 2220/2689 (82%) — 427436 candidatos
+    [analyze] scan 2240/2689 (83%) — 431376 candidatos
+    [analyze] scan 2260/2689 (84%) — 435316 candidatos
+    [analyze] scan 2280/2689 (84%) — 439256 candidatos
+    [analyze] scan 2300/2689 (85%) — 443196 candidatos
+    [analyze] scan 2320/2689 (86%) — 447136 candidatos
+    [analyze] scan 2340/2689 (87%) — 451076 candidatos
+    [analyze] scan 2360/2689 (87%) — 455016 candidatos
+    [analyze] scan 2380/2689 (88%) — 458956 candidatos
+    [analyze] scan 2400/2689 (89%) — 462896 candidatos
+    [analyze] scan 2420/2689 (89%) — 466836 candidatos
+    [analyze] scan 2440/2689 (90%) — 470776 candidatos
+    [analyze] scan 2460/2689 (91%) — 474716 candidatos
+    [analyze] scan 2480/2689 (92%) — 478656 candidatos
+    [analyze] scan 2500/2689 (92%) — 482596 candidatos
+    [analyze] scan 2520/2689 (93%) — 486536 candidatos
+    [analyze] scan 2540/2689 (94%) — 490476 candidatos
+    [analyze] scan 2560/2689 (95%) — 494416 candidatos
+    [analyze] scan 2580/2689 (95%) — 498356 candidatos
+    [analyze] scan 2600/2689 (96%) — 502296 candidatos
+    [analyze] scan 2620/2689 (97%) — 506236 candidatos
+    [analyze] scan 2640/2689 (98%) — 510176 candidatos
+    [analyze] scan 2660/2689 (98%) — 514116 candidatos
+    [analyze] scan 2680/2689 (99%) — 518056 candidatos
+    [analyze] 519829 candidatos encontrados
+    Total alertas simuladas: 3286
+
+══════════════════════════════════════════════════════════════════════
+ BASE (CONFIG)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 3286
+
+Por tipo:
+  HOLD       1363  (41%)
+  RIDING      833  (25%)
+  PREBREAK    832  (25%)
+  BREAKOUT    258  (7%)
+
+Por bucket:
+  BEST    396 — max_24h: +5.04%, drawdown: -4.27%, win >2%: 52%
+  STRONG 1228 — max_24h: +6.37%, drawdown: -4.36%, win >2%: 64%
+  WATCH  1662 — max_24h: +4.90%, drawdown: -4.17%, win >2%: 58%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n=1709  avg max 24h: +4.89%
+  CVD neutral              n=959  avg max 24h: +7.74%
+  CVD bearish (<-0.05)     n=618  avg max 24h: +3.50%
+
+OBV análisis:
+  OBV rising (>+0.05)      n=1711  avg max 24h: +7.04%
+  OBV neutral              n=1476  avg max 24h: +3.69%
+  OBV falling (<-0.05)     n= 99  avg max 24h: +4.63%
+
+recent_long_ok análisis:
+  True  n=2515  avg max 24h: +4.99%, drawdown: -4.21%
+  False n=771  avg max 24h: +7.01%, drawdown: -4.41%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 STOUSDT        RIDING        11 STRONG  +471.60%  +0.07  +0.27   False
+    2 STOUSDT        RIDING        11 STRONG  +463.47%  +0.05  +0.27   False
+    3 STOUSDT        HOLD          11 STRONG  +345.65%  +0.02  +0.07    True
+    4 STOUSDT        RIDING         9 WATCH   +288.50%  +0.04  +0.13   False
+    5 STOUSDT        RIDING        14 BEST    +248.51%  +0.04  +0.13   False
+    6 STOUSDT        RIDING        13 BEST    +241.35%  +0.05  +0.15    True
+    7 STOUSDT        HOLD          11 STRONG  +205.47%  +0.04  +0.22    True
+    8 STOUSDT        RIDING        10 WATCH   +197.41%  +0.04  +0.26   False
+    9 STOUSDT        RIDING        12 STRONG  +189.27%  +0.04  +0.26    True
+   10 STOUSDT        HOLD          11 STRONG  +164.35%  +0.03  +0.22    True
+   11 STOUSDT        HOLD          12 STRONG  +160.86%  +0.06  +0.13   False
+   12 STOUSDT        RIDING        10 WATCH   +143.89%  +0.04  +0.02   False
+   13 STOUSDT        RIDING        10 WATCH   +138.94%  +0.03  +0.10    True
+   14 DUSDT          HOLD           9 WATCH    +72.05%  -0.09  +0.24    True
+   15 TNSRUSDT       PREBREAK      12 STRONG   +59.40%  -0.07  +0.00   False
+   16 HEMIUSDT       HOLD          11 STRONG   +55.06%  -0.02  +0.33    True
+   17 MMTUSDT        BREAKOUT       8 WATCH    +53.37%  +0.04  +0.04    True
+   18 HEMIUSDT       RIDING         9 WATCH    +50.97%  -0.01  +0.33   False
+   19 TREEUSDT       HOLD          13 BEST     +48.80%  +0.08  +0.27   False
+   20 TNSRUSDT       PREBREAK      15 BEST     +48.11%  +0.18  +0.02    True
+   21 TREEUSDT       RIDING        10 WATCH    +47.39%  +0.06  +0.32   False
+   22 XPLUSDT        BREAKOUT       9 WATCH    +46.57%  +0.17  +0.09    True
+   23 STGUSDT        HOLD          12 STRONG   +43.70%  +0.10  +0.37    True
+   24 STGUSDT        BREAKOUT      13 BEST     +41.02%  +0.10  +0.50    True
+   25 DUSDT          HOLD           9 WATCH    +40.27%  -0.11  +0.46    True
+   26 XPLUSDT        HOLD          10 WATCH    +39.46%  +0.01  +0.04    True
+   27 TNSRUSDT       HOLD          12 STRONG   +37.65%  +0.15  +0.38    True
+   28 STGUSDT        BREAKOUT      12 STRONG   +37.60%  +0.07  +0.60    True
+   29 CFGUSDT        RIDING         6 WATCH    +36.81%  +0.00  -0.01    True
+   30 STOUSDT        HOLD          10 WATCH    +36.73%  +0.01  +0.02    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n=258)  6:2 7:2 8:11 9:13 10:24 11:26 12:67 13:41 14:48 15:24
+  HOLD       (n=1363)  6:1 7:24 8:86 9:112 10:278 11:530 12:309 13:23
+  PREBREAK   (n=832)  5:4 6:35 7:59 8:103 9:127 10:89 11:88 12:78 13:58 14:43 15:148
+  RIDING     (n=833)  4:11 5:7 6:41 7:78 8:77 9:187 10:291 11:112 12:18 13:9 14:2
+
+Top 30 movers — desglose:
+  Buckets: BEST=5, STRONG=12, WATCH=13
+  Tipos:   {'RIDING': 12, 'HOLD': 12, 'PREBREAK': 2, 'BREAKOUT': 4}
+  Score promedio top 30: 10.8
+  Move promedio top 30: +135.14%
+
+  >>> Corriendo backtest: VARIANT (cfg_0000)
+    [precompute] Reutilizando indicadores cacheados (197 pares)
+
+  Simulando 672h con scans cada 15min...
+    [analyze] Extrayendo candidatos (2689 scans × 197 pares)...
+    [analyze] scan 0/2689 (0%) — 0 candidatos
+    [analyze] scan 20/2689 (0%) — 0 candidatos
+    [analyze] scan 40/2689 (1%) — 772 candidatos
+    [analyze] scan 60/2689 (2%) — 4632 candidatos
+    [analyze] scan 80/2689 (2%) — 8492 candidatos
+    [analyze] scan 100/2689 (3%) — 12356 candidatos
+    [analyze] scan 120/2689 (4%) — 16236 candidatos
+    [analyze] scan 140/2689 (5%) — 20116 candidatos
+    [analyze] scan 160/2689 (5%) — 23996 candidatos
+    [analyze] scan 180/2689 (6%) — 27876 candidatos
+    [analyze] scan 200/2689 (7%) — 31756 candidatos
+    [analyze] scan 220/2689 (8%) — 35636 candidatos
+    [analyze] scan 240/2689 (8%) — 39516 candidatos
+    [analyze] scan 260/2689 (9%) — 43396 candidatos
+    [analyze] scan 280/2689 (10%) — 47276 candidatos
+    [analyze] scan 300/2689 (11%) — 51156 candidatos
+    [analyze] scan 320/2689 (11%) — 55036 candidatos
+    [analyze] scan 340/2689 (12%) — 58916 candidatos
+    [analyze] scan 360/2689 (13%) — 62796 candidatos
+    [analyze] scan 380/2689 (14%) — 66676 candidatos
+    [analyze] scan 400/2689 (14%) — 70556 candidatos
+    [analyze] scan 420/2689 (15%) — 74436 candidatos
+    [analyze] scan 440/2689 (16%) — 78316 candidatos
+    [analyze] scan 460/2689 (17%) — 82196 candidatos
+    [analyze] scan 480/2689 (17%) — 86076 candidatos
+    [analyze] scan 500/2689 (18%) — 89956 candidatos
+    [analyze] scan 520/2689 (19%) — 93836 candidatos
+    [analyze] scan 540/2689 (20%) — 97716 candidatos
+    [analyze] scan 560/2689 (20%) — 101596 candidatos
+    [analyze] scan 580/2689 (21%) — 105488 candidatos
+    [analyze] scan 600/2689 (22%) — 109388 candidatos
+    [analyze] scan 620/2689 (23%) — 113288 candidatos
+    [analyze] scan 640/2689 (23%) — 117188 candidatos
+    [analyze] scan 660/2689 (24%) — 121088 candidatos

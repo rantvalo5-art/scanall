@@ -122,13 +122,15 @@ def _is_valid_combo(cfg):
     return True
 
 
-def generate_configs(base_cfg, params, out_dir):
-    """Genera todos los configs en out_dir/. Devuelve lista de (combo_dict, path)."""
+def generate_configs(base_cfg, params, out_dir, shard_i=None, shard_n=1):
+    """Genera configs en out_dir/. Con shard_i/shard_n (0-indexed) solo escribe el shard indicado.
+    La numeración cfg_NNNN es global para que múltiples shards no colisionen.
+    Devuelve lista de (combo_dict, path) para el shard (o todos si shard_i is None)."""
     keys    = list(params.keys())
     values  = list(params.values())
     paths   = []
     skipped = 0
-    i = 0
+    i = 0  # índice global de combos válidos
     for vals in product(*values):
         combo = dict(zip(keys, vals))
         cfg   = copy.deepcopy(base_cfg)
@@ -137,9 +139,10 @@ def generate_configs(base_cfg, params, out_dir):
         if not _is_valid_combo(cfg):
             skipped += 1
             continue
-        path = out_dir / f"cfg_{i:04d}.json"
-        path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
-        paths.append((combo, path))
+        if shard_i is None or i % shard_n == shard_i:
+            path = out_dir / f"cfg_{i:04d}.json"
+            path.write_text(json.dumps(cfg, indent=2), encoding="utf-8")
+            paths.append((combo, path))
         i += 1
     if skipped:
         print(f"  [sweep] {skipped} combos inválidos descartados (STRONG_MIN >= BEST_MIN).")
@@ -151,27 +154,75 @@ def generate_configs(base_cfg, params, out_dir):
 # ──────────────────────────────────────────────────────────────────────────────
 
 def run_window(base_path, variant_paths, weeks, max_pairs, scan_interval,
-               end_date, out_json, log_path):
+               end_date, out_json, log_path, variant_workers=1, results_dir=None):
     """
     Corre backtest.py --variants para una ventana. Output va a log_path.
+    Si variant_workers > 1, divide las variantes en sub-grupos y corre en paralelo.
     Devuelve (end_date, ok, out_json).
     """
-    cmd = [
-        sys.executable, "-u", "backtest.py",
-        "--weeks", str(weeks),
-        "--max-pairs", str(max_pairs),
-        "--scan-interval-min", str(scan_interval),
-        "--end-date", end_date,
-        "--out", str(out_json),
-        "--variants", str(base_path),
-        *[str(p) for p in variant_paths],
-    ]
     env = {**os.environ, "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1"}
-    print(f"  [{end_date}] Iniciando... (log: {log_path.name})")
-    with open(log_path, "w", encoding="utf-8") as log_f:
-        result = subprocess.run(cmd, stdout=log_f, stderr=log_f, text=True, env=env)
-    ok = result.returncode == 0
-    status = "OK" if ok else f"ERROR (ver {log_path.name})"
+
+    def _make_cmd(vp_list, sub_out):
+        cmd = [
+            sys.executable, "-u", "backtest.py",
+            "--weeks", str(weeks),
+            "--max-pairs", str(max_pairs),
+            "--scan-interval-min", str(scan_interval),
+            "--end-date", end_date,
+            "--out", str(sub_out),
+            "--variants", str(base_path),
+            *[str(p) for p in vp_list],
+        ]
+        if results_dir:
+            cmd += ["--results-dir", str(results_dir)]
+        return cmd
+
+    if variant_workers <= 1 or len(variant_paths) <= 1:
+        print(f"  [{end_date}] Iniciando... (log: {log_path.name})")
+        with open(log_path, "w", encoding="utf-8") as log_f:
+            result = subprocess.run(_make_cmd(variant_paths, out_json),
+                                    stdout=log_f, stderr=log_f, text=True, env=env)
+        ok = result.returncode == 0
+        status = "OK" if ok else f"ERROR (ver {log_path.name})"
+        print(f"  [{end_date}] {status}")
+        return end_date, ok, out_json
+
+    # Dividir variantes en chunks y correr en paralelo
+    chunk_size = max(1, (len(variant_paths) + variant_workers - 1) // variant_workers)
+    chunks = [variant_paths[i:i + chunk_size] for i in range(0, len(variant_paths), chunk_size)]
+    sub_outs = []
+    print(f"  [{end_date}] Iniciando {len(chunks)} workers ({len(variant_paths)} variantes)...")
+
+    def _run_chunk(chunk, sub_out, sub_log):
+        with open(sub_log, "w", encoding="utf-8") as lf:
+            r = subprocess.run(_make_cmd(chunk, sub_out),
+                               stdout=lf, stderr=lf, text=True, env=env)
+        return r.returncode == 0
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=len(chunks)) as pool:
+        futs = []
+        for k, chunk in enumerate(chunks):
+            sub_out = out_json.parent / f"{out_json.stem}__w{k}.json"
+            sub_log = log_path.parent / f"{log_path.stem}__w{k}.log"
+            sub_outs.append(sub_out)
+            futs.append(pool.submit(_run_chunk, chunk, sub_out, sub_log))
+        statuses = [f.result() for f in futs]
+
+    ok = all(statuses)
+    merged = {}
+    for sub_out in sub_outs:
+        if sub_out.exists():
+            try:
+                merged.update(json.loads(sub_out.read_text(encoding="utf-8")))
+            except Exception as e:
+                print(f"  AVISO: no se pudo leer {sub_out.name}: {e}")
+
+    if merged:
+        out_json.write_text(json.dumps(merged, indent=2), encoding="utf-8")
+    else:
+        ok = False
+
+    status = "OK" if ok else f"ERROR parcial (ver logs {log_path.stem}__w*.log)"
     print(f"  [{end_date}] {status}")
     return end_date, ok, out_json
 
@@ -186,6 +237,14 @@ def main():
     parser.add_argument("--top", type=int, default=10, help="Cuántos top configs mostrar (default 10)")
     parser.add_argument("--no-cleanup", action="store_true",
                         help="Conservar configs temporales en out_dir/")
+    parser.add_argument("--shard", default=None, metavar="i/N",
+                        help="Procesa solo el shard i de N (1-indexed, ej: --shard 1/4). "
+                             "Múltiples shards pueden correr en paralelo apuntando al mismo out_dir.")
+    parser.add_argument("--variant-workers", type=int, default=1, metavar="N",
+                        help="Sub-procesos paralelos por ventana (default 1). "
+                             "Divide las variantes en N grupos; cada grupo corre backtest.py aparte.")
+    parser.add_argument("--max-parallel-windows", type=int, default=None,
+                        help="Override de max_parallel_windows del JSON.")
     args = parser.parse_args()
 
     sweep_cfg     = json.loads(Path(args.sweep_json).read_text(encoding="utf-8"))
@@ -198,6 +257,23 @@ def main():
     out_dir       = Path(sweep_cfg.get("out_dir", ".sweep_results"))
     scan_interval = sweep_cfg.get("scan_interval_min", 15)
     max_parallel  = sweep_cfg.get("max_parallel_windows", len(windows))
+    if args.max_parallel_windows is not None:
+        max_parallel = args.max_parallel_windows
+
+    shard_i = None
+    shard_n = 1
+    if args.shard:
+        try:
+            si, sn = args.shard.split("/")
+            shard_i = int(si) - 1  # convertir a 0-indexed
+            shard_n = int(sn)
+            if not (0 <= shard_i < shard_n):
+                raise ValueError
+        except (ValueError, AttributeError):
+            print(f"ERROR: --shard debe ser i/N con 1<=i<=N (ej: 1/4). Got: {args.shard!r}")
+            sys.exit(1)
+
+    variant_workers = args.variant_workers
 
     base_cfg = json.loads(base_path.read_text(encoding="utf-8"))
 
@@ -205,32 +281,44 @@ def main():
     for vals in params.values():
         n_combos *= len(vals)
 
-    if n_combos > 50:
+    if n_combos > 50 and shard_i is None:
         print(f"AVISO: {n_combos} combos × {len(windows)} ventanas = {n_combos * len(windows)} corridas.")
         print("Continuando en 5s (Ctrl-C para cancelar)...")
         import time; time.sleep(5)
 
     out_dir.mkdir(exist_ok=True)
-    print(f"\n=== SWEEP: {n_combos} combos × {len(windows)} ventanas (paralelo: {max_parallel}) ===")
+    results_dir = out_dir / "results"
+    results_dir.mkdir(exist_ok=True)
+
+    shard_label = f" [shard {shard_i+1}/{shard_n}]" if shard_i is not None else ""
+    print(f"\n=== SWEEP{shard_label}: {n_combos} combos × {len(windows)} ventanas "
+          f"(paralelo: {max_parallel}, workers/ventana: {variant_workers}) ===")
     print(f"Params: {list(params.keys())}")
     print(f"Output: {out_dir}/\n")
 
-    combo_paths   = generate_configs(base_cfg, params, out_dir)
+    combo_paths   = generate_configs(base_cfg, params, out_dir, shard_i=shard_i, shard_n=shard_n)
     variant_paths = [p for _, p in combo_paths]
-    print(f"Generados {n_combos} configs en {out_dir}/")
+    n_shard = len(combo_paths)
+    if shard_i is not None:
+        print(f"  Shard {shard_i+1}/{shard_n}: {n_shard} configs de ~{n_combos} totales.")
+    else:
+        print(f"Generados {n_shard} configs en {out_dir}/")
     print(f"Lanzando {len(windows)} ventanas en paralelo (max {max_parallel})...\n")
 
     period_days = weeks * 7
+
+    shard_suffix = f"__shard{shard_i+1}of{shard_n}" if shard_i is not None else ""
 
     # Correr ventanas en paralelo
     window_results = {}  # end_date -> out_json path
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_parallel) as ex:
         futures = {}
         for window in windows:
-            out_json = out_dir / f"run_{window}.json"
-            log_path = out_dir / f"window_{window}.log"
+            out_json = out_dir / f"run_{window}{shard_suffix}.json"
+            log_path = out_dir / f"window_{window}{shard_suffix}.log"
             f = ex.submit(run_window, base_path, variant_paths, weeks, max_pairs,
-                          scan_interval, window, out_json, log_path)
+                          scan_interval, window, out_json, log_path,
+                          variant_workers, str(results_dir))
             futures[f] = window
         for f in concurrent.futures.as_completed(futures):
             end_date, ok, out_json = f.result()

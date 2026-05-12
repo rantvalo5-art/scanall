@@ -27,5 +27,5 @@
 
   "out_dir": ".sweep_results",
 
-  "max_parallel_windows": 3
+  "max_parallel_windows": 2
 }
