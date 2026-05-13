@@ -37,7 +37,7 @@
   "indicators": {
     "EMA_SLOW": 21,
     "RECENT_LOOKBACK": 15,
-    "ATR_MIN_PCT": 2.4,
+    "ATR_MIN_PCT": 1.8,
     "RECENT_LOOKBACK_LONG": 25,
     "RECENT_LONG_PROXIMITY": 0.01,
     "OBV_SLOPE_LOOKBACK": 10,
