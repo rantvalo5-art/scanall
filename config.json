@@ -87,7 +87,7 @@
     "FADING_PULLBACK_HARD": 0.03
   },
   "scoring": {
-    "BEST_MIN_SCORE": 12,
+    "BEST_MIN_SCORE": 11,
     "STRONG_MIN_SCORE": 10,
     "IMMEDIATE_MIN_SCORE": 11,
     "FORMING_CANDLE_PENALTY": 3,
