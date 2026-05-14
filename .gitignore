@@ -5,3 +5,4 @@
 .sweep_optimized/
 .optuna_results/
 __pycache__/
+.sweep_results3/

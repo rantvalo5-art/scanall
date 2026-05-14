@@ -25,6 +25,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from joblib import Parallel, delayed
 
 import numpy as np
 import pandas as pd
@@ -1435,7 +1436,6 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
     deriv_lookback = cfg.g("derivatives", "OI_LOOKBACK_MIN", default=30)
 
     # Precalcular índices de barras por (sym, TF) con searchsorted vectorizado.
-    # Elimina O(Nscans × Npairs × 3) búsquedas binarias por variante.
     scan_ts_arr = np.asarray(scan_ts, dtype=np.int64)
     bar_idx_cache = {}
     for sym, tfs in klines.items():
@@ -1469,41 +1469,63 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
             return list(klines.keys())
         return [s for s in snapshot_pairs[best] if s in klines]
 
+    # ── Función pura que procesa UN símbolo en UN scan ──
+    def _process_symbol(i, ts_ms, sym, active_pairs_set):
+        """Procesa un símbolo en un scan. Retorna candidato o None."""
+        by_tf = bar_idx_cache.get(sym, {})
+        tf_data = {}
+        valid = True
+        for tf in ("5m", "15m", "1h"):
+            idxs = by_tf.get(tf)
+            if idxs is None:
+                valid = False
+                break
+            idx = int(idxs[i])
+            if idx < 80:
+                valid = False
+                break
+            sym_prep = (prepared.get(sym) or {}) if prepared else {}
+            prep_df = sym_prep.get(tf)
+            df = prep_df if prep_df is not None else klines.get(sym, {}).get(tf)
+            result = analyze_at_index(df, idx, cfg) if prep_df is not None \
+                     else analyze_at_time(df, idx, cfg)
+            if result is None:
+                valid = False
+                break
+            tf_data[tf] = result
+        if not valid:
+            return None
+        if deriv_enabled:
+            oi_delta, funding_rate = lookup_derivatives_at(
+                derivatives.get(sym), ts_ms, oi_lookback_min=deriv_lookback)
+            tf_data["15m"]["oi_delta_30m"] = oi_delta
+            tf_data["15m"]["funding_rate"] = funding_rate
+        idx_15m = int(by_tf["15m"][i])
+        return (i, ts_ms, sym, tf_data, idx_15m)
+
     total_scans = len(scan_ts)
-    candidates = []
+    all_candidates = []
+
+    # ── Bucle sobre scans, pero cada scan dispara tareas en paralelo ──
     for i, ts_ms in enumerate(scan_ts):
-        if i % 20 == 0:
-            print(f"    [analyze] scan {i}/{total_scans} ({i*100//max(total_scans,1)}%) — {len(candidates)} candidatos")
         active_pairs = pairs_for_scan(ts_ms)
-        for sym in active_pairs:
-            by_tf = bar_idx_cache.get(sym, {})
-            tf_data = {}
-            valid = True
-            for tf in ("5m", "15m", "1h"):
-                idxs = by_tf.get(tf)
-                if idxs is None:
-                    valid = False; break
-                idx = int(idxs[i])
-                if idx < 80:
-                    valid = False; break
-                sym_prep = (prepared.get(sym) or {}) if prepared else {}
-                prep_df = sym_prep.get(tf)
-                df = prep_df if prep_df is not None else klines.get(sym, {}).get(tf)
-                result = analyze_at_index(df, idx, cfg) if prep_df is not None \
-                         else analyze_at_time(df, idx, cfg)
-                if result is None:
-                    valid = False; break
-                tf_data[tf] = result
-            if not valid:
-                continue
-            if deriv_enabled:
-                oi_delta, funding_rate = lookup_derivatives_at(
-                    derivatives.get(sym), ts_ms, oi_lookback_min=deriv_lookback)
-                tf_data["15m"]["oi_delta_30m"] = oi_delta
-                tf_data["15m"]["funding_rate"] = funding_rate
-            idx_15m = int(by_tf["15m"][i])
-            candidates.append((i, ts_ms, sym, tf_data, idx_15m))
-    return candidates
+        if not active_pairs:
+            continue
+
+        # Paralelizar sobre los símbolos activos en este scan
+        results = Parallel(n_jobs=-1, prefer="threads")(
+            delayed(_process_symbol)(i, ts_ms, sym, set(active_pairs))
+            for sym in active_pairs
+        )
+
+        for cand in results:
+            if cand is not None:
+                all_candidates.append(cand)
+
+        if i % 50 == 0:
+            print(f"    [analyze] scan {i}/{total_scans} ({i*100//max(total_scans,1)}%) — {len(all_candidates)} candidatos")
+
+    return all_candidates
 
 
 def _classify_pass(candidates, cfg, cooldown_min_by_state, history_window_ms,

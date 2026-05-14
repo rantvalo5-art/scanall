@@ -1,7 +1,7 @@
 {
   "base": "config.json",
   "weeks": 4,
-  "max_pairs": 200,
+  "max_pairs": 150,
   "scan_interval_min": 15,
 
   "windows": [
@@ -35,5 +35,5 @@
   },
 
   "out_dir": ".sweep_results3",
-  "max_parallel_windows": 4
+  "max_parallel_windows": 3
 }
