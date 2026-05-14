@@ -19,7 +19,7 @@
     "indicators.CVD_BULLISH_MIN":            [0.03, 0.08],
     "scoring_breakout.EARLY_ENTRY_BONUS":    [2, 3],
     "scoring_breakout.LATE_ENTRY_PENALTY":   [-1, -2],
-    "scoring_hold.STRUCT_PENALTY":           [0, 2]
+    "scoring_hold.STRUCT_PENALTY":           [-3, -1]
   },
 
   "scoring_weights": {

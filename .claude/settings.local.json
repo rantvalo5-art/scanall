@@ -1,1 +1,11 @@
-{}
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import json; c=json.load\\(open\\('config.json'\\)\\); print\\('scoring_prebreak.STRUCT_PENALTY:', c['scoring_prebreak']['STRUCT_PENALTY']\\); print\\('scoring_breakout.STRUCT_PENALTY:', c['scoring_breakout']['STRUCT_PENALTY']\\); print\\('scoring_hold.STRUCT_PENALTY:', c['scoring_hold']['STRUCT_PENALTY']\\)\")",
+      "Bash(python *)",
+      "Bash(PYTHONIOENCODING=utf-8 cat \"C:\\\\Users\\\\a\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-a-scancrypto\\\\1723ddf0-da82-41a3-a2a9-cdfe0afe000d\\\\tasks\\\\bfqqqekmi.output\")",
+      "Bash(PYTHONIOENCODING=utf-8 python backtest.py --weeks 1 --max-pairs 200 --compare config_pre_struct_fix.json config.json --out compare_riding_fix.json)",
+      "Bash(PYTHONIOENCODING=utf-8 cat *)"
+    ]
+  }
+}

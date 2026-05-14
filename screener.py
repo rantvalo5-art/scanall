@@ -129,12 +129,13 @@ ONE_H_RESIST_BUFFER         = _cfg("hold", "ONE_H_RESIST_BUFFER")
 MAJOR_STRUCT_LOOKBACK       = _cfg("hold", "MAJOR_STRUCT_LOOKBACK")
 MAJOR_STRUCT_MAX_DIST       = _cfg("hold", "MAJOR_STRUCT_MAX_DIST")
 
-RIDING_LOOKBACK_BARS    = _cfg("riding", "RIDING_LOOKBACK_BARS")
-RIDING_MIN_GAIN         = _cfg("riding", "RIDING_MIN_GAIN")
-RIDING_MAX_GAIN         = _cfg("riding", "RIDING_MAX_GAIN")
-RIDING_ZONE_BUFFER      = _cfg("riding", "RIDING_ZONE_BUFFER")
-RIDING_MIN_VOL_RATIO    = _cfg("riding", "RIDING_MIN_VOL_RATIO")
-RIDING_EMA_MUST_TREND   = _cfg("riding", "RIDING_EMA_MUST_TREND")
+RIDING_LOOKBACK_BARS      = _cfg("riding", "RIDING_LOOKBACK_BARS")
+RIDING_MIN_GAIN           = _cfg("riding", "RIDING_MIN_GAIN")
+RIDING_MAX_GAIN           = _cfg("riding", "RIDING_MAX_GAIN")
+RIDING_ZONE_BUFFER        = _cfg("riding", "RIDING_ZONE_BUFFER")
+RIDING_MIN_VOL_RATIO      = _cfg("riding", "RIDING_MIN_VOL_RATIO")
+RIDING_EMA_MUST_TREND     = _cfg("riding", "RIDING_EMA_MUST_TREND")
+RIDING_MAX_FADE_FROM_HIGH = _cfg("riding", "RIDING_MAX_FADE_FROM_HIGH", default=0.025)
 
 FADING_REVERSAL_MIN  = _cfg("fading", "FADING_REVERSAL_MIN")
 FADING_BELOW_ZONE    = _cfg("fading", "FADING_BELOW_ZONE")
@@ -1139,6 +1140,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             and tf15["riding_bars_since"] >= 1
             and (not RIDING_EMA_MUST_TREND or tf1h.get("ema_trend_up"))
             and not tf15.get("breakout")
+            and (tf15.get("fading_reversal") or 0.0) >= -RIDING_MAX_FADE_FROM_HIGH
         )
         if riding_ok and not in_cooldown(symbol, "RIDING", last_seen):
             prev = counts_history.get((symbol, "RIDING"), 0)
@@ -1229,6 +1231,10 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                     elif fr >= _cfg_score(sr, "FUNDING_HOT_MIN", 0.0008):
                         score += _cfg_score(sr, "FUNDING_HOT_PENALTY", -1)
                         reasons.append("⚠ funding caliente — long crowded")
+            late_repeat_pen = _cfg_score(sr, "LATE_REPEAT_PENALTY", 0)
+            if prev > 0 and late_repeat_pen < 0:
+                score += late_repeat_pen
+                reasons.append("repeticion tardia")
             score = min(score, SCORE_CAP)
             candidates.append({
                 "symbol": symbol,

@@ -7,3 +7,4 @@
 __pycache__/
 .sweep_results3/
 .sweep_results3_coarse/
+.audit_results/

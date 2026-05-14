@@ -1208,7 +1208,8 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             and tf15.get("riding_bars_since") is not None
             and tf15["riding_bars_since"] >= 1
             and (not cfg.g("riding", "RIDING_EMA_MUST_TREND") or tf1h.get("ema_trend_up"))
-            and not tf15.get("breakout")):
+            and not tf15.get("breakout")
+            and (tf15.get("fading_reversal") or 0.0) >= -cfg.g("riding", "RIDING_MAX_FADE_FROM_HIGH", default=0.025)):
 
             base_score      = cfg.g("scoring_riding", "BASE_SCORE", default=4)
             gain_strong_min = cfg.g("scoring_riding", "GAIN_TIER_STRONG_MIN", default=0.05)
@@ -1273,6 +1274,12 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                         score += cfg.g("scoring_riding", "FUNDING_HEALTHY_BONUS", default=1)
                     elif fr >= cfg.g("scoring_riding", "FUNDING_HOT_MIN", default=0.0008):
                         score += cfg.g("scoring_riding", "FUNDING_HOT_PENALTY", default=-1)
+
+            # LATE_REPEAT_PENALTY (mismo comportamiento que screener.py)
+            prev_riding = counts_history.get((symbol, "RIDING"), 0)
+            late_repeat_pen = cfg.g("scoring_riding", "LATE_REPEAT_PENALTY", default=0)
+            if prev_riding >= LATE_REPEAT_COUNT and late_repeat_pen < 0:
+                score += late_repeat_pen
 
             score = min(score, SCORE_CAP)
             candidates.append({

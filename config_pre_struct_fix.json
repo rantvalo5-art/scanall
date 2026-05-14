@@ -23,7 +23,7 @@
   "cooldowns_minutes": {
     "PREBREAK": 20,
     "BREAKOUT": 15,
-    "RIDING": 30,
+    "RIDING": 10,
     "FADING": 60,
     "HOLD": 30
   },
@@ -47,7 +47,7 @@
   },
   "prebreak": {
     "PREBREAK_NEAR_MAX": 0.008,
-    "PREBREAK_MIN_VOL_RATIO": 3.0,
+    "PREBREAK_MIN_VOL_RATIO": 2.5,
     "PREBREAK_VOLUME_GROWTH_MIN": 1.2,
     "PREBREAK_BB_WIDTH_MAX": 0.025
   },
@@ -79,8 +79,7 @@
     "RIDING_MAX_GAIN": 0.15,
     "RIDING_ZONE_BUFFER": 0.012,
     "RIDING_MIN_VOL_RATIO": 1.2,
-    "RIDING_EMA_MUST_TREND": true,
-    "RIDING_MAX_FADE_FROM_HIGH": 0.025
+    "RIDING_EMA_MUST_TREND": true
   },
   "fading": {
     "FADING_REVERSAL_MIN": 0.015,
@@ -106,16 +105,16 @@
     "STRONG_CLOSE_BONUS": 1,
     "OBV_RISING_BONUS": 2,
     "OBV_FALLING_PENALTY": -1,
-    "STRUCT_PENALTY": -1,
+    "STRUCT_PENALTY": 1,
     "LATE_REPEAT_PENALTY": -1
   },
   "scoring_breakout": {
     "BASE_SCORE": 8,
-    "OBV_TIER_EXPLOSIVE_MIN": 0.5,
+    "OBV_TIER_EXPLOSIVE_MIN": 0.3,
     "OBV_TIER_EXPLOSIVE_BONUS": 4,
-    "OBV_TIER_STRONG_MIN": 0.2,
+    "OBV_TIER_STRONG_MIN": 0.1,
     "OBV_TIER_STRONG_BONUS": 3,
-    "OBV_TIER_RISING_MIN": 0.08,
+    "OBV_TIER_RISING_MIN": 0.05,
     "OBV_TIER_RISING_BONUS": 2,
     "OBV_TIER_NEUTRAL_MIN": 0,
     "OBV_TIER_NEUTRAL_BONUS": 0,
@@ -136,7 +135,7 @@
     "EARLY_ENTRY_BONUS": 3,
     "LATE_ENTRY_MIN": 0.03,
     "LATE_ENTRY_PENALTY": -2,
-    "STRUCT_PENALTY": -1,
+    "STRUCT_PENALTY": 1,
     "LATE_REPEAT_PENALTY": -1
   },
   "scoring_riding": {
@@ -157,8 +156,7 @@
     "CVD_BULLISH_BONUS": 1,
     "CVD_BEARISH_PENALTY": -2,
     "STRONG_GAIN_BONUS": 2,
-    "STRONG_GAIN_MIN": 0.08,
-    "LATE_REPEAT_PENALTY": -1
+    "STRONG_GAIN_MIN": 0.08
   },
   "scoring_hold": {
     "BASE_SCORE": 5,
@@ -172,7 +170,7 @@
     "OBV_FALLING_PENALTY": -2,
     "CVD_BULLISH_BONUS": 1,
     "CVD_BEARISH_PENALTY": -2,
-    "STRUCT_PENALTY": -3,
+    "STRUCT_PENALTY": 3,
     "LATE_REPEAT_PENALTY": -1,
     "STRONG_MOMENTUM_BONUS": 2,
     "STRONG_MOMENTUM_OBV_MIN": 0.2,
