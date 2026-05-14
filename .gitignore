@@ -6,3 +6,4 @@
 .optuna_results/
 __pycache__/
 .sweep_results3/
+.sweep_results3_coarse/

@@ -21,6 +21,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from itertools import product
 from pathlib import Path
 from statistics import mean, stdev
@@ -170,10 +171,11 @@ def run_window(base_path, variant_paths, weeks, max_pairs, scan_interval,
                end_date, out_json, log_path, variant_workers=1, results_dir=None):
     """
     Corre backtest.py --variants para una ventana.
-    Divide automáticamente en chunks de 50 configs para no exceder límite de Windows.
+    Divide en chunks de 50 configs (límite cmd Windows), los corre en paralelo
+    con variant_workers hilos. Reutiliza chunks ya completados (resume).
     """
     env = {**os.environ, "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1"}
-    CHUNK_SIZE = 50  # seguro para Windows (8191 caracteres)
+    CHUNK_SIZE = 50
 
     def _make_cmd(vp_list, sub_out):
         cmd = [
@@ -190,7 +192,7 @@ def run_window(base_path, variant_paths, weeks, max_pairs, scan_interval,
             cmd += ["--results-dir", str(results_dir)]
         return cmd
 
-    # Si son pocos configs, llamada directa
+    # Si son pocos configs, llamada directa (sin chunking)
     if len(variant_paths) <= CHUNK_SIZE:
         print(f"  [{end_date}] Iniciando... (log: {log_path.name})")
         with open(log_path, "w", encoding="utf-8") as log_f:
@@ -201,43 +203,63 @@ def run_window(base_path, variant_paths, weeks, max_pairs, scan_interval,
         print(f"  [{end_date}] {status}")
         return end_date, ok, out_json
 
-    # Muchos configs: dividir en chunks y ejecutar secuencialmente
-    total_chunks = (len(variant_paths) + CHUNK_SIZE - 1) // CHUNK_SIZE
-    print(f"  [{end_date}] Dividiendo {len(variant_paths)} variantes en {total_chunks} chunks de {CHUNK_SIZE}...")
-    
-    merged = {}
-    all_ok = True
-    
-    for chunk_idx in range(total_chunks):
-        start_idx = chunk_idx * CHUNK_SIZE
-        end_idx = min(start_idx + CHUNK_SIZE, len(variant_paths))
-        chunk = variant_paths[start_idx:end_idx]
-        
+    # Armar lista de chunks
+    chunks = [variant_paths[i:i + CHUNK_SIZE]
+              for i in range(0, len(variant_paths), CHUNK_SIZE)]
+    total_chunks = len(chunks)
+    workers = max(1, variant_workers)
+    print(f"  [{end_date}] {len(variant_paths)} variantes → {total_chunks} chunks "
+          f"(paralelo: {workers})...")
+
+    def _run_chunk(chunk_idx):
+        chunk = chunks[chunk_idx]
         sub_out = out_json.parent / f"{out_json.stem}_c{chunk_idx}.json"
         sub_log = log_path.parent / f"{log_path.stem}_c{chunk_idx}.log"
-        
+
+        # Resume: reusar si ya está completo y válido
+        if sub_out.exists():
+            try:
+                data = json.loads(sub_out.read_text(encoding="utf-8"))
+                if {p.stem for p in chunk}.intersection(data.keys()):
+                    return chunk_idx, True, sub_out, True  # (idx, ok, path, skipped)
+            except (json.JSONDecodeError, OSError):
+                pass
+
         with open(sub_log, "w", encoding="utf-8") as lf:
             result = subprocess.run(_make_cmd(chunk, sub_out),
                                     stdout=lf, stderr=lf, text=True, env=env)
-        
-        ok = result.returncode == 0
-        all_ok = all_ok and ok
-        
-        if sub_out.exists():
-            try:
-                chunk_data = json.loads(sub_out.read_text(encoding="utf-8"))
-                merged.update(chunk_data)
-            except Exception as e:
-                print(f"    chunk {chunk_idx+1}/{total_chunks}: ERROR leyendo JSON - {e}")
-        
-        if (chunk_idx + 1) % 10 == 0 or chunk_idx == total_chunks - 1:
-            print(f"    chunk {chunk_idx+1}/{total_chunks}: {'OK' if ok else 'ERROR'}")
-    
+        return chunk_idx, result.returncode == 0, sub_out, False
+
+    t_start = time.time()
+    completed = 0
+    all_ok = True
+    merged = {}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as ex:
+        futures = {ex.submit(_run_chunk, i): i for i in range(total_chunks)}
+        for fut in concurrent.futures.as_completed(futures):
+            chunk_idx, ok, sub_out, skipped = fut.result()
+            all_ok = all_ok and ok
+            completed += 1
+            elapsed = time.time() - t_start
+            rate = completed / elapsed if elapsed > 0 else 0
+            eta_s = (total_chunks - completed) / rate if rate > 0 else 0
+            tag = "SKIP" if skipped else ("OK" if ok else "ERR")
+            print(f"    [{end_date}] {completed}/{total_chunks} chunks "
+                  f"({100 * completed / total_chunks:.0f}%, "
+                  f"{elapsed / 60:.1f}m elapsed, ETA {eta_s / 60:.1f}m) [{tag}]")
+
+            if sub_out.exists():
+                try:
+                    merged.update(json.loads(sub_out.read_text(encoding="utf-8")))
+                except Exception as e:
+                    print(f"    [{end_date}] chunk {chunk_idx}: ERROR JSON - {e}")
+
     if merged:
         out_json.write_text(json.dumps(merged, indent=2), encoding="utf-8")
-    
+
     status = "OK" if all_ok else "ERROR (parcial)"
-    print(f"  [{end_date}] {status}")
+    print(f"  [{end_date}] {status} ({len(merged)} configs mergeados)")
     return end_date, all_ok, out_json
 
 
@@ -298,7 +320,7 @@ def main():
     if n_combos > 50 and shard_i is None:
         print(f"AVISO: {n_combos} combos × {len(windows)} ventanas = {n_combos * len(windows)} corridas.")
         print("Continuando en 5s (Ctrl-C para cancelar)...")
-        import time; time.sleep(5)
+        time.sleep(5)
 
     out_dir.mkdir(exist_ok=True)
     results_dir = out_dir / "results"
