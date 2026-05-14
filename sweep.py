@@ -169,11 +169,11 @@ def generate_configs(base_cfg, params, out_dir, shard_i=None, shard_n=1):
 def run_window(base_path, variant_paths, weeks, max_pairs, scan_interval,
                end_date, out_json, log_path, variant_workers=1, results_dir=None):
     """
-    Corre backtest.py --variants para una ventana. Output va a log_path.
-    Si variant_workers > 1, divide las variantes en sub-grupos y corre en paralelo.
-    Devuelve (end_date, ok, out_json).
+    Corre backtest.py --variants para una ventana.
+    Divide automáticamente en chunks de 50 configs para no exceder límite de Windows.
     """
     env = {**os.environ, "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1"}
+    CHUNK_SIZE = 50  # seguro para Windows (8191 caracteres)
 
     def _make_cmd(vp_list, sub_out):
         cmd = [
@@ -190,7 +190,8 @@ def run_window(base_path, variant_paths, weeks, max_pairs, scan_interval,
             cmd += ["--results-dir", str(results_dir)]
         return cmd
 
-    if variant_workers <= 1 or len(variant_paths) <= 1:
+    # Si son pocos configs, llamada directa
+    if len(variant_paths) <= CHUNK_SIZE:
         print(f"  [{end_date}] Iniciando... (log: {log_path.name})")
         with open(log_path, "w", encoding="utf-8") as log_f:
             result = subprocess.run(_make_cmd(variant_paths, out_json),
@@ -200,44 +201,44 @@ def run_window(base_path, variant_paths, weeks, max_pairs, scan_interval,
         print(f"  [{end_date}] {status}")
         return end_date, ok, out_json
 
-    # Dividir variantes en chunks y correr en paralelo
-    chunk_size = max(1, (len(variant_paths) + variant_workers - 1) // variant_workers)
-    chunks = [variant_paths[i:i + chunk_size] for i in range(0, len(variant_paths), chunk_size)]
-    sub_outs = []
-    print(f"  [{end_date}] Iniciando {len(chunks)} workers ({len(variant_paths)} variantes)...")
-
-    def _run_chunk(chunk, sub_out, sub_log):
-        with open(sub_log, "w", encoding="utf-8") as lf:
-            r = subprocess.run(_make_cmd(chunk, sub_out),
-                               stdout=lf, stderr=lf, text=True, env=env)
-        return r.returncode == 0
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=len(chunks)) as pool:
-        futs = []
-        for k, chunk in enumerate(chunks):
-            sub_out = out_json.parent / f"{out_json.stem}__w{k}.json"
-            sub_log = log_path.parent / f"{log_path.stem}__w{k}.log"
-            sub_outs.append(sub_out)
-            futs.append(pool.submit(_run_chunk, chunk, sub_out, sub_log))
-        statuses = [f.result() for f in futs]
-
-    ok = all(statuses)
+    # Muchos configs: dividir en chunks y ejecutar secuencialmente
+    total_chunks = (len(variant_paths) + CHUNK_SIZE - 1) // CHUNK_SIZE
+    print(f"  [{end_date}] Dividiendo {len(variant_paths)} variantes en {total_chunks} chunks de {CHUNK_SIZE}...")
+    
     merged = {}
-    for sub_out in sub_outs:
+    all_ok = True
+    
+    for chunk_idx in range(total_chunks):
+        start_idx = chunk_idx * CHUNK_SIZE
+        end_idx = min(start_idx + CHUNK_SIZE, len(variant_paths))
+        chunk = variant_paths[start_idx:end_idx]
+        
+        sub_out = out_json.parent / f"{out_json.stem}_c{chunk_idx}.json"
+        sub_log = log_path.parent / f"{log_path.stem}_c{chunk_idx}.log"
+        
+        with open(sub_log, "w", encoding="utf-8") as lf:
+            result = subprocess.run(_make_cmd(chunk, sub_out),
+                                    stdout=lf, stderr=lf, text=True, env=env)
+        
+        ok = result.returncode == 0
+        all_ok = all_ok and ok
+        
         if sub_out.exists():
             try:
-                merged.update(json.loads(sub_out.read_text(encoding="utf-8")))
+                chunk_data = json.loads(sub_out.read_text(encoding="utf-8"))
+                merged.update(chunk_data)
             except Exception as e:
-                print(f"  AVISO: no se pudo leer {sub_out.name}: {e}")
-
+                print(f"    chunk {chunk_idx+1}/{total_chunks}: ERROR leyendo JSON - {e}")
+        
+        if (chunk_idx + 1) % 10 == 0 or chunk_idx == total_chunks - 1:
+            print(f"    chunk {chunk_idx+1}/{total_chunks}: {'OK' if ok else 'ERROR'}")
+    
     if merged:
         out_json.write_text(json.dumps(merged, indent=2), encoding="utf-8")
-    else:
-        ok = False
-
-    status = "OK" if ok else f"ERROR parcial (ver logs {log_path.stem}__w*.log)"
+    
+    status = "OK" if all_ok else "ERROR (parcial)"
     print(f"  [{end_date}] {status}")
-    return end_date, ok, out_json
+    return end_date, all_ok, out_json
 
 
 # ──────────────────────────────────────────────────────────────────────────────
