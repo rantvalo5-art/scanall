@@ -1,5 +1,5 @@
 {
-  "_note": "Completar con valores del top-5 de sweeper3_coarse (.sweep_results3_coarse/ranking.md). Ver plan para instrucciones.",
+  "_note": "Refined sweep post-coarse: zoom en knobs inestables. ATR_MIN_PCT ya promovido a 2.5 en config base.",
   "base": "config.json",
   "weeks": 3,
   "max_pairs": 200,
@@ -14,14 +14,10 @@
   ],
 
   "params": {
-    "scoring.BEST_MIN_SCORE":                [],
-    "scoring.STRONG_MIN_SCORE":              [],
-    "indicators.ATR_MIN_PCT":                [],
-    "indicators.OBV_RISING_MIN":             [],
-    "indicators.CVD_BULLISH_MIN":            [],
-    "scoring_breakout.EARLY_ENTRY_BONUS":    [],
-    "scoring_breakout.LATE_ENTRY_PENALTY":   [],
-    "scoring_hold.STRUCT_PENALTY":           []
+    "scoring.BEST_MIN_SCORE":                [11, 12, 13],
+    "scoring.STRONG_MIN_SCORE":              [9, 10],
+    "indicators.OBV_RISING_MIN":             [0.03, 0.06, 0.09, 0.12],
+    "scoring_hold.STRUCT_PENALTY":           [-3, -2, -1]
   },
 
   "scoring_weights": {
