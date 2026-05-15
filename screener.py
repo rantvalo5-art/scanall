@@ -639,6 +639,8 @@ def analyze(symbol, interval):
     vol_recent = volume.iloc[-3:].mean()
     vol_prev = volume.iloc[-6:-3].mean()
     vol_growth = vol_prev and (vol_recent / vol_prev) or 0.0
+    vol_mean_prev = volume.iloc[-22:-2].mean()
+    vol_ratio_prev = (volume.iloc[-2] / vol_mean_prev) if vol_mean_prev > 0 else 0.0
 
     close_pos = close_position(price, high.iloc[-1], low.iloc[-1])
     strong_close = close_pos >= STRONG_CLOSE_MIN
@@ -657,9 +659,13 @@ def analyze(symbol, interval):
         obv_ref = obv.iloc[-OBV_SLOPE_LOOKBACK]
         obv_slope = (obv_now - obv_ref) / abs(obv_now) if abs(obv_now) > 1e-12 else 0.0
         obv_rising = obv_slope >= OBV_RISING_MIN
+        obv_prev = obv.iloc[-2]
+        obv_ref_prev = obv.iloc[-OBV_SLOPE_LOOKBACK - 1]
+        obv_slope_prev = (obv_prev - obv_ref_prev) / abs(obv_prev) if abs(obv_prev) > 1e-12 else 0.0
     except Exception:
         obv_slope = 0.0
         obv_rising = False
+        obv_slope_prev = 0.0
 
     # ── CVD (Cumulative Volume Delta) con taker buy/sell de Binance.
     # Binance reporta cuánto del volumen de cada vela fue iniciado por el comprador agresivo
@@ -806,6 +812,7 @@ def analyze(symbol, interval):
         "width_expansion": width_expansion,
         "atr_pct": atr_pct,
         "vol_ratio": vol_ratio,
+        "vol_ratio_prev": vol_ratio_prev,
         "vol_growth": vol_growth,
         "strong_close": strong_close,
         "candle_body_pct": candle_body_pct,
@@ -816,6 +823,7 @@ def analyze(symbol, interval):
         "recent_max_long": recent_max_long,
         "recent_long_ok": recent_long_ok,
         "obv_slope": obv_slope,
+        "obv_slope_prev": obv_slope_prev,
         "obv_rising": obv_rising,
         "cvd_ratio": cvd_ratio,
         "cvd_bullish": cvd_bullish,
@@ -867,12 +875,18 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
 
     candidates = []
 
+    _persist_on = _cfg("persistence", "ENABLED", default=False)
+
     # ── PRE-BREAK ──────────────────────────────────────────────────────────────
     if ACTIVE_SIGNALS_PREBREAK:
+        _pre_vol_bars = _cfg("persistence", "PREBREAK_VOL_BARS", default=1) if _persist_on else 1
+        _vol_ok_pre = tf5.get("vol_ratio", 0) >= PREBREAK_MIN_VOL_RATIO
+        if _pre_vol_bars >= 2:
+            _vol_ok_pre = _vol_ok_pre and tf5.get("vol_ratio_prev", 0) >= PREBREAK_MIN_VOL_RATIO
         pre_ok = (
             tf5.get("near_recent_max")
             and tf5.get("width_curr", 9) <= PREBREAK_BB_WIDTH_MAX
-            and tf5.get("vol_ratio", 0) >= PREBREAK_MIN_VOL_RATIO
+            and _vol_ok_pre
             and tf5.get("vol_growth", 0) >= PREBREAK_VOLUME_GROWTH_MIN
         )
         if pre_ok and not in_cooldown(symbol, "PREBREAK", last_seen):
@@ -1307,11 +1321,18 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     if ACTIVE_SIGNALS_HOLD:
         require_obv = _cfg("hold", "HOLD_REQUIRE_OBV_RISING", default=False)
         require_cvd = _cfg("hold", "HOLD_REQUIRE_CVD_BULLISH", default=False)
+        _hold_obv_bars = _cfg("persistence", "HOLD_OBV_BARS", default=1) if _persist_on else 1
+        _obv_ok_hold = (not require_obv) or tf15.get("obv_rising", False)
+        if require_obv and _hold_obv_bars >= 2:
+            _obv_ok_hold = _obv_ok_hold and tf15.get("obv_slope_prev", 0) >= OBV_RISING_MIN
+        _cvd_ok_hold = (not require_cvd) or tf15.get("cvd_bullish", False)
         hold_ok = (
             tf15.get("hold_recent_break")
             and tf15.get("hold_kept_zone")
             and tf15.get("hold_pullback_ok")
             and tf15.get("hold_strong")
+            and _obv_ok_hold
+            and _cvd_ok_hold
         )
         if hold_ok and not in_cooldown(symbol, "HOLD", last_seen):
             prev = counts_history.get((symbol, "HOLD"), 0)

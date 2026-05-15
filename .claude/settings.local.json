@@ -5,7 +5,18 @@
       "Bash(python *)",
       "Bash(PYTHONIOENCODING=utf-8 cat \"C:\\\\Users\\\\a\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-a-scancrypto\\\\1723ddf0-da82-41a3-a2a9-cdfe0afe000d\\\\tasks\\\\bfqqqekmi.output\")",
       "Bash(PYTHONIOENCODING=utf-8 python backtest.py --weeks 1 --max-pairs 200 --compare config_pre_struct_fix.json config.json --out compare_riding_fix.json)",
-      "Bash(PYTHONIOENCODING=utf-8 cat *)"
+      "Bash(PYTHONIOENCODING=utf-8 cat *)",
+      "Bash(git stash *)",
+      "Bash(copy config.json config_pre11_9.json)",
+      "Bash(SUPABASE_KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjZ2Rzd3JveWdrZmNra2FndXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MTUyNzEsImV4cCI6MjA4OTA5MTI3MX0.N_qJsJWTJaqRHpugzlnRTpoZI84mUoctt3RKmUshIrU\" PYTHONIOENCODING=utf-8 python dump_outcomes.py)",
+      "Bash(PYTHONIOENCODING=utf-8 python audit_misses.py false-positives --dump outcomes_dump.json --days 7)",
+      "PowerShell(Copy-Item *)",
+      "Bash(PYTHONIOENCODING=utf-8 python backtest.py --weeks 1 --max-pairs 200 --compare config_pre13.json config.json --out compare_13.json)",
+      "Bash(PYTHONIOENCODING=utf-8 python backtest.py --weeks 1 --max-pairs 200 --compare config_pre_pertype.json config.json --out compare_pertype.json)",
+      "Bash(PYTHONIOENCODING=utf-8 python -c ' *)",
+      "Bash(PYTHONIOENCODING=utf-8 python backtest.py --weeks 1 --max-pairs 200 --compare config_pre_tighten.json config.json --out compare_tighten.json)",
+      "PowerShell(cd C:\\\\Users\\\\a\\\\scancrypto; $env:PYTHONIOENCODING=\"utf-8\"; python backtest.py --weeks 1 --max-pairs 200 --compare config_deriv_off.json config.json --out compare_deriv.json 2>&1)",
+      "PowerShell(cd C:\\\\Users\\\\a\\\\scancrypto; $env:PYTHONIOENCODING=\"utf-8\"; python backtest.py --weeks 2 --max-pairs 300 --compare config_persist_off.json config.json --out compare_persist.json 2>&1)"
     ]
   }
 }

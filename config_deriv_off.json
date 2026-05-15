@@ -87,11 +87,6 @@
     "FADING_BELOW_ZONE": 0.008,
     "FADING_PULLBACK_HARD": 0.03
   },
-  "persistence": {
-    "ENABLED": true,
-    "PREBREAK_VOL_BARS": 2,
-    "HOLD_OBV_BARS": 2
-  },
   "scoring": {
     "BEST_MIN_SCORE": 12,
     "STRONG_MIN_SCORE": 10,

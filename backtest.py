@@ -619,6 +619,7 @@ def analyze_at_time(df_full, end_idx, cfg):
         "width_expansion": width_expansion,
         "atr_pct": atr_pct,
         "vol_ratio": vol_ratio,
+        "vol_ratio_prev": 0.0,
         "vol_growth": vol_growth,
         "strong_close": strong_close,
         "candle_body_pct": candle_body_pct,
@@ -629,6 +630,7 @@ def analyze_at_time(df_full, end_idx, cfg):
         "recent_max_long": recent_max_long,
         "recent_long_ok": recent_long_ok,
         "obv_slope": obv_slope,
+        "obv_slope_prev": 0.0,
         "obv_rising": obv_rising,
         "cvd_ratio": cvd_ratio,
         "cvd_bullish": cvd_bullish,
@@ -734,6 +736,8 @@ def precompute_indicators(df, cfg):
     df["_atr"] = ta.volatility.AverageTrueRange(high, low, close, window=14).average_true_range()
 
     df["_vol_mean20"] = volume.rolling(20).mean().shift(1)
+    df["_vol_ratio"] = volume / df["_vol_mean20"].replace(0, np.nan)
+    df["_vol_ratio"] = df["_vol_ratio"].fillna(0.0)
     df["_vol_recent3"] = volume.rolling(3).mean()
     df["_vol_prev3"] = volume.rolling(3).mean().shift(3)
 
@@ -813,6 +817,8 @@ def analyze_at_index(df, end_idx, cfg):
     vol_mean = float(vol_mean_raw) if pd.notna(vol_mean_raw) and vol_mean_raw > 0 else 0.0
     vol_curr = float(df["volume"].iat[end_idx])
     vol_ratio = (vol_curr / vol_mean) if vol_mean > 0 else 0.0
+    vr_prev_raw = df["_vol_ratio"].iat[end_idx - 1] if end_idx >= 1 else 0.0
+    vol_ratio_prev = float(vr_prev_raw) if pd.notna(vr_prev_raw) else 0.0
     vol_recent_raw = df["_vol_recent3"].iat[end_idx]
     vol_prev_raw = df["_vol_prev3"].iat[end_idx]
     vol_recent = float(vol_recent_raw) if pd.notna(vol_recent_raw) else 0.0
@@ -831,9 +837,14 @@ def analyze_at_index(df, end_idx, cfg):
         obv_ref = float(df["_obv"].iat[obv_ref_idx])
         obv_slope = (obv_now - obv_ref) / abs(obv_now) if abs(obv_now) > 1e-12 else 0.0
         obv_rising = obv_slope >= OBV_RISING_MIN
+        obv_prev = float(df["_obv"].iat[end_idx - 1]) if end_idx >= 1 else 0.0
+        obv_ref_prev_idx = max(0, end_idx - 1 - OBV_SLOPE_LOOKBACK + 1)
+        obv_ref_prev = float(df["_obv"].iat[obv_ref_prev_idx])
+        obv_slope_prev = (obv_prev - obv_ref_prev) / abs(obv_prev) if abs(obv_prev) > 1e-12 else 0.0
     except Exception:
         obv_slope = 0.0
         obv_rising = False
+        obv_slope_prev = 0.0
 
     # CVD
     try:
@@ -958,6 +969,7 @@ def analyze_at_index(df, end_idx, cfg):
         "width_expansion": width_expansion,
         "atr_pct": atr_pct,
         "vol_ratio": vol_ratio,
+        "vol_ratio_prev": vol_ratio_prev,
         "vol_growth": vol_growth,
         "strong_close": strong_close,
         "candle_body_pct": candle_body_pct,
@@ -968,6 +980,7 @@ def analyze_at_index(df, end_idx, cfg):
         "recent_max_long": recent_max_long,
         "recent_long_ok": recent_long_ok,
         "obv_slope": obv_slope,
+        "obv_slope_prev": obv_slope_prev,
         "obv_rising": obv_rising,
         "cvd_ratio": cvd_ratio,
         "cvd_bullish": cvd_bullish,
@@ -1033,11 +1046,17 @@ def classify(symbol, tf_data, cfg, counts_history=None):
     SCORE_CAP = cfg.g("scoring", "SCORE_CAP")
     LATE_REPEAT_COUNT = cfg.g("history", "LATE_REPEAT_COUNT", default=1)
 
+    _persist_on = cfg.g("persistence", "ENABLED", default=False)
+
     # ── PREBREAK ──────────────────────────────────────────────────────────
     if cfg.g("active_signals", "PREBREAK"):
+        _pre_vol_bars = cfg.g("persistence", "PREBREAK_VOL_BARS", default=1) if _persist_on else 1
+        _vol_ok_pre = tf5.get("vol_ratio", 0) >= cfg.g("prebreak", "PREBREAK_MIN_VOL_RATIO")
+        if _pre_vol_bars >= 2:
+            _vol_ok_pre = _vol_ok_pre and tf5.get("vol_ratio_prev", 0) >= cfg.g("prebreak", "PREBREAK_MIN_VOL_RATIO")
         if (tf5.get("near_recent_max")
             and tf5.get("width_curr", 9) <= cfg.g("prebreak", "PREBREAK_BB_WIDTH_MAX")
-            and tf5.get("vol_ratio", 0) >= cfg.g("prebreak", "PREBREAK_MIN_VOL_RATIO")
+            and _vol_ok_pre
             and tf5.get("vol_growth", 0) >= cfg.g("prebreak", "PREBREAK_VOLUME_GROWTH_MIN")):
 
             base_offset    = cfg.g("scoring_prebreak", "BASE_OFFSET", default=4)
@@ -1294,8 +1313,15 @@ def classify(symbol, tf_data, cfg, counts_history=None):
 
     # ── HOLD ──────────────────────────────────────────────────────────────
     if cfg.g("active_signals", "HOLD"):
+        _require_obv_hold = cfg.g("hold", "HOLD_REQUIRE_OBV_RISING", default=False)
+        _hold_obv_bars = cfg.g("persistence", "HOLD_OBV_BARS", default=1) if _persist_on else 1
+        _obv_ok_hold = (not _require_obv_hold) or tf15.get("obv_rising", False)
+        if _require_obv_hold and _hold_obv_bars >= 2:
+            _obv_ok_hold = _obv_ok_hold and (tf15.get("obv_slope_prev", 0) >= cfg.g("indicators", "OBV_RISING_MIN", default=0.05))
+        _cvd_ok_hold = (not cfg.g("hold", "HOLD_REQUIRE_CVD_BULLISH", default=False)) or tf15.get("cvd_bullish", False)
         if (tf15.get("hold_recent_break") and tf15.get("hold_kept_zone")
-            and tf15.get("hold_pullback_ok") and tf15.get("hold_strong")):
+            and tf15.get("hold_pullback_ok") and tf15.get("hold_strong")
+            and _obv_ok_hold and _cvd_ok_hold):
 
             base          = cfg.g("scoring_hold", "BASE_SCORE", default=5)
             above_b       = cfg.g("scoring_hold", "ABOVE_RESIST_BONUS", default=2)

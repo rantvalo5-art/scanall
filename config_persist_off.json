@@ -65,13 +65,13 @@
     "HOLD_RECENT_BREAK_MAX_BARS": 5,
     "HOLD_ZONE_BUFFER": 0.003,
     "HOLD_PULLBACK_MAX": 0.03,
-    "STRONG_CLOSE_MIN": 0.70,
+    "STRONG_CLOSE_MIN": 0.7,
     "ONE_H_RESIST_LOOKBACK": 24,
     "ONE_H_RESIST_BUFFER": 0.015,
     "MAJOR_STRUCT_LOOKBACK": 60,
-    "MAJOR_STRUCT_MAX_DIST": 0.10,
-    "HOLD_REQUIRE_OBV_RISING": true,    
-    "HOLD_REQUIRE_CVD_BULLISH": true    
+    "MAJOR_STRUCT_MAX_DIST": 0.1,
+    "HOLD_REQUIRE_OBV_RISING": true,
+    "HOLD_REQUIRE_CVD_BULLISH": true
   },
   "riding": {
     "RIDING_LOOKBACK_BARS": 20,
@@ -88,7 +88,7 @@
     "FADING_PULLBACK_HARD": 0.03
   },
   "persistence": {
-    "ENABLED": true,
+    "ENABLED": false,
     "PREBREAK_VOL_BARS": 2,
     "HOLD_OBV_BARS": 2
   },
