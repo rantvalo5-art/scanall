@@ -860,7 +860,15 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     if not tf5 or not tf15 or not tf1h:
         return None
 
-    if not (tf1h.get("ema_trend_up") and tf1h.get("not_near_resistance")):
+    # Resistencia es siempre un gate duro (el precio debe tener espacio o estar en breakout).
+    if not tf1h.get("not_near_resistance"):
+        return None
+
+    # EMA gate — configurable: hard filter (default) o penalización suave.
+    # EMA_GATE_HARD=true (default): corta aquí como antes.
+    # EMA_GATE_HARD=false: permite señales sin tendencia confirmada, aplica EMA_SOFT_PENALTY al score.
+    _ema_gate_hard = _cfg("indicators", "EMA_GATE_HARD", default=True)
+    if not tf1h.get("ema_trend_up") and _ema_gate_hard:
         return None
 
     # Filtro ATR: descartar pares muertos (volatilidad insuficiente en 1h)
@@ -1432,6 +1440,14 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             # Si por la penalización ya no llega a IMMEDIATE_MIN_SCORE, bajamos el flag
             if c.get("immediate") and c["score"] < IMMEDIATE_MIN_SCORE:
                 c["immediate"] = False
+
+    # Penalización suave por EMA 1h no alcista (solo cuando EMA_GATE_HARD=false).
+    # Se aplica a todos los candidatos: la señal puede dispararse pero queda descontada.
+    if not _ema_gate_hard and not tf1h.get("ema_trend_up"):
+        _ema_pen = int(_cfg("indicators", "EMA_SOFT_PENALTY", default=-2))
+        for c in candidates:
+            c["score"] = max(0, c["score"] + _ema_pen)
+            c["bucket"] = final_bucket(c["score"])
 
     # Cap superior: scores de 20+, 30+, 40+ en BREAKOUT son outliers que NO predicen mejor
     # rendimiento (datos empíricos). Capeamos para que la escala 0-15 sea legible y

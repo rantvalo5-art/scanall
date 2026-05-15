@@ -1,0 +1,4206 @@
+{
+  "generated_at": "2026-05-15T13:09:34.527054+00:00",
+  "period_days": 30,
+  "n": 466,
+  "median_pct": 1.114,
+  "p75_pct": 1.879,
+  "p90_pct": 2.623,
+  "early_count": 92,
+  "late_count": 102,
+  "entries": [
+    {
+      "symbol": "AIUSDT",
+      "alerted_at": "2026-05-14T01:17",
+      "bucket": "WATCH",
+      "score": 8,
+      "entry_price": 0.0285,
+      "ref_price": 0.0253,
+      "lateness_pct": 12.348221343873533
+    },
+    {
+      "symbol": "OSMOUSDT",
+      "alerted_at": "2026-05-13T13:27",
+      "bucket": "STRONG",
+      "score": 10,
+      "entry_price": 0.0884,
+      "ref_price": 0.0837,
+      "lateness_pct": 5.31529271206691
+    },
+    {
+      "symbol": "RADUSDT",
+      "alerted_at": "2026-05-15T05:31",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.374,
+      "ref_price": 0.355,
+      "lateness_pct": 5.052112676056353
+    },
+    {
+      "symbol": "DUSKUSDT",
+      "alerted_at": "2026-05-14T13:16",
+      "bucket": "BEST",
+      "score": 12,
+      "entry_price": 0.1482,
+      "ref_price": 0.1414,
+      "lateness_pct": 4.509052333804819
+    },
+    {
+      "symbol": "STORJUSDT",
+      "alerted_at": "2026-05-06T00:01",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.1121,
+      "ref_price": 0.1078,
+      "lateness_pct": 3.6888682745825574
+    },
+    {
+      "symbol": "CHIPUSDT",
+      "alerted_at": "2026-05-08T03:58",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.06365,
+      "ref_price": 0.06131,
+      "lateness_pct": 3.5166693850921527
+    },
+    {
+      "symbol": "SUIUSDT",
+      "alerted_at": "2026-05-08T22:04",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 1.0845,
+      "ref_price": 1.0449,
+      "lateness_pct": 3.4898363479758943
+    },
+    {
+      "symbol": "NILUSDT",
+      "alerted_at": "2026-05-14T07:30",
+      "bucket": "STRONG",
+      "score": 10,
+      "entry_price": 0.0562,
+      "ref_price": 0.05417,
+      "lateness_pct": 3.447461694664933
+    },
+    {
+      "symbol": "PARTIUSDT",
+      "alerted_at": "2026-05-11T06:31",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.0582,
+      "ref_price": 0.0561,
+      "lateness_pct": 3.443315508021405
+    },
+    {
+      "symbol": "FARMUSDT",
+      "alerted_at": "2026-05-06T09:04",
+      "bucket": "WATCH",
+      "score": 8,
+      "entry_price": 12.8,
+      "ref_price": 12.34,
+      "lateness_pct": 3.4277147487844384
+    },
+    {
+      "symbol": "PENGUUSDT",
+      "alerted_at": "2026-05-04T23:16",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.010784,
+      "ref_price": 0.0104,
+      "lateness_pct": 3.3923076923077056
+    },
+    {
+      "symbol": "AEVOUSDT",
+      "alerted_at": "2026-05-05T23:00",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.0292,
+      "ref_price": 0.0282,
+      "lateness_pct": 3.2460992907801356
+    },
+    {
+      "symbol": "DASHUSDT",
+      "alerted_at": "2026-05-06T05:58",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 57.84,
+      "ref_price": 55.87,
+      "lateness_pct": 3.2260425988902885
+    },
+    {
+      "symbol": "OPUSDT",
+      "alerted_at": "2026-05-06T18:52",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 0.147,
+      "ref_price": 0.142,
+      "lateness_pct": 3.2211267605633753
+    },
+    {
+      "symbol": "FILUSDT",
+      "alerted_at": "2026-05-06T01:13",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 1.118,
+      "ref_price": 1.08,
+      "lateness_pct": 3.2185185185185206
+    },
+    {
+      "symbol": "BABYUSDT",
+      "alerted_at": "2026-05-09T14:01",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.01825,
+      "ref_price": 0.01763,
+      "lateness_pct": 3.2167328417470054
+    },
+    {
+      "symbol": "EDENUSDT",
+      "alerted_at": "2026-05-11T22:04",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.0444,
+      "ref_price": 0.0429,
+      "lateness_pct": 3.1965034965035
+    },
+    {
+      "symbol": "VIRTUALUSDT",
+      "alerted_at": "2026-05-05T12:46",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.7999,
+      "ref_price": 0.7729,
+      "lateness_pct": 3.193336783542511
+    },
+    {
+      "symbol": "TURBOUSDT",
+      "alerted_at": "2026-05-13T07:34",
+      "bucket": "BEST",
+      "score": 12,
+      "entry_price": 0.001524,
+      "ref_price": 0.001473,
+      "lateness_pct": 3.1623217922606917
+    },
+    {
+      "symbol": "REZUSDT",
+      "alerted_at": "2026-05-09T03:07",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.00693,
+      "ref_price": 0.0067,
+      "lateness_pct": 3.13283582089553
+    },
+    {
+      "symbol": "REZUSDT",
+      "alerted_at": "2026-05-09T03:06",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.00693,
+      "ref_price": 0.0067,
+      "lateness_pct": 3.13283582089553
+    },
+    {
+      "symbol": "NEIROUSDT",
+      "alerted_at": "2026-05-05T06:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.00010827,
+      "ref_price": 0.0001047,
+      "lateness_pct": 3.1097421203438396
+    },
+    {
+      "symbol": "ICPUSDT",
+      "alerted_at": "2026-05-06T20:46",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 3.208,
+      "ref_price": 3.104,
+      "lateness_pct": 3.0505154639175363
+    },
+    {
+      "symbol": "OGUSDT",
+      "alerted_at": "2026-05-08T05:22",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 3.4,
+      "ref_price": 3.29,
+      "lateness_pct": 3.0434650455927086
+    },
+    {
+      "symbol": "GIGGLEUSDT",
+      "alerted_at": "2026-05-10T13:03",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 40.01,
+      "ref_price": 38.72,
+      "lateness_pct": 3.031611570247928
+    },
+    {
+      "symbol": "KSMUSDT",
+      "alerted_at": "2026-05-07T00:01",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 5.28,
+      "ref_price": 5.11,
+      "lateness_pct": 3.026810176125239
+    },
+    {
+      "symbol": "AIUSDT",
+      "alerted_at": "2026-05-12T08:22",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 0.0249,
+      "ref_price": 0.0241,
+      "lateness_pct": 3.019502074688785
+    },
+    {
+      "symbol": "NEARUSDT",
+      "alerted_at": "2026-05-06T05:43",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 1.404,
+      "ref_price": 1.359,
+      "lateness_pct": 3.0112582781456902
+    },
+    {
+      "symbol": "ENSUSDT",
+      "alerted_at": "2026-05-10T16:34",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 7.56,
+      "ref_price": 7.32,
+      "lateness_pct": 2.9786885245901455
+    },
+    {
+      "symbol": "GIGGLEUSDT",
+      "alerted_at": "2026-05-08T23:03",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 39.75,
+      "ref_price": 38.49,
+      "lateness_pct": 2.9735775526110624
+    },
+    {
+      "symbol": "KSMUSDT",
+      "alerted_at": "2026-05-07T00:31",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 5.48,
+      "ref_price": 5.31,
+      "lateness_pct": 2.901506591337111
+    },
+    {
+      "symbol": "COSUSDT",
+      "alerted_at": "2026-05-12T14:01",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.001336,
+      "ref_price": 0.001295,
+      "lateness_pct": 2.8660231660231688
+    },
+    {
+      "symbol": "ICPUSDT",
+      "alerted_at": "2026-05-08T22:36",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 3.891,
+      "ref_price": 3.773,
+      "lateness_pct": 2.827484760137822
+    },
+    {
+      "symbol": "NIGHTUSDT",
+      "alerted_at": "2026-05-08T13:09",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.03329,
+      "ref_price": 0.03229,
+      "lateness_pct": 2.7969340353050436
+    },
+    {
+      "symbol": "HOLOUSDT",
+      "alerted_at": "2026-05-08T00:12",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 0.0737,
+      "ref_price": 0.0715,
+      "lateness_pct": 2.7769230769230884
+    },
+    {
+      "symbol": "STRKUSDT",
+      "alerted_at": "2026-05-05T19:28",
+      "bucket": "WATCH",
+      "score": 7,
+      "entry_price": 0.0404,
+      "ref_price": 0.0392,
+      "lateness_pct": 2.761224489795911
+    },
+    {
+      "symbol": "WALUSDT",
+      "alerted_at": "2026-05-08T22:10",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.0842,
+      "ref_price": 0.0817,
+      "lateness_pct": 2.7599755201958347
+    },
+    {
+      "symbol": "SUIUSDT",
+      "alerted_at": "2026-05-10T13:21",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 1.2407,
+      "ref_price": 1.204,
+      "lateness_pct": 2.7481727574750874
+    },
+    {
+      "symbol": "SUIUSDT",
+      "alerted_at": "2026-05-10T13:00",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 1.225,
+      "ref_price": 1.189,
+      "lateness_pct": 2.7277544154751814
+    },
+    {
+      "symbol": "MAVUSDT",
+      "alerted_at": "2026-05-12T06:01",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.01748,
+      "ref_price": 0.01697,
+      "lateness_pct": 2.705303476723631
+    },
+    {
+      "symbol": "BANANAUSDT",
+      "alerted_at": "2026-05-09T13:46",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 5.15,
+      "ref_price": 5.0,
+      "lateness_pct": 2.700000000000003
+    },
+    {
+      "symbol": "LINEAUSDT",
+      "alerted_at": "2026-05-08T14:46",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.00423,
+      "ref_price": 0.004107,
+      "lateness_pct": 2.6948867786705692
+    },
+    {
+      "symbol": "MANTRAUSDT",
+      "alerted_at": "2026-05-12T00:03",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.01137,
+      "ref_price": 0.01104,
+      "lateness_pct": 2.6891304347826166
+    },
+    {
+      "symbol": "PEOPLEUSDT",
+      "alerted_at": "2026-05-08T01:04",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.00863,
+      "ref_price": 0.00838,
+      "lateness_pct": 2.683293556085931
+    },
+    {
+      "symbol": "INJUSDT",
+      "alerted_at": "2026-05-08T05:03",
+      "bucket": "WATCH",
+      "score": 8,
+      "entry_price": 4.035,
+      "ref_price": 3.919,
+      "lateness_pct": 2.659938759887737
+    },
+    {
+      "symbol": "CFXUSDT",
+      "alerted_at": "2026-05-14T11:46",
+      "bucket": "BEST",
+      "score": 12,
+      "entry_price": 0.07714,
+      "ref_price": 0.07493,
+      "lateness_pct": 2.6494194581609625
+    },
+    {
+      "symbol": "PENDLEUSDT",
+      "alerted_at": "2026-05-11T17:01",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 2.148,
+      "ref_price": 2.087,
+      "lateness_pct": 2.6228557738380402
+    },
+    {
+      "symbol": "HMSTRUSDT",
+      "alerted_at": "2026-05-04T22:04",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.0001816,
+      "ref_price": 0.0001765,
+      "lateness_pct": 2.589518413597725
+    },
+    {
+      "symbol": "SUSHIUSDT",
+      "alerted_at": "2026-05-08T06:21",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.237,
+      "ref_price": 0.2304,
+      "lateness_pct": 2.564583333333326
+    },
+    {
+      "symbol": "ARBUSDT",
+      "alerted_at": "2026-05-08T06:21",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.134,
+      "ref_price": 0.1303,
+      "lateness_pct": 2.5396009209516572
+    },
+    {
+      "symbol": "MITOUSDT",
+      "alerted_at": "2026-05-09T08:15",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.07197,
+      "ref_price": 0.07,
+      "lateness_pct": 2.5142857142857027
+    },
+    {
+      "symbol": "JUPUSDT",
+      "alerted_at": "2026-05-08T13:15",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.2231,
+      "ref_price": 0.217,
+      "lateness_pct": 2.5110599078341016
+    },
+    {
+      "symbol": "RIFUSDT",
+      "alerted_at": "2026-05-05T17:22",
+      "bucket": "WATCH",
+      "score": 8,
+      "entry_price": 0.0517,
+      "ref_price": 0.0503,
+      "lateness_pct": 2.4833001988071706
+    },
+    {
+      "symbol": "WLDUSDT",
+      "alerted_at": "2026-05-10T13:00",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.2813,
+      "ref_price": 0.2737,
+      "lateness_pct": 2.476762879064676
+    },
+    {
+      "symbol": "GALAUSDT",
+      "alerted_at": "2026-05-08T10:07",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.00408,
+      "ref_price": 0.00397,
+      "lateness_pct": 2.470780856423194
+    },
+    {
+      "symbol": "JUPUSDT",
+      "alerted_at": "2026-05-08T13:36",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.2263,
+      "ref_price": 0.2202,
+      "lateness_pct": 2.470208900999083
+    },
+    {
+      "symbol": "SAGAUSDT",
+      "alerted_at": "2026-05-08T21:45",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0197,
+      "ref_price": 0.01917,
+      "lateness_pct": 2.464736567553472
+    },
+    {
+      "symbol": "HAEDALUSDT",
+      "alerted_at": "2026-05-10T13:16",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.03832,
+      "ref_price": 0.03729,
+      "lateness_pct": 2.462134620541712
+    },
+    {
+      "symbol": "CFGUSDT",
+      "alerted_at": "2026-05-08T22:31",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.3307,
+      "ref_price": 0.3219,
+      "lateness_pct": 2.4337682510096164
+    },
+    {
+      "symbol": "BANANAUSDT",
+      "alerted_at": "2026-05-04T22:43",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 4.14,
+      "ref_price": 4.03,
+      "lateness_pct": 2.4295285359801415
+    },
+    {
+      "symbol": "PARTIUSDT",
+      "alerted_at": "2026-05-13T14:18",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.064,
+      "ref_price": 0.0623,
+      "lateness_pct": 2.4287319422150793
+    },
+    {
+      "symbol": "OPUSDT",
+      "alerted_at": "2026-05-08T14:37",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.1588,
+      "ref_price": 0.1546,
+      "lateness_pct": 2.416688227684361
+    },
+    {
+      "symbol": "TAOUSDT",
+      "alerted_at": "2026-05-05T19:31",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 303.9,
+      "ref_price": 295.9,
+      "lateness_pct": 2.4036160865157257
+    },
+    {
+      "symbol": "ZECUSDT",
+      "alerted_at": "2026-05-08T19:30",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 614.48,
+      "ref_price": 598.32,
+      "lateness_pct": 2.4008958416900654
+    },
+    {
+      "symbol": "EULUSDT",
+      "alerted_at": "2026-05-04T14:16",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 1.494,
+      "ref_price": 1.455,
+      "lateness_pct": 2.3804123711340113
+    },
+    {
+      "symbol": "CHIPUSDT",
+      "alerted_at": "2026-05-12T23:31",
+      "bucket": "BEST",
+      "score": 12,
+      "entry_price": 0.06915,
+      "ref_price": 0.06735,
+      "lateness_pct": 2.372605790645899
+    },
+    {
+      "symbol": "LUNCUSDT",
+      "alerted_at": "2026-05-05T13:16",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.00011564,
+      "ref_price": 0.00011265,
+      "lateness_pct": 2.35423879272082
+    },
+    {
+      "symbol": "SAHARAUSDT",
+      "alerted_at": "2026-05-09T15:03",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.04345,
+      "ref_price": 0.04233,
+      "lateness_pct": 2.34587762815971
+    },
+    {
+      "symbol": "TURBOUSDT",
+      "alerted_at": "2026-05-08T01:07",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.001363,
+      "ref_price": 0.001328,
+      "lateness_pct": 2.3355421686746984
+    },
+    {
+      "symbol": "JUPUSDT",
+      "alerted_at": "2026-05-08T13:58",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 0.2299,
+      "ref_price": 0.224,
+      "lateness_pct": 2.333928571428568
+    },
+    {
+      "symbol": "SKYUSDT",
+      "alerted_at": "2026-05-08T15:01",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.08279,
+      "ref_price": 0.08068,
+      "lateness_pct": 2.315270203272191
+    },
+    {
+      "symbol": "JUPUSDT",
+      "alerted_at": "2026-05-08T14:34",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.2398,
+      "ref_price": 0.2337,
+      "lateness_pct": 2.3101839965768205
+    },
+    {
+      "symbol": "RUNEUSDT",
+      "alerted_at": "2026-05-08T08:28",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.59,
+      "ref_price": 0.575,
+      "lateness_pct": 2.3086956521739204
+    },
+    {
+      "symbol": "DOGSUSDT",
+      "alerted_at": "2026-05-04T21:31",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 3.94e-05,
+      "ref_price": 3.84e-05,
+      "lateness_pct": 2.3041666666666742
+    },
+    {
+      "symbol": "1000SATSUSDT",
+      "alerted_at": "2026-05-07T02:03",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 1.62e-05,
+      "ref_price": 1.579e-05,
+      "lateness_pct": 2.2965801139962165
+    },
+    {
+      "symbol": "CATIUSDT",
+      "alerted_at": "2026-05-04T23:03",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 0.0633,
+      "ref_price": 0.0617,
+      "lateness_pct": 2.293192868719596
+    },
+    {
+      "symbol": "FOGOUSDT",
+      "alerted_at": "2026-05-09T15:03",
+      "bucket": "WATCH",
+      "score": 7,
+      "entry_price": 0.02224,
+      "ref_price": 0.02168,
+      "lateness_pct": 2.28302583025829
+    },
+    {
+      "symbol": "STRKUSDT",
+      "alerted_at": "2026-05-06T05:31",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.0441,
+      "ref_price": 0.043,
+      "lateness_pct": 2.25813953488373
+    },
+    {
+      "symbol": "JASMYUSDT",
+      "alerted_at": "2026-05-08T17:30",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 0.00644,
+      "ref_price": 0.00628,
+      "lateness_pct": 2.2477707006369423
+    },
+    {
+      "symbol": "FFUSDT",
+      "alerted_at": "2026-05-15T07:46",
+      "bucket": "BEST",
+      "score": 12,
+      "entry_price": 0.09306,
+      "ref_price": 0.09077,
+      "lateness_pct": 2.2228599757629146
+    },
+    {
+      "symbol": "SUIUSDT",
+      "alerted_at": "2026-05-08T22:25",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 1.0933,
+      "ref_price": 1.0668,
+      "lateness_pct": 2.184064491938498
+    },
+    {
+      "symbol": "SAHARAUSDT",
+      "alerted_at": "2026-05-08T02:00",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.02718,
+      "ref_price": 0.02653,
+      "lateness_pct": 2.150056539766288
+    },
+    {
+      "symbol": "INJUSDT",
+      "alerted_at": "2026-05-12T23:34",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 5.112,
+      "ref_price": 4.99,
+      "lateness_pct": 2.144889779559123
+    },
+    {
+      "symbol": "CHIPUSDT",
+      "alerted_at": "2026-05-08T04:31",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.06684,
+      "ref_price": 0.06525,
+      "lateness_pct": 2.1367816091954044
+    },
+    {
+      "symbol": "ZRXUSDT",
+      "alerted_at": "2026-05-10T19:46",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.1264,
+      "ref_price": 0.1234,
+      "lateness_pct": 2.131118314424641
+    },
+    {
+      "symbol": "SEIUSDT",
+      "alerted_at": "2026-05-10T14:27",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.07409,
+      "ref_price": 0.07234,
+      "lateness_pct": 2.119131877246339
+    },
+    {
+      "symbol": "UNIUSDT",
+      "alerted_at": "2026-05-10T02:33",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 3.854,
+      "ref_price": 3.763,
+      "lateness_pct": 2.118283284613354
+    },
+    {
+      "symbol": "TURBOUSDT",
+      "alerted_at": "2026-05-05T04:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.001275,
+      "ref_price": 0.001245,
+      "lateness_pct": 2.1096385542168754
+    },
+    {
+      "symbol": "NEIROUSDT",
+      "alerted_at": "2026-05-05T05:49",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.00010462,
+      "ref_price": 0.00010216,
+      "lateness_pct": 2.10798747063431
+    },
+    {
+      "symbol": "NILUSDT",
+      "alerted_at": "2026-05-07T00:12",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.04606,
+      "ref_price": 0.04498,
+      "lateness_pct": 2.1010671409515185
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "alerted_at": "2026-05-08T18:31",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.1366,
+      "ref_price": 0.1334,
+      "lateness_pct": 2.098800599700146
+    },
+    {
+      "symbol": "ZECUSDT",
+      "alerted_at": "2026-05-05T17:16",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 463.02,
+      "ref_price": 452.19,
+      "lateness_pct": 2.0950109467259397
+    },
+    {
+      "symbol": "LUNCUSDT",
+      "alerted_at": "2026-05-05T12:22",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.00010982,
+      "ref_price": 0.00010727,
+      "lateness_pct": 2.077179080824088
+    },
+    {
+      "symbol": "GALAUSDT",
+      "alerted_at": "2026-05-05T17:16",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.00346,
+      "ref_price": 0.00338,
+      "lateness_pct": 2.066863905325434
+    },
+    {
+      "symbol": "PARTIUSDT",
+      "alerted_at": "2026-05-11T07:21",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.0606,
+      "ref_price": 0.0592,
+      "lateness_pct": 2.0648648648648686
+    },
+    {
+      "symbol": "ZENUSDT",
+      "alerted_at": "2026-05-06T04:58",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 7.973,
+      "ref_price": 7.789,
+      "lateness_pct": 2.062305815894206
+    },
+    {
+      "symbol": "ZENUSDT",
+      "alerted_at": "2026-05-06T04:57",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 7.973,
+      "ref_price": 7.789,
+      "lateness_pct": 2.062305815894206
+    },
+    {
+      "symbol": "APTUSDT",
+      "alerted_at": "2026-05-10T14:27",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 1.17,
+      "ref_price": 1.143,
+      "lateness_pct": 2.062204724409445
+    },
+    {
+      "symbol": "WIFUSDT",
+      "alerted_at": "2026-05-06T00:01",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.218,
+      "ref_price": 0.213,
+      "lateness_pct": 2.0474178403755987
+    },
+    {
+      "symbol": "NEIROUSDT",
+      "alerted_at": "2026-05-05T05:27",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.00010152,
+      "ref_price": 9.92e-05,
+      "lateness_pct": 2.0387096774193596
+    },
+    {
+      "symbol": "NEARUSDT",
+      "alerted_at": "2026-05-08T05:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 1.535,
+      "ref_price": 1.5,
+      "lateness_pct": 2.033333333333321
+    },
+    {
+      "symbol": "OPNUSDT",
+      "alerted_at": "2026-05-07T18:57",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.1938,
+      "ref_price": 0.1894,
+      "lateness_pct": 2.0231256599788754
+    },
+    {
+      "symbol": "RUNEUSDT",
+      "alerted_at": "2026-05-11T16:01",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.623,
+      "ref_price": 0.609,
+      "lateness_pct": 1.998850574712641
+    },
+    {
+      "symbol": "GALAUSDT",
+      "alerted_at": "2026-05-08T09:46",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.00402,
+      "ref_price": 0.00393,
+      "lateness_pct": 1.9900763358778555
+    },
+    {
+      "symbol": "2ZUSDT",
+      "alerted_at": "2026-05-06T00:19",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.09723,
+      "ref_price": 0.09506,
+      "lateness_pct": 1.9827687776141305
+    },
+    {
+      "symbol": "CGPTUSDT",
+      "alerted_at": "2026-05-15T00:00",
+      "bucket": "STRONG",
+      "score": 10,
+      "entry_price": 0.03945,
+      "ref_price": 0.03857,
+      "lateness_pct": 1.9815659839253268
+    },
+    {
+      "symbol": "PYTHUSDT",
+      "alerted_at": "2026-05-08T15:21",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.0587,
+      "ref_price": 0.0574,
+      "lateness_pct": 1.9648083623693529
+    },
+    {
+      "symbol": "THETAUSDT",
+      "alerted_at": "2026-05-08T13:04",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.226,
+      "ref_price": 0.221,
+      "lateness_pct": 1.9624434389140193
+    },
+    {
+      "symbol": "THETAUSDT",
+      "alerted_at": "2026-05-08T13:04",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.226,
+      "ref_price": 0.221,
+      "lateness_pct": 1.9624434389140193
+    },
+    {
+      "symbol": "OPNUSDT",
+      "alerted_at": "2026-05-07T19:43",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.1992,
+      "ref_price": 0.1948,
+      "lateness_pct": 1.9587268993839784
+    },
+    {
+      "symbol": "1000CATUSDT",
+      "alerted_at": "2026-05-07T02:03",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.00227,
+      "ref_price": 0.00222,
+      "lateness_pct": 1.9522522522522294
+    },
+    {
+      "symbol": "RAREUSDT",
+      "alerted_at": "2026-05-11T16:10",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.0184,
+      "ref_price": 0.018,
+      "lateness_pct": 1.9222222222222367
+    },
+    {
+      "symbol": "SUIUSDT",
+      "alerted_at": "2026-05-10T13:43",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 1.2573,
+      "ref_price": 1.23,
+      "lateness_pct": 1.9195121951219534
+    },
+    {
+      "symbol": "XPLUSDT",
+      "alerted_at": "2026-05-06T10:01",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.1014,
+      "ref_price": 0.0992,
+      "lateness_pct": 1.9177419354838747
+    },
+    {
+      "symbol": "BOMEUSDT",
+      "alerted_at": "2026-05-05T06:31",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.000605,
+      "ref_price": 0.000592,
+      "lateness_pct": 1.8959459459459431
+    },
+    {
+      "symbol": "GALAUSDT",
+      "alerted_at": "2026-05-08T10:46",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.0042,
+      "ref_price": 0.00411,
+      "lateness_pct": 1.8897810218977966
+    },
+    {
+      "symbol": "RSRUSDT",
+      "alerted_at": "2026-05-08T07:31",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.002063,
+      "ref_price": 0.002019,
+      "lateness_pct": 1.8792966815255223
+    },
+    {
+      "symbol": "EDUUSDT",
+      "alerted_at": "2026-05-11T20:46",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.0564,
+      "ref_price": 0.0552,
+      "lateness_pct": 1.8739130434782707
+    },
+    {
+      "symbol": "HAEDALUSDT",
+      "alerted_at": "2026-05-06T06:22",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.03306,
+      "ref_price": 0.03236,
+      "lateness_pct": 1.863164400494444
+    },
+    {
+      "symbol": "INJUSDT",
+      "alerted_at": "2026-05-11T15:06",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 4.544,
+      "ref_price": 4.448,
+      "lateness_pct": 1.8582733812949508
+    },
+    {
+      "symbol": "BOMEUSDT",
+      "alerted_at": "2026-05-05T00:31",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.000571,
+      "ref_price": 0.000559,
+      "lateness_pct": 1.846690518783534
+    },
+    {
+      "symbol": "TOWNSUSDT",
+      "alerted_at": "2026-05-07T14:01",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.00381,
+      "ref_price": 0.00373,
+      "lateness_pct": 1.844772117962468
+    },
+    {
+      "symbol": "MUBARAKUSDT",
+      "alerted_at": "2026-05-12T09:28",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.01718,
+      "ref_price": 0.01682,
+      "lateness_pct": 1.8403091557669287
+    },
+    {
+      "symbol": "FFUSDT",
+      "alerted_at": "2026-05-13T07:16",
+      "bucket": "BEST",
+      "score": 12,
+      "entry_price": 0.08573,
+      "ref_price": 0.08394,
+      "lateness_pct": 1.8324755777936579
+    },
+    {
+      "symbol": "SAHARAUSDT",
+      "alerted_at": "2026-05-09T04:46",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.03358,
+      "ref_price": 0.03288,
+      "lateness_pct": 1.8289537712895436
+    },
+    {
+      "symbol": "VIRTUALUSDT",
+      "alerted_at": "2026-05-05T13:16",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.8183,
+      "ref_price": 0.8013,
+      "lateness_pct": 1.82155247722452
+    },
+    {
+      "symbol": "JTOUSDT",
+      "alerted_at": "2026-05-06T11:37",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.4679,
+      "ref_price": 0.4582,
+      "lateness_pct": 1.816979484941073
+    },
+    {
+      "symbol": "TWTUSDT",
+      "alerted_at": "2026-05-11T12:46",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.5224,
+      "ref_price": 0.5116,
+      "lateness_pct": 1.811024237685677
+    },
+    {
+      "symbol": "EIGENUSDT",
+      "alerted_at": "2026-05-10T15:31",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.2329,
+      "ref_price": 0.2281,
+      "lateness_pct": 1.8043402016659442
+    },
+    {
+      "symbol": "INITUSDT",
+      "alerted_at": "2026-05-06T12:01",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.0985,
+      "ref_price": 0.0965,
+      "lateness_pct": 1.7725388601036345
+    },
+    {
+      "symbol": "ENAUSDT",
+      "alerted_at": "2026-05-06T07:37",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.1188,
+      "ref_price": 0.1164,
+      "lateness_pct": 1.7618556701030856
+    },
+    {
+      "symbol": "STRKUSDT",
+      "alerted_at": "2026-05-07T13:16",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0447,
+      "ref_price": 0.0438,
+      "lateness_pct": 1.7547945205479314
+    },
+    {
+      "symbol": "GIGGLEUSDT",
+      "alerted_at": "2026-05-04T01:15",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 33.37,
+      "ref_price": 32.7,
+      "lateness_pct": 1.7489296636085454
+    },
+    {
+      "symbol": "OPUSDT",
+      "alerted_at": "2026-05-06T18:31",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.1449,
+      "ref_price": 0.142,
+      "lateness_pct": 1.7422535211267691
+    },
+    {
+      "symbol": "TOWNSUSDT",
+      "alerted_at": "2026-05-09T08:45",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.004,
+      "ref_price": 0.00392,
+      "lateness_pct": 1.7408163265306147
+    },
+    {
+      "symbol": "OPENUSDT",
+      "alerted_at": "2026-05-08T11:16",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.2302,
+      "ref_price": 0.2256,
+      "lateness_pct": 1.739007092198575
+    },
+    {
+      "symbol": "ENAUSDT",
+      "alerted_at": "2026-05-10T14:57",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.136,
+      "ref_price": 0.1333,
+      "lateness_pct": 1.7255063765941552
+    },
+    {
+      "symbol": "LUNCUSDT",
+      "alerted_at": "2026-05-05T12:01",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.000108,
+      "ref_price": 0.00010587,
+      "lateness_pct": 1.7119013884953187
+    },
+    {
+      "symbol": "2ZUSDT",
+      "alerted_at": "2026-05-05T22:33",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.09307,
+      "ref_price": 0.09124,
+      "lateness_pct": 1.705699254712834
+    },
+    {
+      "symbol": "USUALUSDT",
+      "alerted_at": "2026-05-05T18:01",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.01528,
+      "ref_price": 0.01498,
+      "lateness_pct": 1.7026702269692944
+    },
+    {
+      "symbol": "AIUSDT",
+      "alerted_at": "2026-05-14T01:01",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.0258,
+      "ref_price": 0.0253,
+      "lateness_pct": 1.6762845849802481
+    },
+    {
+      "symbol": "IOTAUSDT",
+      "alerted_at": "2026-05-08T14:46",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0626,
+      "ref_price": 0.0614,
+      "lateness_pct": 1.6543973941368089
+    },
+    {
+      "symbol": "INITUSDT",
+      "alerted_at": "2026-05-06T12:25",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.0992,
+      "ref_price": 0.0973,
+      "lateness_pct": 1.652723535457346
+    },
+    {
+      "symbol": "VIRTUALUSDT",
+      "alerted_at": "2026-05-07T03:45",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.9327,
+      "ref_price": 0.9149,
+      "lateness_pct": 1.6455678216198315
+    },
+    {
+      "symbol": "CRVUSDT",
+      "alerted_at": "2026-05-11T13:16",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.2806,
+      "ref_price": 0.2753,
+      "lateness_pct": 1.6251725390483145
+    },
+    {
+      "symbol": "JTOUSDT",
+      "alerted_at": "2026-05-14T11:46",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.533,
+      "ref_price": 0.523,
+      "lateness_pct": 1.6120458891013438
+    },
+    {
+      "symbol": "DYMUSDT",
+      "alerted_at": "2026-05-08T16:36",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.0215,
+      "ref_price": 0.0211,
+      "lateness_pct": 1.5957345971563957
+    },
+    {
+      "symbol": "ENAUSDT",
+      "alerted_at": "2026-05-05T06:43",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.1079,
+      "ref_price": 0.1059,
+      "lateness_pct": 1.5885741265344704
+    },
+    {
+      "symbol": "WUSDT",
+      "alerted_at": "2026-05-10T10:45",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.0162,
+      "ref_price": 0.0159,
+      "lateness_pct": 1.5867924528301662
+    },
+    {
+      "symbol": "RESOLVUSDT",
+      "alerted_at": "2026-05-05T13:16",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0324,
+      "ref_price": 0.0318,
+      "lateness_pct": 1.5867924528301662
+    },
+    {
+      "symbol": "KITEUSDT",
+      "alerted_at": "2026-05-07T08:22",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.1621,
+      "ref_price": 0.1591,
+      "lateness_pct": 1.5856065367693244
+    },
+    {
+      "symbol": "SUIUSDT",
+      "alerted_at": "2026-05-10T05:36",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 1.1176,
+      "ref_price": 1.0972,
+      "lateness_pct": 1.5592781625957013
+    },
+    {
+      "symbol": "SUSDT",
+      "alerted_at": "2026-05-10T11:12",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.05479,
+      "ref_price": 0.05379,
+      "lateness_pct": 1.559081613682845
+    },
+    {
+      "symbol": "ATOMUSDT",
+      "alerted_at": "2026-05-11T07:21",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 2.09,
+      "ref_price": 2.052,
+      "lateness_pct": 1.551851851851838
+    },
+    {
+      "symbol": "CFGUSDT",
+      "alerted_at": "2026-05-05T06:46",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.2319,
+      "ref_price": 0.2277,
+      "lateness_pct": 1.5445322793148701
+    },
+    {
+      "symbol": "NEARUSDT",
+      "alerted_at": "2026-05-06T05:16",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 1.381,
+      "ref_price": 1.356,
+      "lateness_pct": 1.5436578171091346
+    },
+    {
+      "symbol": "ERAUSDT",
+      "alerted_at": "2026-05-10T02:30",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.1547,
+      "ref_price": 0.1519,
+      "lateness_pct": 1.5433179723502226
+    },
+    {
+      "symbol": "STGUSDT",
+      "alerted_at": "2026-05-06T21:45",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.2723,
+      "ref_price": 0.2674,
+      "lateness_pct": 1.532460732984287
+    },
+    {
+      "symbol": "TOWNSUSDT",
+      "alerted_at": "2026-05-09T08:00",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.0039,
+      "ref_price": 0.00383,
+      "lateness_pct": 1.5276762402088755
+    },
+    {
+      "symbol": "HOLOUSDT",
+      "alerted_at": "2026-05-07T23:46",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.0728,
+      "ref_price": 0.0715,
+      "lateness_pct": 1.51818181818183
+    },
+    {
+      "symbol": "IDUSDT",
+      "alerted_at": "2026-05-05T01:45",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0336,
+      "ref_price": 0.033,
+      "lateness_pct": 1.5181818181818079
+    },
+    {
+      "symbol": "USTCUSDT",
+      "alerted_at": "2026-05-05T07:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.00786,
+      "ref_price": 0.00772,
+      "lateness_pct": 1.5134715025906802
+    },
+    {
+      "symbol": "SEIUSDT",
+      "alerted_at": "2026-05-10T14:07",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.07327,
+      "ref_price": 0.07197,
+      "lateness_pct": 1.506308183965544
+    },
+    {
+      "symbol": "FILUSDT",
+      "alerted_at": "2026-05-08T20:27",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 1.297,
+      "ref_price": 1.274,
+      "lateness_pct": 1.5053375196232182
+    },
+    {
+      "symbol": "FETUSDT",
+      "alerted_at": "2026-05-10T16:31",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.2482,
+      "ref_price": 0.2438,
+      "lateness_pct": 1.5047579983593078
+    },
+    {
+      "symbol": "SSVUSDT",
+      "alerted_at": "2026-05-11T12:01",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 3.28,
+      "ref_price": 3.222,
+      "lateness_pct": 1.5001241464928654
+    },
+    {
+      "symbol": "RIFUSDT",
+      "alerted_at": "2026-05-05T17:01",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.0509,
+      "ref_price": 0.05,
+      "lateness_pct": 1.5000000000000018
+    },
+    {
+      "symbol": "SLPUSDT",
+      "alerted_at": "2026-05-07T12:16",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.000792,
+      "ref_price": 0.000778,
+      "lateness_pct": 1.499485861182504
+    },
+    {
+      "symbol": "DOTUSDT",
+      "alerted_at": "2026-05-08T13:04",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 1.359,
+      "ref_price": 1.335,
+      "lateness_pct": 1.497752808988773
+    },
+    {
+      "symbol": "DOTUSDT",
+      "alerted_at": "2026-05-08T13:04",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 1.359,
+      "ref_price": 1.335,
+      "lateness_pct": 1.497752808988773
+    },
+    {
+      "symbol": "VETUSDT",
+      "alerted_at": "2026-05-10T10:04",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.007908,
+      "ref_price": 0.007769,
+      "lateness_pct": 1.4891620543184496
+    },
+    {
+      "symbol": "ZROUSDT",
+      "alerted_at": "2026-05-06T14:16",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 1.486,
+      "ref_price": 1.46,
+      "lateness_pct": 1.4808219178082176
+    },
+    {
+      "symbol": "NEIROUSDT",
+      "alerted_at": "2026-05-05T05:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 9.998e-05,
+      "ref_price": 9.824e-05,
+      "lateness_pct": 1.4711726384364914
+    },
+    {
+      "symbol": "LAYERUSDT",
+      "alerted_at": "2026-05-09T13:57",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.0977,
+      "ref_price": 0.096,
+      "lateness_pct": 1.4708333333333217
+    },
+    {
+      "symbol": "SAHARAUSDT",
+      "alerted_at": "2026-05-09T04:07",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.03259,
+      "ref_price": 0.03203,
+      "lateness_pct": 1.4483609116453193
+    },
+    {
+      "symbol": "FOGOUSDT",
+      "alerted_at": "2026-05-06T09:04",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 0.02038,
+      "ref_price": 0.02003,
+      "lateness_pct": 1.4473789316025947
+    },
+    {
+      "symbol": "SAPIENUSDT",
+      "alerted_at": "2026-05-11T19:16",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.1171,
+      "ref_price": 0.1151,
+      "lateness_pct": 1.4376194613379694
+    },
+    {
+      "symbol": "KITEUSDT",
+      "alerted_at": "2026-05-09T01:33",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.1698,
+      "ref_price": 0.1669,
+      "lateness_pct": 1.4375674056321346
+    },
+    {
+      "symbol": "RIFUSDT",
+      "alerted_at": "2026-05-06T00:42",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.0527,
+      "ref_price": 0.0518,
+      "lateness_pct": 1.437451737451723
+    },
+    {
+      "symbol": "ZILUSDT",
+      "alerted_at": "2026-05-06T09:01",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.00471,
+      "ref_price": 0.00463,
+      "lateness_pct": 1.4278617710583257
+    },
+    {
+      "symbol": "SUIUSDT",
+      "alerted_at": "2026-05-10T14:24",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 1.2979,
+      "ref_price": 1.276,
+      "lateness_pct": 1.4163009404388642
+    },
+    {
+      "symbol": "MINAUSDT",
+      "alerted_at": "2026-05-10T15:00",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.0713,
+      "ref_price": 0.0701,
+      "lateness_pct": 1.4118402282453761
+    },
+    {
+      "symbol": "ZECUSDT",
+      "alerted_at": "2026-05-05T10:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 432.19,
+      "ref_price": 424.95,
+      "lateness_pct": 1.4037298505706568
+    },
+    {
+      "symbol": "SYSUSDT",
+      "alerted_at": "2026-05-11T14:16",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.01083,
+      "ref_price": 0.01065,
+      "lateness_pct": 1.3901408450704205
+    },
+    {
+      "symbol": "INJUSDT",
+      "alerted_at": "2026-05-11T15:28",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 4.582,
+      "ref_price": 4.506,
+      "lateness_pct": 1.3866400355082025
+    },
+    {
+      "symbol": "ONDOUSDT",
+      "alerted_at": "2026-05-07T02:01",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.3334,
+      "ref_price": 0.3279,
+      "lateness_pct": 1.377340652637982
+    },
+    {
+      "symbol": "STRKUSDT",
+      "alerted_at": "2026-05-08T06:21",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.0546,
+      "ref_price": 0.0537,
+      "lateness_pct": 1.3759776536313
+    },
+    {
+      "symbol": "FLUXUSDT",
+      "alerted_at": "2026-05-06T04:25",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 0.073,
+      "ref_price": 0.0718,
+      "lateness_pct": 1.3713091922005543
+    },
+    {
+      "symbol": "DUSKUSDT",
+      "alerted_at": "2026-05-13T21:46",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.1343,
+      "ref_price": 0.1321,
+      "lateness_pct": 1.3654049962149921
+    },
+    {
+      "symbol": "BONKUSDT",
+      "alerted_at": "2026-05-10T15:27",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 7.95e-06,
+      "ref_price": 7.82e-06,
+      "lateness_pct": 1.3624040920716123
+    },
+    {
+      "symbol": "BLURUSDT",
+      "alerted_at": "2026-05-05T07:37",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0277,
+      "ref_price": 0.02725,
+      "lateness_pct": 1.3513761467889855
+    },
+    {
+      "symbol": "BONKUSDT",
+      "alerted_at": "2026-05-06T03:58",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 6.9e-06,
+      "ref_price": 6.79e-06,
+      "lateness_pct": 1.320029455080996
+    },
+    {
+      "symbol": "SAPIENUSDT",
+      "alerted_at": "2026-05-07T03:03",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.1067,
+      "ref_price": 0.105,
+      "lateness_pct": 1.3190476190476312
+    },
+    {
+      "symbol": "EIGENUSDT",
+      "alerted_at": "2026-05-10T14:30",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.227,
+      "ref_price": 0.2234,
+      "lateness_pct": 1.3114592658907913
+    },
+    {
+      "symbol": "EIGENUSDT",
+      "alerted_at": "2026-05-10T14:30",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.227,
+      "ref_price": 0.2234,
+      "lateness_pct": 1.3114592658907913
+    },
+    {
+      "symbol": "PHBUSDT",
+      "alerted_at": "2026-05-09T13:46",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.127,
+      "ref_price": 0.125,
+      "lateness_pct": 1.3000000000000016
+    },
+    {
+      "symbol": "TOWNSUSDT",
+      "alerted_at": "2026-05-05T04:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.00383,
+      "ref_price": 0.00377,
+      "lateness_pct": 1.2915119363395293
+    },
+    {
+      "symbol": "RIFUSDT",
+      "alerted_at": "2026-05-12T02:31",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.0767,
+      "ref_price": 0.0755,
+      "lateness_pct": 1.289403973509951
+    },
+    {
+      "symbol": "PIXELUSDT",
+      "alerted_at": "2026-05-12T03:07",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.00895,
+      "ref_price": 0.00881,
+      "lateness_pct": 1.289103291713956
+    },
+    {
+      "symbol": "TAOUSDT",
+      "alerted_at": "2026-05-05T18:01",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 294.2,
+      "ref_price": 289.6,
+      "lateness_pct": 1.2883977900552406
+    },
+    {
+      "symbol": "ETCUSDT",
+      "alerted_at": "2026-05-08T13:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 9.63,
+      "ref_price": 9.48,
+      "lateness_pct": 1.2822784810126668
+    },
+    {
+      "symbol": "BOMEUSDT",
+      "alerted_at": "2026-05-10T15:36",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.000646,
+      "ref_price": 0.000636,
+      "lateness_pct": 1.2723270440251682
+    },
+    {
+      "symbol": "PSGUSDT",
+      "alerted_at": "2026-05-10T05:01",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 1.168,
+      "ref_price": 1.15,
+      "lateness_pct": 1.2652173913043523
+    },
+    {
+      "symbol": "NIGHTUSDT",
+      "alerted_at": "2026-05-11T15:52",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.03579,
+      "ref_price": 0.03524,
+      "lateness_pct": 1.2607264472190742
+    },
+    {
+      "symbol": "FFUSDT",
+      "alerted_at": "2026-05-11T07:46",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.07034,
+      "ref_price": 0.06927,
+      "lateness_pct": 1.2446802367547365
+    },
+    {
+      "symbol": "ICPUSDT",
+      "alerted_at": "2026-05-08T17:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 3.357,
+      "ref_price": 3.306,
+      "lateness_pct": 1.2426497277676978
+    },
+    {
+      "symbol": "FILUSDT",
+      "alerted_at": "2026-05-05T18:07",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 0.988,
+      "ref_price": 0.973,
+      "lateness_pct": 1.241623843782114
+    },
+    {
+      "symbol": "SCRUSDT",
+      "alerted_at": "2026-05-09T05:16",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.05493,
+      "ref_price": 0.0541,
+      "lateness_pct": 1.2341959334565615
+    },
+    {
+      "symbol": "AVNTUSDT",
+      "alerted_at": "2026-05-07T13:31",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.1592,
+      "ref_price": 0.1568,
+      "lateness_pct": 1.2306122448979666
+    },
+    {
+      "symbol": "CATIUSDT",
+      "alerted_at": "2026-05-07T05:46",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0732,
+      "ref_price": 0.0721,
+      "lateness_pct": 1.2256588072122048
+    },
+    {
+      "symbol": "ALCXUSDT",
+      "alerted_at": "2026-05-11T07:16",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 5.99,
+      "ref_price": 5.9,
+      "lateness_pct": 1.2254237288135466
+    },
+    {
+      "symbol": "VANAUSDT",
+      "alerted_at": "2026-05-11T03:16",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 1.745,
+      "ref_price": 1.719,
+      "lateness_pct": 1.2125072716695833
+    },
+    {
+      "symbol": "MEMEUSDT",
+      "alerted_at": "2026-05-04T22:58",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.000606,
+      "ref_price": 0.000597,
+      "lateness_pct": 1.2075376884422067
+    },
+    {
+      "symbol": "ENAUSDT",
+      "alerted_at": "2026-05-10T14:30",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.1353,
+      "ref_price": 0.1333,
+      "lateness_pct": 1.200375093773454
+    },
+    {
+      "symbol": "ENAUSDT",
+      "alerted_at": "2026-05-10T14:30",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.1353,
+      "ref_price": 0.1333,
+      "lateness_pct": 1.200375093773454
+    },
+    {
+      "symbol": "CFXUSDT",
+      "alerted_at": "2026-05-15T01:45",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.07867,
+      "ref_price": 0.07751,
+      "lateness_pct": 1.196581086311455
+    },
+    {
+      "symbol": "WIFUSDT",
+      "alerted_at": "2026-05-05T22:16",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 0.204,
+      "ref_price": 0.201,
+      "lateness_pct": 1.192537313432818
+    },
+    {
+      "symbol": "CUSDT",
+      "alerted_at": "2026-05-04T13:46",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0817,
+      "ref_price": 0.0805,
+      "lateness_pct": 1.1906832298136498
+    },
+    {
+      "symbol": "PYTHUSDT",
+      "alerted_at": "2026-05-08T05:46",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.0545,
+      "ref_price": 0.0537,
+      "lateness_pct": 1.1897579143389185
+    },
+    {
+      "symbol": "ARKMUSDT",
+      "alerted_at": "2026-05-06T00:31",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.1297,
+      "ref_price": 0.1278,
+      "lateness_pct": 1.1866979655712155
+    },
+    {
+      "symbol": "EULUSDT",
+      "alerted_at": "2026-05-11T22:30",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 1.576,
+      "ref_price": 1.553,
+      "lateness_pct": 1.1810045074050262
+    },
+    {
+      "symbol": "BERAUSDT",
+      "alerted_at": "2026-05-08T22:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.412,
+      "ref_price": 0.406,
+      "lateness_pct": 1.1778325123152582
+    },
+    {
+      "symbol": "JUPUSDT",
+      "alerted_at": "2026-05-06T08:07",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.1998,
+      "ref_price": 0.1969,
+      "lateness_pct": 1.1728288471305364
+    },
+    {
+      "symbol": "ENAUSDT",
+      "alerted_at": "2026-05-06T07:16",
+      "bucket": "STRONG",
+      "score": 15,
+      "entry_price": 0.1173,
+      "ref_price": 0.1156,
+      "lateness_pct": 1.1705882352941348
+    },
+    {
+      "symbol": "WIFUSDT",
+      "alerted_at": "2026-05-05T22:57",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.207,
+      "ref_price": 0.204,
+      "lateness_pct": 1.1705882352941126
+    },
+    {
+      "symbol": "ARBUSDT",
+      "alerted_at": "2026-05-08T06:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.132,
+      "ref_price": 0.1301,
+      "lateness_pct": 1.1604150653343641
+    },
+    {
+      "symbol": "AUSDT",
+      "alerted_at": "2026-05-10T10:00",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.0973,
+      "ref_price": 0.0959,
+      "lateness_pct": 1.1598540145985385
+    },
+    {
+      "symbol": "AIXBTUSDT",
+      "alerted_at": "2026-05-06T09:46",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0348,
+      "ref_price": 0.0343,
+      "lateness_pct": 1.1577259475218709
+    },
+    {
+      "symbol": "ALPINEUSDT",
+      "alerted_at": "2026-05-06T17:31",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.488,
+      "ref_price": 0.481,
+      "lateness_pct": 1.155301455301461
+    },
+    {
+      "symbol": "INJUSDT",
+      "alerted_at": "2026-05-12T23:16",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 5.062,
+      "ref_price": 4.99,
+      "lateness_pct": 1.142885771543079
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "alerted_at": "2026-05-11T13:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 102.68,
+      "ref_price": 101.23,
+      "lateness_pct": 1.132381705028152
+    },
+    {
+      "symbol": "VANAUSDT",
+      "alerted_at": "2026-05-06T00:01",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 1.567,
+      "ref_price": 1.545,
+      "lateness_pct": 1.1239482200647304
+    },
+    {
+      "symbol": "BLURUSDT",
+      "alerted_at": "2026-05-05T12:31",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 0.02869,
+      "ref_price": 0.02829,
+      "lateness_pct": 1.1139271827500856
+    },
+    {
+      "symbol": "PHAUSDT",
+      "alerted_at": "2026-05-07T09:16",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.0359,
+      "ref_price": 0.0354,
+      "lateness_pct": 1.1124293785310773
+    },
+    {
+      "symbol": "NILUSDT",
+      "alerted_at": "2026-05-14T13:16",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.057,
+      "ref_price": 0.05621,
+      "lateness_pct": 1.1054438711972985
+    },
+    {
+      "symbol": "AVNTUSDT",
+      "alerted_at": "2026-05-08T22:06",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.1662,
+      "ref_price": 0.1639,
+      "lateness_pct": 1.103294691885293
+    },
+    {
+      "symbol": "ILVUSDT",
+      "alerted_at": "2026-05-07T17:13",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 5.06,
+      "ref_price": 4.99,
+      "lateness_pct": 1.1028056112224354
+    },
+    {
+      "symbol": "TURTLEUSDT",
+      "alerted_at": "2026-05-12T02:46",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.058,
+      "ref_price": 0.0572,
+      "lateness_pct": 1.0986013986013958
+    },
+    {
+      "symbol": "RUNEUSDT",
+      "alerted_at": "2026-05-08T08:06",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.58,
+      "ref_price": 0.572,
+      "lateness_pct": 1.0986013986013958
+    },
+    {
+      "symbol": "CATIUSDT",
+      "alerted_at": "2026-05-05T23:00",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0656,
+      "ref_price": 0.0647,
+      "lateness_pct": 1.0910355486862704
+    },
+    {
+      "symbol": "GMTUSDT",
+      "alerted_at": "2026-05-11T05:16",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.01248,
+      "ref_price": 0.01231,
+      "lateness_pct": 1.0809910641754632
+    },
+    {
+      "symbol": "INJUSDT",
+      "alerted_at": "2026-05-12T07:07",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 4.854,
+      "ref_price": 4.788,
+      "lateness_pct": 1.0784461152882123
+    },
+    {
+      "symbol": "INJUSDT",
+      "alerted_at": "2026-05-12T07:07",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 4.854,
+      "ref_price": 4.788,
+      "lateness_pct": 1.0784461152882123
+    },
+    {
+      "symbol": "1MBABYDOGEUSDT",
+      "alerted_at": "2026-05-08T19:46",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.0004717,
+      "ref_price": 0.0004653,
+      "lateness_pct": 1.075456694605637
+    },
+    {
+      "symbol": "FETUSDT",
+      "alerted_at": "2026-05-06T00:45",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.2214,
+      "ref_price": 0.2184,
+      "lateness_pct": 1.073626373626369
+    },
+    {
+      "symbol": "PARTIUSDT",
+      "alerted_at": "2026-05-11T07:00",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0592,
+      "ref_price": 0.0584,
+      "lateness_pct": 1.0698630136986358
+    },
+    {
+      "symbol": "HYPERUSDT",
+      "alerted_at": "2026-05-08T06:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.1113,
+      "ref_price": 0.1098,
+      "lateness_pct": 1.0661202185792256
+    },
+    {
+      "symbol": "ROBOUSDT",
+      "alerted_at": "2026-05-07T02:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.02086,
+      "ref_price": 0.02058,
+      "lateness_pct": 1.0605442176870765
+    },
+    {
+      "symbol": "2ZUSDT",
+      "alerted_at": "2026-05-08T12:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.1004,
+      "ref_price": 0.09907,
+      "lateness_pct": 1.042485111537295
+    },
+    {
+      "symbol": "ILVUSDT",
+      "alerted_at": "2026-05-08T22:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 5.29,
+      "ref_price": 5.22,
+      "lateness_pct": 1.040996168582387
+    },
+    {
+      "symbol": "GALAUSDT",
+      "alerted_at": "2026-05-07T01:42",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.00378,
+      "ref_price": 0.00373,
+      "lateness_pct": 1.0404825737265426
+    },
+    {
+      "symbol": "KITEUSDT",
+      "alerted_at": "2026-05-13T23:06",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.212,
+      "ref_price": 0.2092,
+      "lateness_pct": 1.0384321223709252
+    },
+    {
+      "symbol": "ZILUSDT",
+      "alerted_at": "2026-05-06T08:22",
+      "bucket": "STRONG",
+      "score": 15,
+      "entry_price": 0.00458,
+      "ref_price": 0.00452,
+      "lateness_pct": 1.0274336283185974
+    },
+    {
+      "symbol": "MOVRUSDT",
+      "alerted_at": "2026-05-10T00:36",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 2.828,
+      "ref_price": 2.791,
+      "lateness_pct": 1.0256897169473316
+    },
+    {
+      "symbol": "PEOPLEUSDT",
+      "alerted_at": "2026-05-05T00:58",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.00842,
+      "ref_price": 0.00831,
+      "lateness_pct": 1.023706377858014
+    },
+    {
+      "symbol": "SAPIENUSDT",
+      "alerted_at": "2026-05-05T01:31",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.1,
+      "ref_price": 0.0987,
+      "lateness_pct": 1.0171225937183452
+    },
+    {
+      "symbol": "GRTUSDT",
+      "alerted_at": "2026-05-08T13:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.02698,
+      "ref_price": 0.02663,
+      "lateness_pct": 1.014307172362006
+    },
+    {
+      "symbol": "XAIUSDT",
+      "alerted_at": "2026-05-09T05:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.01236,
+      "ref_price": 0.0122,
+      "lateness_pct": 1.0114754098360494
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "alerted_at": "2026-05-07T01:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.1237,
+      "ref_price": 0.1221,
+      "lateness_pct": 1.0104013104013214
+    },
+    {
+      "symbol": "ACTUSDT",
+      "alerted_at": "2026-05-04T07:06",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0155,
+      "ref_price": 0.0153,
+      "lateness_pct": 1.0071895424836557
+    },
+    {
+      "symbol": "METISUSDT",
+      "alerted_at": "2026-05-07T10:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 3.88,
+      "ref_price": 3.83,
+      "lateness_pct": 1.0054830287206222
+    },
+    {
+      "symbol": "REZUSDT",
+      "alerted_at": "2026-05-11T10:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.00709,
+      "ref_price": 0.007,
+      "lateness_pct": 0.9857142857142901
+    },
+    {
+      "symbol": "RIFUSDT",
+      "alerted_at": "2026-05-13T23:30",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.0793,
+      "ref_price": 0.0783,
+      "lateness_pct": 0.9771392081736944
+    },
+    {
+      "symbol": "BLURUSDT",
+      "alerted_at": "2026-05-05T07:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.02719,
+      "ref_price": 0.02685,
+      "lateness_pct": 0.9662942271880918
+    },
+    {
+      "symbol": "TURBOUSDT",
+      "alerted_at": "2026-05-08T23:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.001372,
+      "ref_price": 0.001355,
+      "lateness_pct": 0.9546125461254443
+    },
+    {
+      "symbol": "ENAUSDT",
+      "alerted_at": "2026-05-06T08:16",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.1212,
+      "ref_price": 0.1197,
+      "lateness_pct": 0.953132832080195
+    },
+    {
+      "symbol": "CATIUSDT",
+      "alerted_at": "2026-05-04T08:27",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.0566,
+      "ref_price": 0.0559,
+      "lateness_pct": 0.9522361359570634
+    },
+    {
+      "symbol": "THETAUSDT",
+      "alerted_at": "2026-05-11T18:31",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.245,
+      "ref_price": 0.242,
+      "lateness_pct": 0.9396694214876103
+    },
+    {
+      "symbol": "KITEUSDT",
+      "alerted_at": "2026-05-08T10:00",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.1638,
+      "ref_price": 0.1618,
+      "lateness_pct": 0.9360939431396823
+    },
+    {
+      "symbol": "ENAUSDT",
+      "alerted_at": "2026-05-05T06:22",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 0.1065,
+      "ref_price": 0.1052,
+      "lateness_pct": 0.9357414448669114
+    },
+    {
+      "symbol": "NEARUSDT",
+      "alerted_at": "2026-05-08T06:36",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 1.568,
+      "ref_price": 1.549,
+      "lateness_pct": 0.926597805035512
+    },
+    {
+      "symbol": "2ZUSDT",
+      "alerted_at": "2026-05-11T13:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.10867,
+      "ref_price": 0.10736,
+      "lateness_pct": 0.9201937406855601
+    },
+    {
+      "symbol": "PEOPLEUSDT",
+      "alerted_at": "2026-05-04T23:45",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0083,
+      "ref_price": 0.0082,
+      "lateness_pct": 0.9195121951219524
+    },
+    {
+      "symbol": "NEWTUSDT",
+      "alerted_at": "2026-05-08T22:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0832,
+      "ref_price": 0.0822,
+      "lateness_pct": 0.9165450121654598
+    },
+    {
+      "symbol": "ONDOUSDT",
+      "alerted_at": "2026-05-07T09:36",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.3617,
+      "ref_price": 0.3574,
+      "lateness_pct": 0.903133743704532
+    },
+    {
+      "symbol": "RONINUSDT",
+      "alerted_at": "2026-05-11T04:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.1178,
+      "ref_price": 0.1164,
+      "lateness_pct": 0.9027491408934666
+    },
+    {
+      "symbol": "PLUMEUSDT",
+      "alerted_at": "2026-05-08T08:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.01362,
+      "ref_price": 0.01346,
+      "lateness_pct": 0.8887072808320909
+    },
+    {
+      "symbol": "COOKIEUSDT",
+      "alerted_at": "2026-05-04T23:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0172,
+      "ref_price": 0.017,
+      "lateness_pct": 0.87647058823529
+    },
+    {
+      "symbol": "ICPUSDT",
+      "alerted_at": "2026-05-06T13:07",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 2.933,
+      "ref_price": 2.899,
+      "lateness_pct": 0.8728182131769405
+    },
+    {
+      "symbol": "KAVAUSDT",
+      "alerted_at": "2026-05-07T16:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.06579,
+      "ref_price": 0.06503,
+      "lateness_pct": 0.8686913732123606
+    },
+    {
+      "symbol": "KAVAUSDT",
+      "alerted_at": "2026-05-07T16:00",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.06579,
+      "ref_price": 0.06503,
+      "lateness_pct": 0.8686913732123606
+    },
+    {
+      "symbol": "INJUSDT",
+      "alerted_at": "2026-05-12T22:31",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 4.965,
+      "ref_price": 4.908,
+      "lateness_pct": 0.861369193154016
+    },
+    {
+      "symbol": "SAHARAUSDT",
+      "alerted_at": "2026-05-07T22:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.02629,
+      "ref_price": 0.02599,
+      "lateness_pct": 0.8542901115813909
+    },
+    {
+      "symbol": "MANTAUSDT",
+      "alerted_at": "2026-05-08T07:04",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.07043,
+      "ref_price": 0.06963,
+      "lateness_pct": 0.8489300588826801
+    },
+    {
+      "symbol": "HAEDALUSDT",
+      "alerted_at": "2026-05-06T03:46",
+      "bucket": "BEST",
+      "score": 16,
+      "entry_price": 0.03201,
+      "ref_price": 0.03165,
+      "lateness_pct": 0.8374407582938285
+    },
+    {
+      "symbol": "2ZUSDT",
+      "alerted_at": "2026-05-09T02:46",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.10141,
+      "ref_price": 0.10027,
+      "lateness_pct": 0.8369302882217936
+    },
+    {
+      "symbol": "1MBABYDOGEUSDT",
+      "alerted_at": "2026-05-05T06:31",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.0004461,
+      "ref_price": 0.0004411,
+      "lateness_pct": 0.8335298118340554
+    },
+    {
+      "symbol": "HYPERUSDT",
+      "alerted_at": "2026-05-10T05:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.1162,
+      "ref_price": 0.1149,
+      "lateness_pct": 0.8314186248912118
+    },
+    {
+      "symbol": "WALUSDT",
+      "alerted_at": "2026-05-08T14:00",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.0807,
+      "ref_price": 0.0798,
+      "lateness_pct": 0.8278195488721777
+    },
+    {
+      "symbol": "TIAUSDT",
+      "alerted_at": "2026-05-06T00:37",
+      "bucket": "BEST",
+      "score": 16,
+      "entry_price": 0.3775,
+      "ref_price": 0.3733,
+      "lateness_pct": 0.8251004553977984
+    },
+    {
+      "symbol": "OPNUSDT",
+      "alerted_at": "2026-05-08T23:01",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.2075,
+      "ref_price": 0.2052,
+      "lateness_pct": 0.8208576998050557
+    },
+    {
+      "symbol": "WCTUSDT",
+      "alerted_at": "2026-05-12T00:46",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.0724,
+      "ref_price": 0.0716,
+      "lateness_pct": 0.8173184357541999
+    },
+    {
+      "symbol": "EIGENUSDT",
+      "alerted_at": "2026-05-14T12:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.2265,
+      "ref_price": 0.224,
+      "lateness_pct": 0.8160714285714191
+    },
+    {
+      "symbol": "TURTLEUSDT",
+      "alerted_at": "2026-05-09T02:01",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 0.055,
+      "ref_price": 0.0544,
+      "lateness_pct": 0.8029411764705844
+    },
+    {
+      "symbol": "SCRUSDT",
+      "alerted_at": "2026-05-06T11:10",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 0.05044,
+      "ref_price": 0.04989,
+      "lateness_pct": 0.8024253357386327
+    },
+    {
+      "symbol": "PYTHUSDT",
+      "alerted_at": "2026-05-08T06:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0551,
+      "ref_price": 0.0545,
+      "lateness_pct": 0.8009174311926718
+    },
+    {
+      "symbol": "1MBABYDOGEUSDT",
+      "alerted_at": "2026-05-06T07:46",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0004592,
+      "ref_price": 0.0004542,
+      "lateness_pct": 0.8008366358432387
+    },
+    {
+      "symbol": "PLUMEUSDT",
+      "alerted_at": "2026-05-08T13:48",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.01383,
+      "ref_price": 0.01368,
+      "lateness_pct": 0.7964912280701845
+    },
+    {
+      "symbol": "MUBARAKUSDT",
+      "alerted_at": "2026-05-12T10:16",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.01767,
+      "ref_price": 0.01748,
+      "lateness_pct": 0.7869565217391353
+    },
+    {
+      "symbol": "OPNUSDT",
+      "alerted_at": "2026-05-07T19:19",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.1964,
+      "ref_price": 0.1943,
+      "lateness_pct": 0.7808028821410076
+    },
+    {
+      "symbol": "SUSHIUSDT",
+      "alerted_at": "2026-05-08T07:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.2433,
+      "ref_price": 0.2407,
+      "lateness_pct": 0.7801828001661739
+    },
+    {
+      "symbol": "RIFUSDT",
+      "alerted_at": "2026-05-06T11:37",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0564,
+      "ref_price": 0.0558,
+      "lateness_pct": 0.7752688172043001
+    },
+    {
+      "symbol": "RONINUSDT",
+      "alerted_at": "2026-05-10T04:30",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.1129,
+      "ref_price": 0.1117,
+      "lateness_pct": 0.77430617726052
+    },
+    {
+      "symbol": "USTCUSDT",
+      "alerted_at": "2026-05-09T13:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.00753,
+      "ref_price": 0.00745,
+      "lateness_pct": 0.7738255033557075
+    },
+    {
+      "symbol": "FOGOUSDT",
+      "alerted_at": "2026-05-09T16:16",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.02282,
+      "ref_price": 0.02258,
+      "lateness_pct": 0.7628875110717528
+    },
+    {
+      "symbol": "APTUSDT",
+      "alerted_at": "2026-05-06T06:01",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 1.046,
+      "ref_price": 1.035,
+      "lateness_pct": 0.7628019323671633
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "alerted_at": "2026-05-06T05:01",
+      "bucket": "BEST",
+      "score": 16,
+      "entry_price": 0.1238,
+      "ref_price": 0.1225,
+      "lateness_pct": 0.7612244897959088
+    },
+    {
+      "symbol": "SEIUSDT",
+      "alerted_at": "2026-05-08T13:43",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.06381,
+      "ref_price": 0.06314,
+      "lateness_pct": 0.7611339879632586
+    },
+    {
+      "symbol": "PARTIUSDT",
+      "alerted_at": "2026-05-12T01:01",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.0669,
+      "ref_price": 0.0662,
+      "lateness_pct": 0.7574018126888296
+    },
+    {
+      "symbol": "APTUSDT",
+      "alerted_at": "2026-05-10T14:07",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 1.149,
+      "ref_price": 1.137,
+      "lateness_pct": 0.7554089709762459
+    },
+    {
+      "symbol": "KMNOUSDT",
+      "alerted_at": "2026-05-07T04:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.02204,
+      "ref_price": 0.02181,
+      "lateness_pct": 0.7545621274644645
+    },
+    {
+      "symbol": "APTUSDT",
+      "alerted_at": "2026-05-06T06:31",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 1.058,
+      "ref_price": 1.047,
+      "lateness_pct": 0.7506208213944656
+    },
+    {
+      "symbol": "MUBARAKUSDT",
+      "alerted_at": "2026-05-10T15:00",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.01641,
+      "ref_price": 0.01624,
+      "lateness_pct": 0.7467980295566503
+    },
+    {
+      "symbol": "HOLOUSDT",
+      "alerted_at": "2026-05-09T05:16",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0774,
+      "ref_price": 0.0766,
+      "lateness_pct": 0.7443864229764843
+    },
+    {
+      "symbol": "FLUXUSDT",
+      "alerted_at": "2026-05-09T16:00",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.0874,
+      "ref_price": 0.0865,
+      "lateness_pct": 0.7404624277456697
+    },
+    {
+      "symbol": "ORDIUSDT",
+      "alerted_at": "2026-05-09T08:15",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 5.731,
+      "ref_price": 5.672,
+      "lateness_pct": 0.7401974612129771
+    },
+    {
+      "symbol": "SUIUSDT",
+      "alerted_at": "2026-05-10T14:03",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 1.2731,
+      "ref_price": 1.26,
+      "lateness_pct": 0.7396825396825404
+    },
+    {
+      "symbol": "SAGAUSDT",
+      "alerted_at": "2026-05-05T03:01",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.01851,
+      "ref_price": 0.01832,
+      "lateness_pct": 0.7371179039301292
+    },
+    {
+      "symbol": "ROBOUSDT",
+      "alerted_at": "2026-05-11T13:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.02347,
+      "ref_price": 0.02323,
+      "lateness_pct": 0.733146792940176
+    },
+    {
+      "symbol": "SUIUSDT",
+      "alerted_at": "2026-05-10T05:57",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 1.1254,
+      "ref_price": 1.1139,
+      "lateness_pct": 0.732408654277761
+    },
+    {
+      "symbol": "MOVRUSDT",
+      "alerted_at": "2026-05-07T10:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 2.372,
+      "ref_price": 2.348,
+      "lateness_pct": 0.7221465076660996
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "alerted_at": "2026-05-10T16:00",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 101.42,
+      "ref_price": 100.4,
+      "lateness_pct": 0.7159362549800654
+    },
+    {
+      "symbol": "FORMUSDT",
+      "alerted_at": "2026-05-08T17:07",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.2894,
+      "ref_price": 0.2865,
+      "lateness_pct": 0.7122164048865567
+    },
+    {
+      "symbol": "PENGUUSDT",
+      "alerted_at": "2026-05-10T14:45",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.010884,
+      "ref_price": 0.010776,
+      "lateness_pct": 0.702227171492187
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "alerted_at": "2026-05-05T18:31",
+      "bucket": "STRONG",
+      "score": 15,
+      "entry_price": 0.121,
+      "ref_price": 0.1198,
+      "lateness_pct": 0.701669449081799
+    },
+    {
+      "symbol": "RSRUSDT",
+      "alerted_at": "2026-05-05T16:16",
+      "bucket": "STRONG",
+      "score": 15,
+      "entry_price": 0.001916,
+      "ref_price": 0.001897,
+      "lateness_pct": 0.7015814443858683
+    },
+    {
+      "symbol": "POLUSDT",
+      "alerted_at": "2026-05-08T15:16",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.1014,
+      "ref_price": 0.1004,
+      "lateness_pct": 0.6960159362549792
+    },
+    {
+      "symbol": "COOKIEUSDT",
+      "alerted_at": "2026-05-10T09:16",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.0203,
+      "ref_price": 0.0201,
+      "lateness_pct": 0.695024875621886
+    },
+    {
+      "symbol": "WLDUSDT",
+      "alerted_at": "2026-05-08T12:45",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.2649,
+      "ref_price": 0.2623,
+      "lateness_pct": 0.6912314144109979
+    },
+    {
+      "symbol": "UNIUSDT",
+      "alerted_at": "2026-05-08T13:36",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 3.65,
+      "ref_price": 3.615,
+      "lateness_pct": 0.6681881051175622
+    },
+    {
+      "symbol": "PENGUUSDT",
+      "alerted_at": "2026-05-05T09:01",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.011162,
+      "ref_price": 0.011056,
+      "lateness_pct": 0.6587554269175235
+    },
+    {
+      "symbol": "VANRYUSDT",
+      "alerted_at": "2026-05-07T16:01",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.005913,
+      "ref_price": 0.005857,
+      "lateness_pct": 0.65612088099708
+    },
+    {
+      "symbol": "VANRYUSDT",
+      "alerted_at": "2026-05-07T16:00",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.005913,
+      "ref_price": 0.005857,
+      "lateness_pct": 0.65612088099708
+    },
+    {
+      "symbol": "RAYUSDT",
+      "alerted_at": "2026-05-08T14:31",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.848,
+      "ref_price": 0.84,
+      "lateness_pct": 0.652380952380949
+    },
+    {
+      "symbol": "WLDUSDT",
+      "alerted_at": "2026-05-05T03:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.2438,
+      "ref_price": 0.2415,
+      "lateness_pct": 0.652380952380949
+    },
+    {
+      "symbol": "ILVUSDT",
+      "alerted_at": "2026-05-08T22:45",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 5.34,
+      "ref_price": 5.29,
+      "lateness_pct": 0.6451795841209698
+    },
+    {
+      "symbol": "FORMUSDT",
+      "alerted_at": "2026-05-10T12:12",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.2997,
+      "ref_price": 0.2969,
+      "lateness_pct": 0.6430784776018885
+    },
+    {
+      "symbol": "FLOKIUSDT",
+      "alerted_at": "2026-05-11T13:22",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 3.749e-05,
+      "ref_price": 3.714e-05,
+      "lateness_pct": 0.6423801830910072
+    },
+    {
+      "symbol": "OPUSDT",
+      "alerted_at": "2026-05-05T17:22",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 0.1293,
+      "ref_price": 0.1281,
+      "lateness_pct": 0.636768149882905
+    },
+    {
+      "symbol": "PROMUSDT",
+      "alerted_at": "2026-05-07T00:45",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 2.156,
+      "ref_price": 2.136,
+      "lateness_pct": 0.6363295880149724
+    },
+    {
+      "symbol": "RSRUSDT",
+      "alerted_at": "2026-05-07T05:00",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.002055,
+      "ref_price": 0.002036,
+      "lateness_pct": 0.6332023575638448
+    },
+    {
+      "symbol": "ROBOUSDT",
+      "alerted_at": "2026-05-11T11:07",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.02275,
+      "ref_price": 0.02254,
+      "lateness_pct": 0.6316770186335254
+    },
+    {
+      "symbol": "RONINUSDT",
+      "alerted_at": "2026-05-09T05:51",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.1088,
+      "ref_price": 0.1078,
+      "lateness_pct": 0.6276437847866247
+    },
+    {
+      "symbol": "GRTUSDT",
+      "alerted_at": "2026-05-10T11:06",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.02834,
+      "ref_price": 0.02808,
+      "lateness_pct": 0.62592592592593
+    },
+    {
+      "symbol": "FLOKIUSDT",
+      "alerted_at": "2026-05-08T05:46",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 3.604e-05,
+      "ref_price": 3.571e-05,
+      "lateness_pct": 0.624110893307195
+    },
+    {
+      "symbol": "SEIUSDT",
+      "alerted_at": "2026-05-08T13:21",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.06341,
+      "ref_price": 0.06283,
+      "lateness_pct": 0.623125895272947
+    },
+    {
+      "symbol": "CHZUSDT",
+      "alerted_at": "2026-05-09T05:16",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.04707,
+      "ref_price": 0.04664,
+      "lateness_pct": 0.6219554030874821
+    },
+    {
+      "symbol": "SAGAUSDT",
+      "alerted_at": "2026-05-09T02:46",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.02093,
+      "ref_price": 0.02074,
+      "lateness_pct": 0.6161041465766572
+    },
+    {
+      "symbol": "CRVUSDT",
+      "alerted_at": "2026-05-08T13:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.2543,
+      "ref_price": 0.252,
+      "lateness_pct": 0.6126984126984316
+    },
+    {
+      "symbol": "TURTLEUSDT",
+      "alerted_at": "2026-05-09T02:51",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.0555,
+      "ref_price": 0.055,
+      "lateness_pct": 0.6090909090909038
+    },
+    {
+      "symbol": "WLFIUSDT",
+      "alerted_at": "2026-05-06T05:46",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 0.0666,
+      "ref_price": 0.066,
+      "lateness_pct": 0.6090909090909038
+    },
+    {
+      "symbol": "TIAUSDT",
+      "alerted_at": "2026-05-08T11:37",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.4222,
+      "ref_price": 0.4184,
+      "lateness_pct": 0.6082217973231498
+    },
+    {
+      "symbol": "SNXUSDT",
+      "alerted_at": "2026-05-06T05:46",
+      "bucket": "STRONG",
+      "score": 15,
+      "entry_price": 0.334,
+      "ref_price": 0.331,
+      "lateness_pct": 0.6063444108761364
+    },
+    {
+      "symbol": "DUSKUSDT",
+      "alerted_at": "2026-05-05T18:16",
+      "bucket": "STRONG",
+      "score": 15,
+      "entry_price": 0.1451,
+      "ref_price": 0.1438,
+      "lateness_pct": 0.6040333796940247
+    },
+    {
+      "symbol": "TUTUSDT",
+      "alerted_at": "2026-05-09T07:31",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.01453,
+      "ref_price": 0.0144,
+      "lateness_pct": 0.6027777777777856
+    },
+    {
+      "symbol": "MUBARAKUSDT",
+      "alerted_at": "2026-05-12T09:01",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.01697,
+      "ref_price": 0.01682,
+      "lateness_pct": 0.5917954815695461
+    },
+    {
+      "symbol": "TURTLEUSDT",
+      "alerted_at": "2026-05-09T22:45",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0567,
+      "ref_price": 0.0562,
+      "lateness_pct": 0.5896797153024937
+    },
+    {
+      "symbol": "1MBABYDOGEUSDT",
+      "alerted_at": "2026-05-08T21:15",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0004789,
+      "ref_price": 0.0004747,
+      "lateness_pct": 0.5847693279966373
+    },
+    {
+      "symbol": "KMNOUSDT",
+      "alerted_at": "2026-05-12T03:30",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.02624,
+      "ref_price": 0.02601,
+      "lateness_pct": 0.5842752787389551
+    },
+    {
+      "symbol": "PEOPLEUSDT",
+      "alerted_at": "2026-05-04T23:06",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.00813,
+      "ref_price": 0.00806,
+      "lateness_pct": 0.5684863523573227
+    },
+    {
+      "symbol": "FLOWUSDT",
+      "alerted_at": "2026-05-07T17:28",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.04186,
+      "ref_price": 0.0415,
+      "lateness_pct": 0.5674698795180679
+    },
+    {
+      "symbol": "DEXEUSDT",
+      "alerted_at": "2026-05-05T11:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 10.57,
+      "ref_price": 10.48,
+      "lateness_pct": 0.558778625954204
+    },
+    {
+      "symbol": "OPUSDT",
+      "alerted_at": "2026-05-08T14:15",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.1559,
+      "ref_price": 0.1546,
+      "lateness_pct": 0.5408796895213566
+    },
+    {
+      "symbol": "STRKUSDT",
+      "alerted_at": "2026-05-08T02:00",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.0483,
+      "ref_price": 0.0479,
+      "lateness_pct": 0.5350730688935437
+    },
+    {
+      "symbol": "THETAUSDT",
+      "alerted_at": "2026-05-08T23:15",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.242,
+      "ref_price": 0.24,
+      "lateness_pct": 0.5333333333333303
+    },
+    {
+      "symbol": "AIUSDT",
+      "alerted_at": "2026-05-12T08:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0243,
+      "ref_price": 0.0241,
+      "lateness_pct": 0.5298755186721962
+    },
+    {
+      "symbol": "HOMEUSDT",
+      "alerted_at": "2026-05-08T16:43",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.01464,
+      "ref_price": 0.01452,
+      "lateness_pct": 0.5264462809917327
+    },
+    {
+      "symbol": "PENDLEUSDT",
+      "alerted_at": "2026-05-05T12:31",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 1.958,
+      "ref_price": 1.942,
+      "lateness_pct": 0.5238928939237943
+    },
+    {
+      "symbol": "PHBUSDT",
+      "alerted_at": "2026-05-09T13:04",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.123,
+      "ref_price": 0.122,
+      "lateness_pct": 0.5196721311475307
+    },
+    {
+      "symbol": "UNIUSDT",
+      "alerted_at": "2026-05-10T10:15",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 4.091,
+      "ref_price": 4.058,
+      "lateness_pct": 0.5132084770823055
+    },
+    {
+      "symbol": "KMNOUSDT",
+      "alerted_at": "2026-05-08T08:31",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.02369,
+      "ref_price": 0.0235,
+      "lateness_pct": 0.5085106382978768
+    },
+    {
+      "symbol": "KMNOUSDT",
+      "alerted_at": "2026-05-09T01:07",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.02503,
+      "ref_price": 0.02483,
+      "lateness_pct": 0.5054772452678271
+    },
+    {
+      "symbol": "ZROUSDT",
+      "alerted_at": "2026-05-09T03:00",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 1.507,
+      "ref_price": 1.495,
+      "lateness_pct": 0.5026755852842626
+    },
+    {
+      "symbol": "MANAUSDT",
+      "alerted_at": "2026-05-11T03:22",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.1007,
+      "ref_price": 0.0999,
+      "lateness_pct": 0.5008008008008049
+    },
+    {
+      "symbol": "SAPIENUSDT",
+      "alerted_at": "2026-05-11T18:46",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.1144,
+      "ref_price": 0.1135,
+      "lateness_pct": 0.49295154185021756
+    },
+    {
+      "symbol": "BANKUSDT",
+      "alerted_at": "2026-05-07T11:19",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0383,
+      "ref_price": 0.038,
+      "lateness_pct": 0.4894736842105399
+    },
+    {
+      "symbol": "ZKPUSDT",
+      "alerted_at": "2026-05-08T00:31",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0896,
+      "ref_price": 0.0889,
+      "lateness_pct": 0.4874015748031482
+    },
+    {
+      "symbol": "ALICEUSDT",
+      "alerted_at": "2026-05-05T18:57",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.1546,
+      "ref_price": 0.1534,
+      "lateness_pct": 0.4822685788787309
+    },
+    {
+      "symbol": "EDUUSDT",
+      "alerted_at": "2026-05-09T06:15",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0519,
+      "ref_price": 0.0515,
+      "lateness_pct": 0.4766990291262266
+    },
+    {
+      "symbol": "KMNOUSDT",
+      "alerted_at": "2026-05-05T20:01",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 0.02096,
+      "ref_price": 0.0208,
+      "lateness_pct": 0.4692307692307665
+    },
+    {
+      "symbol": "METISUSDT",
+      "alerted_at": "2026-05-08T17:15",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 3.99,
+      "ref_price": 3.96,
+      "lateness_pct": 0.4575757575757569
+    },
+    {
+      "symbol": "KITEUSDT",
+      "alerted_at": "2026-05-07T22:21",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.1598,
+      "ref_price": 0.1586,
+      "lateness_pct": 0.45662042875157544
+    },
+    {
+      "symbol": "RENDERUSDT",
+      "alerted_at": "2026-05-05T13:01",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 1.89,
+      "ref_price": 1.876,
+      "lateness_pct": 0.446268656716409
+    },
+    {
+      "symbol": "CTSIUSDT",
+      "alerted_at": "2026-05-05T03:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.03385,
+      "ref_price": 0.0336,
+      "lateness_pct": 0.4440476190476275
+    },
+    {
+      "symbol": "MMTUSDT",
+      "alerted_at": "2026-05-10T14:22",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.149,
+      "ref_price": 0.1479,
+      "lateness_pct": 0.4437457741717335
+    },
+    {
+      "symbol": "TIAUSDT",
+      "alerted_at": "2026-05-08T05:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.4053,
+      "ref_price": 0.4024,
+      "lateness_pct": 0.42067594433400385
+    },
+    {
+      "symbol": "TURTLEUSDT",
+      "alerted_at": "2026-05-06T08:37",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0565,
+      "ref_price": 0.0561,
+      "lateness_pct": 0.41301247771837774
+    },
+    {
+      "symbol": "NEWTUSDT",
+      "alerted_at": "2026-05-11T10:01",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.0849,
+      "ref_price": 0.0843,
+      "lateness_pct": 0.4117437722419906
+    },
+    {
+      "symbol": "APTUSDT",
+      "alerted_at": "2026-05-05T09:16",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.999,
+      "ref_price": 0.992,
+      "lateness_pct": 0.40564516129032474
+    },
+    {
+      "symbol": "BLURUSDT",
+      "alerted_at": "2026-05-10T00:45",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.02759,
+      "ref_price": 0.0274,
+      "lateness_pct": 0.39343065693430185
+    },
+    {
+      "symbol": "LDOUSDT",
+      "alerted_at": "2026-05-05T23:12",
+      "bucket": "BEST",
+      "score": 16,
+      "entry_price": 0.3811,
+      "ref_price": 0.3785,
+      "lateness_pct": 0.3869220607661708
+    },
+    {
+      "symbol": "SOLVUSDT",
+      "alerted_at": "2026-05-07T08:16",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.00444,
+      "ref_price": 0.00441,
+      "lateness_pct": 0.3802721088435382
+    },
+    {
+      "symbol": "MMTUSDT",
+      "alerted_at": "2026-05-10T14:00",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.1484,
+      "ref_price": 0.1474,
+      "lateness_pct": 0.37842605156038794
+    },
+    {
+      "symbol": "ETHFIUSDT",
+      "alerted_at": "2026-05-08T13:46",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.45,
+      "ref_price": 0.447,
+      "lateness_pct": 0.3711409395973256
+    },
+    {
+      "symbol": "WUSDT",
+      "alerted_at": "2026-05-08T14:37",
+      "bucket": "WATCH",
+      "score": 9,
+      "entry_price": 0.015,
+      "ref_price": 0.0149,
+      "lateness_pct": 0.3711409395973034
+    },
+    {
+      "symbol": "MANTRAUSDT",
+      "alerted_at": "2026-05-12T10:46",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.01202,
+      "ref_price": 0.01194,
+      "lateness_pct": 0.370016750418756
+    },
+    {
+      "symbol": "ENAUSDT",
+      "alerted_at": "2026-05-05T06:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.1059,
+      "ref_price": 0.1052,
+      "lateness_pct": 0.36539923954371806
+    },
+    {
+      "symbol": "PNUTUSDT",
+      "alerted_at": "2026-05-06T07:31",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 0.063,
+      "ref_price": 0.0626,
+      "lateness_pct": 0.3389776357827337
+    },
+    {
+      "symbol": "STRKUSDT",
+      "alerted_at": "2026-05-08T00:31",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.0474,
+      "ref_price": 0.0471,
+      "lateness_pct": 0.33694267515921333
+    },
+    {
+      "symbol": "USUALUSDT",
+      "alerted_at": "2026-05-06T05:16",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 0.01592,
+      "ref_price": 0.01582,
+      "lateness_pct": 0.3321112515802696
+    },
+    {
+      "symbol": "THEUSDT",
+      "alerted_at": "2026-05-12T10:00",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.1126,
+      "ref_price": 0.1119,
+      "lateness_pct": 0.3255585344057346
+    },
+    {
+      "symbol": "GALAUSDT",
+      "alerted_at": "2026-05-05T04:58",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.00323,
+      "ref_price": 0.00321,
+      "lateness_pct": 0.3230529595015355
+    },
+    {
+      "symbol": "SUIUSDT",
+      "alerted_at": "2026-05-06T06:46",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 1.0242,
+      "ref_price": 1.0179,
+      "lateness_pct": 0.3189213085764811
+    },
+    {
+      "symbol": "FLOWUSDT",
+      "alerted_at": "2026-05-08T22:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.04229,
+      "ref_price": 0.04203,
+      "lateness_pct": 0.31860575779206785
+    },
+    {
+      "symbol": "ACHUSDT",
+      "alerted_at": "2026-05-07T06:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.00822,
+      "ref_price": 0.00817,
+      "lateness_pct": 0.3119951040391536
+    },
+    {
+      "symbol": "GALAUSDT",
+      "alerted_at": "2026-05-05T09:45",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.00329,
+      "ref_price": 0.00327,
+      "lateness_pct": 0.3116207951070374
+    },
+    {
+      "symbol": "GPSUSDT",
+      "alerted_at": "2026-05-05T05:13",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.00834,
+      "ref_price": 0.00829,
+      "lateness_pct": 0.3031363088057962
+    },
+    {
+      "symbol": "ICPUSDT",
+      "alerted_at": "2026-05-06T13:46",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 3.026,
+      "ref_price": 3.008,
+      "lateness_pct": 0.29840425531914044
+    },
+    {
+      "symbol": "ALICEUSDT",
+      "alerted_at": "2026-05-05T18:28",
+      "bucket": "STRONG",
+      "score": 15,
+      "entry_price": 0.153,
+      "ref_price": 0.1521,
+      "lateness_pct": 0.2917159763313418
+    },
+    {
+      "symbol": "SOLVUSDT",
+      "alerted_at": "2026-05-12T06:30",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.00513,
+      "ref_price": 0.0051,
+      "lateness_pct": 0.288235294117645
+    },
+    {
+      "symbol": "CHRUSDT",
+      "alerted_at": "2026-05-05T13:07",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.02744,
+      "ref_price": 0.02728,
+      "lateness_pct": 0.28651026392961826
+    },
+    {
+      "symbol": "UNIUSDT",
+      "alerted_at": "2026-05-09T21:00",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 3.81,
+      "ref_price": 3.788,
+      "lateness_pct": 0.28078141499473547
+    },
+    {
+      "symbol": "AXSUSDT",
+      "alerted_at": "2026-05-06T21:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 1.397,
+      "ref_price": 1.389,
+      "lateness_pct": 0.2759539236861011
+    },
+    {
+      "symbol": "XPLUSDT",
+      "alerted_at": "2026-05-07T08:46",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.1049,
+      "ref_price": 0.1043,
+      "lateness_pct": 0.27526366251197115
+    },
+    {
+      "symbol": "EDUUSDT",
+      "alerted_at": "2026-05-09T11:16",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.0528,
+      "ref_price": 0.0525,
+      "lateness_pct": 0.2714285714285783
+    },
+    {
+      "symbol": "PYTHUSDT",
+      "alerted_at": "2026-05-08T01:15",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0535,
+      "ref_price": 0.0532,
+      "lateness_pct": 0.2639097744360999
+    },
+    {
+      "symbol": "CRVUSDT",
+      "alerted_at": "2026-05-06T18:31",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.2505,
+      "ref_price": 0.2491,
+      "lateness_pct": 0.2620232838217554
+    },
+    {
+      "symbol": "SNXUSDT",
+      "alerted_at": "2026-05-08T14:15",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.359,
+      "ref_price": 0.357,
+      "lateness_pct": 0.26022408963585236
+    },
+    {
+      "symbol": "ZRXUSDT",
+      "alerted_at": "2026-05-11T14:46",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.1281,
+      "ref_price": 0.1274,
+      "lateness_pct": 0.24945054945052528
+    },
+    {
+      "symbol": "TURTLEUSDT",
+      "alerted_at": "2026-05-09T03:16",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.056,
+      "ref_price": 0.0557,
+      "lateness_pct": 0.23859964093356803
+    },
+    {
+      "symbol": "RAREUSDT",
+      "alerted_at": "2026-05-11T21:46",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0187,
+      "ref_price": 0.0186,
+      "lateness_pct": 0.23763440860217225
+    },
+    {
+      "symbol": "INJUSDT",
+      "alerted_at": "2026-05-08T05:30",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 4.063,
+      "ref_price": 4.042,
+      "lateness_pct": 0.21954477981197565
+    },
+    {
+      "symbol": "FLOKIUSDT",
+      "alerted_at": "2026-05-11T13:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 3.732e-05,
+      "ref_price": 3.713e-05,
+      "lateness_pct": 0.21171559385942976
+    },
+    {
+      "symbol": "BONKUSDT",
+      "alerted_at": "2026-05-10T15:00",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 7.86e-06,
+      "ref_price": 7.82e-06,
+      "lateness_pct": 0.2115089514066362
+    },
+    {
+      "symbol": "STRKUSDT",
+      "alerted_at": "2026-05-05T19:07",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0394,
+      "ref_price": 0.0392,
+      "lateness_pct": 0.21020408163264806
+    },
+    {
+      "symbol": "VIRTUALUSDT",
+      "alerted_at": "2026-05-07T03:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.9084,
+      "ref_price": 0.9038,
+      "lateness_pct": 0.20896215976985458
+    },
+    {
+      "symbol": "WALUSDT",
+      "alerted_at": "2026-05-08T13:04",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.0797,
+      "ref_price": 0.0793,
+      "lateness_pct": 0.20441361916770953
+    },
+    {
+      "symbol": "WALUSDT",
+      "alerted_at": "2026-05-08T13:04",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.0797,
+      "ref_price": 0.0793,
+      "lateness_pct": 0.20441361916770953
+    },
+    {
+      "symbol": "COOKIEUSDT",
+      "alerted_at": "2026-05-09T08:00",
+      "bucket": "WATCH",
+      "score": 11,
+      "entry_price": 0.02,
+      "ref_price": 0.0199,
+      "lateness_pct": 0.2025125628140614
+    },
+    {
+      "symbol": "DCRUSDT",
+      "alerted_at": "2026-05-04T23:01",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 20.22,
+      "ref_price": 20.12,
+      "lateness_pct": 0.19701789264411376
+    },
+    {
+      "symbol": "IOTAUSDT",
+      "alerted_at": "2026-05-08T14:00",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0609,
+      "ref_price": 0.0606,
+      "lateness_pct": 0.19504950495049547
+    },
+    {
+      "symbol": "DASHUSDT",
+      "alerted_at": "2026-05-06T05:01",
+      "bucket": "STRONG",
+      "score": 14,
+      "entry_price": 53.15,
+      "ref_price": 52.89,
+      "lateness_pct": 0.1915863112119556
+    },
+    {
+      "symbol": "BELUSDT",
+      "alerted_at": "2026-05-11T14:16",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.123,
+      "ref_price": 0.1224,
+      "lateness_pct": 0.1901960784313708
+    },
+    {
+      "symbol": "KATUSDT",
+      "alerted_at": "2026-05-09T07:01",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 0.0103,
+      "ref_price": 0.01025,
+      "lateness_pct": 0.1878048780487809
+    },
+    {
+      "symbol": "DYMUSDT",
+      "alerted_at": "2026-05-05T03:52",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.0206,
+      "ref_price": 0.0205,
+      "lateness_pct": 0.1878048780487809
+    },
+    {
+      "symbol": "MANTAUSDT",
+      "alerted_at": "2026-05-09T08:00",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.07441,
+      "ref_price": 0.07405,
+      "lateness_pct": 0.18615800135043406
+    },
+    {
+      "symbol": "IOTAUSDT",
+      "alerted_at": "2026-05-08T21:45",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 0.0628,
+      "ref_price": 0.0625,
+      "lateness_pct": 0.17999999999999153
+    },
+    {
+      "symbol": "FILUSDT",
+      "alerted_at": "2026-05-06T00:21",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 1.051,
+      "ref_price": 1.046,
+      "lateness_pct": 0.17801147227533035
+    },
+    {
+      "symbol": "SAGAUSDT",
+      "alerted_at": "2026-05-07T10:13",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.01909,
+      "ref_price": 0.019,
+      "lateness_pct": 0.17368421052631502
+    },
+    {
+      "symbol": "PEPEUSDT",
+      "alerted_at": "2026-05-08T13:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 4.28e-06,
+      "ref_price": 4.26e-06,
+      "lateness_pct": 0.16948356807510193
+    },
+    {
+      "symbol": "RONINUSDT",
+      "alerted_at": "2026-05-09T05:30",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.1081,
+      "ref_price": 0.1076,
+      "lateness_pct": 0.16468401486989828
+    },
+    {
+      "symbol": "LDOUSDT",
+      "alerted_at": "2026-05-08T09:06",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.4003,
+      "ref_price": 0.3985,
+      "lateness_pct": 0.15169385194478993
+    },
+    {
+      "symbol": "ASTRUSDT",
+      "alerted_at": "2026-05-06T07:01",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.009147,
+      "ref_price": 0.009106,
+      "lateness_pct": 0.15025258071602623
+    },
+    {
+      "symbol": "JUPUSDT",
+      "alerted_at": "2026-05-08T05:16",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.2064,
+      "ref_price": 0.2055,
+      "lateness_pct": 0.1379562043795637
+    },
+    {
+      "symbol": "THETAUSDT",
+      "alerted_at": "2026-05-08T13:46",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.23,
+      "ref_price": 0.229,
+      "lateness_pct": 0.13668122270741348
+    },
+    {
+      "symbol": "CELRUSDT",
+      "alerted_at": "2026-05-08T23:15",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.003064,
+      "ref_price": 0.003051,
+      "lateness_pct": 0.12608980662077743
+    },
+    {
+      "symbol": "ROSEUSDT",
+      "alerted_at": "2026-05-13T21:43",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.01204,
+      "ref_price": 0.01199,
+      "lateness_pct": 0.1170141784820558
+    },
+    {
+      "symbol": "ROSEUSDT",
+      "alerted_at": "2026-05-13T21:31",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.01204,
+      "ref_price": 0.01199,
+      "lateness_pct": 0.1170141784820558
+    },
+    {
+      "symbol": "KATUSDT",
+      "alerted_at": "2026-05-08T05:30",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.00977,
+      "ref_price": 0.00973,
+      "lateness_pct": 0.11109969167520965
+    },
+    {
+      "symbol": "HOMEUSDT",
+      "alerted_at": "2026-05-09T05:16",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.01476,
+      "ref_price": 0.0147,
+      "lateness_pct": 0.10816326530612734
+    },
+    {
+      "symbol": "TREEUSDT",
+      "alerted_at": "2026-05-11T12:01",
+      "bucket": "BEST",
+      "score": 14,
+      "entry_price": 0.076,
+      "ref_price": 0.0757,
+      "lateness_pct": 0.09630118890356947
+    },
+    {
+      "symbol": "RADUSDT",
+      "alerted_at": "2026-05-09T12:31",
+      "bucket": "STRONG",
+      "score": 11,
+      "entry_price": 0.258,
+      "ref_price": 0.257,
+      "lateness_pct": 0.08910505836575737
+    },
+    {
+      "symbol": "SEIUSDT",
+      "alerted_at": "2026-05-08T13:01",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.06307,
+      "ref_price": 0.06283,
+      "lateness_pct": 0.08198312907846698
+    },
+    {
+      "symbol": "PUNDIXUSDT",
+      "alerted_at": "2026-05-06T05:16",
+      "bucket": "STRONG",
+      "score": 12,
+      "entry_price": 0.1597,
+      "ref_price": 0.1591,
+      "lateness_pct": 0.07712130735387816
+    },
+    {
+      "symbol": "JTOUSDT",
+      "alerted_at": "2026-05-13T22:31",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.5137,
+      "ref_price": 0.5118,
+      "lateness_pct": 0.0712387651426452
+    },
+    {
+      "symbol": "PSGUSDT",
+      "alerted_at": "2026-05-10T03:01",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 1.092,
+      "ref_price": 1.088,
+      "lateness_pct": 0.0676470588235281
+    },
+    {
+      "symbol": "MANTRAUSDT",
+      "alerted_at": "2026-05-08T21:15",
+      "bucket": "WATCH",
+      "score": 10,
+      "entry_price": 0.01108,
+      "ref_price": 0.01104,
+      "lateness_pct": 0.06231884057971175
+    },
+    {
+      "symbol": "NEIROUSDT",
+      "alerted_at": "2026-05-10T14:30",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.00010255,
+      "ref_price": 0.00010219,
+      "lateness_pct": 0.05228495938937065
+    },
+    {
+      "symbol": "NEIROUSDT",
+      "alerted_at": "2026-05-10T14:30",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.00010255,
+      "ref_price": 0.00010219,
+      "lateness_pct": 0.05228495938937065
+    },
+    {
+      "symbol": "PYRUSDT",
+      "alerted_at": "2026-05-11T17:16",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.294,
+      "ref_price": 0.293,
+      "lateness_pct": 0.041296928327650126
+    },
+    {
+      "symbol": "CGPTUSDT",
+      "alerted_at": "2026-05-07T04:07",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.02952,
+      "ref_price": 0.02942,
+      "lateness_pct": 0.03990482664854049
+    },
+    {
+      "symbol": "GMTUSDT",
+      "alerted_at": "2026-05-08T22:16",
+      "bucket": "STRONG",
+      "score": 13,
+      "entry_price": 0.01212,
+      "ref_price": 0.01208,
+      "lateness_pct": 0.03112582781456012
+    },
+    {
+      "symbol": "CETUSUSDT",
+      "alerted_at": "2026-05-09T13:28",
+      "bucket": "BEST",
+      "score": 13,
+      "entry_price": 0.03362,
+      "ref_price": 0.03351,
+      "lateness_pct": 0.02826022082959038
+    },
+    {
+      "symbol": "BROCCOLI714USDT",
+      "alerted_at": "2026-05-09T06:30",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.01906,
+      "ref_price": 0.019,
+      "lateness_pct": 0.015789473684224824
+    },
+    {
+      "symbol": "MANTAUSDT",
+      "alerted_at": "2026-05-08T18:00",
+      "bucket": "WATCH",
+      "score": 12,
+      "entry_price": 0.07191,
+      "ref_price": 0.07169,
+      "lateness_pct": 0.006876830799263083
+    },
+    {
+      "symbol": "HOLOUSDT",
+      "alerted_at": "2026-05-04T23:45",
+      "bucket": "BEST",
+      "score": 15,
+      "entry_price": 0.0657,
+      "ref_price": 0.0655,
+      "lateness_pct": 0.0053435114503733
+    }
+  ]
+}

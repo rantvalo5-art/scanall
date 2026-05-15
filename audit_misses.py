@@ -2,15 +2,17 @@
 audit_misses.py — Auditoría de cobertura del screener.
 
 Subcomandos:
-  catch-rate             Mide catch-rate real vs universo de movers (últimos 7 días)
+  catch-rate             Mide catch-rate real vs universo de movers
   post-mortem SYM TS     Replay de analyze+classify para símbolo+timestamp
   false-positives        Analiza outcomes_dump.json: alertas que no se cumplieron
+  lateness               Mide cuánto tarde entran los BREAKOUTs (chasing)
 
 Uso:
-  python audit_misses.py catch-rate [--days 7] [--max-pairs 400]
+  python audit_misses.py catch-rate [--days 14] [--max-pairs 400]
   python audit_misses.py post-mortem BTCUSDT 2025-01-15T14:30:00
   python audit_misses.py post-mortem BTCUSDT 1705327800000
-  python audit_misses.py false-positives [--dump outcomes_dump.json] [--days 7]
+  python audit_misses.py false-positives [--dump outcomes_dump.json] [--days 14]
+  python audit_misses.py lateness [--dump outcomes_dump.json] [--days 30]
 """
 
 import argparse
@@ -54,6 +56,65 @@ PRE_PUMP_WINDOW = 4
 
 # ── Clasificación con diagnóstico ─────────────────────────────────────────────
 
+def _get_signal_fail_reason(tf5, tf15, cfg):
+    """Devuelve razón específica cuando todos los pre-gates pasaron pero ninguna señal disparó.
+    Evalúa las gates de cada señal en orden, elige la que más estuvo a punto de pasar
+    (mayor cantidad de checks superados) y devuelve '<prefijo>:<primera_gate_fallida>'.
+    Formato ejemplos: 'bo:bb_exp', 'pre:bb_width', 'ri:gain_range', 'ho:recent_break'."""
+    require_obv = cfg.g("breakout", "BREAKOUT_REQUIRE_OBV_NON_NEGATIVE", default=True)
+    min_g = cfg.g("riding", "RIDING_MIN_GAIN", default=0.005)
+    max_g = cfg.g("riding", "RIDING_MAX_GAIN", default=0.15)
+
+    signals = {
+        "pre": [
+            ("near_max",   bool(tf5.get("near_recent_max"))),
+            ("bb_width",   tf5.get("width_curr", 9) <= cfg.g("prebreak", "PREBREAK_BB_WIDTH_MAX")),
+            ("vol_ratio",  tf5.get("vol_ratio", 0) >= cfg.g("prebreak", "PREBREAK_MIN_VOL_RATIO")),
+            ("vol_growth", tf5.get("vol_growth", 0) >= cfg.g("prebreak", "PREBREAK_VOLUME_GROWTH_MIN")),
+        ],
+        "bo": [
+            ("breakout",   bool(tf15.get("breakout"))),
+            ("vol_ratio",  tf15.get("vol_ratio", 0) >= cfg.g("breakout", "BREAKOUT_MIN_VOL_RATIO")),
+            ("distance",   tf15.get("breakout_distance", 9) <= cfg.g("breakout", "BREAKOUT_MAX_EXTENDED")),
+            ("bb_exp",     tf15.get("width_expansion", -9) >= cfg.g("breakout", "BREAKOUT_BB_EXPANSION_MIN")),
+            ("strong_close", bool(tf15.get("strong_close"))),
+            ("body",       tf15.get("candle_body_pct", 0) >= cfg.g("breakout", "BREAKOUT_MIN_BODY_PCT")),
+            ("5m_vol",     tf5.get("vol_ratio", 0) >= cfg.g("breakout", "BREAKOUT_5M_MIN_VOL_RATIO")),
+            ("5m_close",   bool(tf5.get("strong_close"))),
+            ("obv_nonneg", (not require_obv) or tf15.get("obv_slope", 0) >= 0),
+        ],
+        "ri": [
+            ("above_zone", bool(tf15.get("riding_above_zone"))),
+            ("vol_ok",     bool(tf15.get("riding_vol_ok"))),
+            ("gain_range", min_g <= (tf15.get("riding_gain") or 0) <= max_g),
+            ("bars_since", tf15.get("riding_bars_since") is not None and tf15.get("riding_bars_since", 0) >= 1),
+            ("no_breakout", not bool(tf15.get("breakout"))),
+        ],
+        "ho": [
+            ("recent_break", bool(tf15.get("hold_recent_break"))),
+            ("kept_zone",    bool(tf15.get("hold_kept_zone"))),
+            ("pullback_ok",  bool(tf15.get("hold_pullback_ok"))),
+            ("strong",       bool(tf15.get("hold_strong"))),
+        ],
+    }
+
+    best_prefix = "all"
+    best_fail   = "signals"
+    best_passes = -1
+
+    for prefix, checks in signals.items():
+        passes = sum(v for _, v in checks)
+        first_fail = next((k for k, v in checks if not v), None)
+        if first_fail is None:
+            return f"{prefix}:cooldown_or_active"
+        if passes > best_passes:
+            best_passes = passes
+            best_prefix = prefix
+            best_fail   = first_fail
+
+    return f"{best_prefix}:{best_fail}"
+
+
 def classify_explain(symbol, tf_data, cfg):
     """Llama classify() y si devuelve None explica la primera causa.
     Devuelve (alert_o_None, razon_str_o_None)."""
@@ -84,7 +145,7 @@ def classify_explain(symbol, tf_data, cfg):
     result = classify(symbol, tf_data, cfg)
     if result is not None:
         return result, None
-    return None, "all_signals_filtered"
+    return None, _get_signal_fail_reason(tf5, tf15, cfg)
 
 
 # ── Detección de pump-starts ──────────────────────────────────────────────────
@@ -580,6 +641,111 @@ def cmd_false_positives(args, cfg):
             print(f"  {label:<8} — OBV slope avg: {obv_avg:+.3f}  CVD ratio avg: {cvd_avg:+.3f}  (n={len(obvs)})")
 
 
+# ── Subcomando: lateness ──────────────────────────────────────────────────────
+
+def cmd_lateness(args, cfg):
+    """Mide cuánto tarde entran las señales BREAKOUT respecto al nivel de ruptura.
+    Para cada alerta usa entry_price y ref_price (guardados en outcomes) para calcular
+    lateness_pct = (entry_price / ref_price - 1) - BREAKOUT_BUFFER.
+    Si lateness_pct > 2% la señal llegó tarde (chasing). Si < 0.5% fue temprana."""
+    dump_path = Path(args.dump)
+    if not dump_path.exists():
+        sys.exit(
+            f"FATAL: {dump_path} no encontrado.\n"
+            f"  Primero corrí:  python dump_outcomes.py"
+        )
+
+    with open(dump_path, "r", encoding="utf-8") as f:
+        rows = json.load(f)
+
+    cutoff = datetime.now(timezone.utc) - timedelta(days=args.days)
+    bo_rows = [
+        r for r in rows
+        if r.get("signal_type") == "BREAKOUT"
+        and r.get("entry_price") and r.get("ref_price")
+        and r.get("alerted_at")
+        and datetime.fromisoformat(r["alerted_at"].replace("Z", "+00:00")) >= cutoff
+    ]
+
+    if not bo_rows:
+        print(f"  Sin BREAKOUTs con entry_price+ref_price completos en los últimos {args.days} días.")
+        return
+
+    buffer = cfg.g("breakout", "BREAKOUT_BUFFER", default=0.003)
+
+    entries = []
+    for r in bo_rows:
+        ep = float(r["entry_price"])
+        rp = float(r["ref_price"])
+        if rp > 0:
+            lateness = (ep / rp - 1) - buffer
+            entries.append({
+                "symbol":      r.get("symbol", "?"),
+                "alerted_at":  (r.get("alerted_at") or "")[:16],
+                "bucket":      r.get("bucket", "?"),
+                "score":       r.get("score", 0),
+                "entry_price": ep,
+                "ref_price":   rp,
+                "lateness_pct": lateness * 100,
+            })
+
+    if not entries:
+        return
+
+    vals = sorted(x["lateness_pct"] for x in entries)
+    n    = len(vals)
+    med  = vals[n // 2]
+    p75  = vals[min(int(n * 0.75), n - 1)]
+    p90  = vals[min(int(n * 0.90), n - 1)]
+    early = sum(1 for v in vals if v <= 0.5)
+    late  = sum(1 for v in vals if v > 2.0)
+
+    print(f"\n=== LATENESS — BREAKOUT últimos {args.days} días ===")
+    print(f"  N={n}   mediana={med:+.2f}%   p75={p75:+.2f}%   p90={p90:+.2f}%")
+    print(f"  Tempranas (<=0.5% sobre nivel): {early:>4}  ({early*100/n:.0f}%)")
+    print(f"  Tardías   (> 2%  sobre nivel):  {late:>4}  ({late*100/n:.0f}%)")
+    print(f"\n  Interpretación:")
+    print(f"    mediana > 2%  → chasing estructural (bajar gates de confirmación)")
+    print(f"    mediana < 1%  → entrada ajustada    (no urge cambiar)")
+
+    # Por bucket
+    print("\n─── Por bucket ──────────────────────────────────────────────")
+    by_bucket = defaultdict(list)
+    for x in entries:
+        by_bucket[x["bucket"]].append(x["lateness_pct"])
+    for bk in ("BEST", "STRONG", "WATCH"):
+        vs = sorted(by_bucket.get(bk, []))
+        if vs:
+            med_bk = vs[len(vs) // 2]
+            late_bk = sum(1 for v in vs if v > 2.0)
+            print(f"  {bk:<6}  n={len(vs):>3}  mediana={med_bk:+.2f}%  tardías={late_bk} ({late_bk*100/len(vs):.0f}%)")
+
+    # Top 15 más tardías
+    entries.sort(key=lambda x: x["lateness_pct"], reverse=True)
+    print("\n─── Top 15 más tardías ──────────────────────────────────────")
+    print(f"  {'#':>3} {'Symbol':<14} {'Bucket':<8} {'Score':>5} {'Lateness':>10}  alerted_at")
+    for i, x in enumerate(entries[:15], 1):
+        print(f"  {i:>3} {x['symbol']:<14} {x['bucket']:<8} {x['score']:>5} "
+              f"{x['lateness_pct']:>+9.2f}%  {x['alerted_at']}")
+
+    # Exportar JSON
+    ts_str   = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
+    out_path = AUDIT_RESULTS / f"lateness_{ts_str}.json"
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump({
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "period_days":  args.days,
+            "n":            n,
+            "median_pct":   round(med, 3),
+            "p75_pct":      round(p75, 3),
+            "p90_pct":      round(p90, 3),
+            "early_count":  early,
+            "late_count":   late,
+            "entries":      entries,
+        }, f, ensure_ascii=False, indent=2)
+    print(f"\n  Resultado guardado en: {out_path}")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -599,8 +765,18 @@ def main():
                       help="Path a outcomes_dump.json (default: outcomes_dump.json)")
     p_fp.add_argument("--days", type=int, default=7, help="Últimos N días (default 7)")
 
+    p_la = sub.add_parser("lateness", help="Cuánto tarde entran los BREAKOUTs (chasing)")
+    p_la.add_argument("--dump", default="outcomes_dump.json",
+                      help="Path a outcomes_dump.json (default: outcomes_dump.json)")
+    p_la.add_argument("--days", type=int, default=30, help="Últimos N días (default 30)")
+
+    parser.add_argument(
+        "--config", default=str(CONFIG_PATH),
+        help="Path a config.json a usar (default: config.json). Permite A/B entre variantes.",
+    )
+
     args = parser.parse_args()
-    cfg  = Config(CONFIG_PATH)
+    cfg  = Config(Path(args.config))
 
     if args.cmd == "catch-rate":
         cmd_catch_rate(args, cfg)
@@ -608,6 +784,8 @@ def main():
         cmd_post_mortem(args, cfg)
     elif args.cmd == "false-positives":
         cmd_false_positives(args, cfg)
+    elif args.cmd == "lateness":
+        cmd_lateness(args, cfg)
 
 
 if __name__ == "__main__":

@@ -131,38 +131,48 @@ def get_pairs_from_snapshot(start_dt, end_dt):
     headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
     all_symbols = set()
     runs_to_pairs = {}
-    offset = 0
     PAGE = 1000
-    while True:
-        params = {
-            "select": "run_at,symbol",
-            "run_at": f"gte.{start_dt.isoformat()}",
-            "and": f"(run_at.lte.{end_dt.isoformat()})",
-            "limit": PAGE,
-            "offset": offset,
-            "order": "run_at.asc",
-        }
-        try:
-            r = requests.get(
-                f"{SUPABASE_URL}/rest/v1/screener_pairs_snapshot",
-                headers=headers, params=params, timeout=30,
-            )
-            r.raise_for_status()
-            rows = r.json()
-        except Exception as e:
-            print(f"  [snapshot] error fetching: {e}")
-            break
-        if not rows:
-            break
-        for row in rows:
-            run = row["run_at"]
-            sym = row["symbol"]
-            runs_to_pairs.setdefault(run, []).append(sym)
-            all_symbols.add(sym)
-        if len(rows) < PAGE:
-            break
-        offset += PAGE
-        print(f"  [snapshot] cargadas {offset} filas...")
+    WINDOW_HOURS = 24
+    cursor_dt = start_dt
+    while cursor_dt < end_dt:
+        win_end = min(cursor_dt + timedelta(hours=WINDOW_HOURS), end_dt)
+        offset = 0
+        while True:
+            params = {
+                "select": "run_at,symbol",
+                "run_at": f"gte.{cursor_dt.isoformat()}",
+                "and": f"(run_at.lt.{win_end.isoformat()})",
+                "limit": PAGE,
+                "offset": offset,
+                "order": "run_at.asc",
+            }
+            rows = None
+            for attempt in range(3):
+                try:
+                    r = requests.get(
+                        f"{SUPABASE_URL}/rest/v1/screener_pairs_snapshot",
+                        headers=headers, params=params, timeout=30,
+                    )
+                    r.raise_for_status()
+                    rows = r.json()
+                    break
+                except Exception as e:
+                    wait = 2 ** attempt
+                    print(f"  [snapshot] error {cursor_dt.date()} off={offset} (intento {attempt+1}/3): {e}; reintentando en {wait}s")
+                    time.sleep(wait)
+            if rows is None:
+                print(f"  [snapshot] ventana {cursor_dt.date()} abortada tras reintentos; sigo con la siguiente")
+                break
+            if not rows:
+                break
+            for row in rows:
+                runs_to_pairs.setdefault(row["run_at"], []).append(row["symbol"])
+                all_symbols.add(row["symbol"])
+            if len(rows) < PAGE:
+                break
+            offset += PAGE
+        print(f"  [snapshot] ventana {cursor_dt.date()} ok ({len(all_symbols)} símbolos acum)")
+        cursor_dt = win_end
     print(f"  [snapshot] {len(runs_to_pairs)} runs distintos, {len(all_symbols)} símbolos únicos")
     return runs_to_pairs, all_symbols
 
@@ -1035,7 +1045,10 @@ def classify(symbol, tf_data, cfg, counts_history=None):
     tf15["obv_rising"]  = tf15.get("obv_slope", 0) >= cfg.g("indicators", "OBV_RISING_MIN", default=0.05)
     tf15["cvd_bullish"] = tf15.get("cvd_ratio", 0) >= cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05)
 
-    if not (tf1h.get("ema_trend_up") and tf1h.get("not_near_resistance")):
+    if not tf1h.get("not_near_resistance"):
+        return None
+    _ema_gate_hard = cfg.g("indicators", "EMA_GATE_HARD", default=True)
+    if not tf1h.get("ema_trend_up") and _ema_gate_hard:
         return None
     if tf1h.get("atr_pct", 0) < cfg.g("indicators", "ATR_MIN_PCT"):
         return None
@@ -1395,7 +1408,14 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             if c.get("immediate") and c["score"] < IMMEDIATE_MIN_SCORE:
                 c["immediate"] = False
 
-    # Final cap loop (mismo screener.py:1293-1296). Redundante porque cada bloque ya
+    # Penalización suave por EMA 1h no alcista (solo cuando EMA_GATE_HARD=false).
+    if not _ema_gate_hard and not tf1h.get("ema_trend_up"):
+        _ema_pen = int(cfg.g("indicators", "EMA_SOFT_PENALTY", default=-2))
+        for c in candidates:
+            c["score"] = max(0, c["score"] + _ema_pen)
+            c["bucket"] = final_bucket(c["score"], cfg)
+
+    # Final cap loop (mismo screener.py). Redundante porque cada bloque ya
     # aplicó min(score, SCORE_CAP), pero se mantiene para que la simulación sea espejo.
     for c in candidates:
         if c["score"] > SCORE_CAP:
