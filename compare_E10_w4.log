@@ -1,0 +1,282 @@
+Período backtest: 2026-03-21 00:00:00+00:00 → 2026-04-04 00:00:00+00:00 (2 semana(s), 14d)
+Scan interval simulado: 15 min
+
+[1/4] Sin snapshots; usando top pares actuales por volumen...
+  179 pares calificantes hoy (top 200 por volumen)
+
+[2/4] Descargando klines históricas...
+
+  Descargando 179 pares × 3 timeframes = 537 requests
+  Rango: 2026-03-18 a 2026-04-04 (3d buffer + período)
+    50/537 descargados...
+    100/537 descargados...
+    150/537 descargados...
+    200/537 descargados...
+    250/537 descargados...
+    300/537 descargados...
+    350/537 descargados...
+    400/537 descargados...
+    450/537 descargados...
+    500/537 descargados...
+  176/179 pares con data completa en los 3 TF
+
+[3/4] Ejecutando simulación...
+
+  >>> Corriendo backtest: OLD (config_E6_cal.json)
+    [precompute] Calculando indicadores para 176 pares...
+
+  Simulando 336h con scans cada 15min...
+    [analyze] Extrayendo candidatos (1345 scans × 176 pares)...
+    [analyze] scan 0/1345 (0%) — 0 candidatos
+    [analyze] scan 50/1345 (3%) — 2610 candidatos
+    [analyze] scan 100/1345 (7%) — 11323 candidatos
+    [analyze] scan 150/1345 (11%) — 20073 candidatos
+    [analyze] scan 200/1345 (14%) — 28823 candidatos
+    [analyze] scan 250/1345 (18%) — 37573 candidatos
+    [analyze] scan 300/1345 (22%) — 46323 candidatos
+    [analyze] scan 350/1345 (26%) — 55073 candidatos
+    [analyze] scan 400/1345 (29%) — 63823 candidatos
+    [analyze] scan 450/1345 (33%) — 72573 candidatos
+    [analyze] scan 500/1345 (37%) — 81323 candidatos
+    [analyze] scan 550/1345 (40%) — 90073 candidatos
+    [analyze] scan 600/1345 (44%) — 98823 candidatos
+    [analyze] scan 650/1345 (48%) — 107573 candidatos
+    [analyze] scan 700/1345 (52%) — 116323 candidatos
+    [analyze] scan 750/1345 (55%) — 125073 candidatos
+    [analyze] scan 800/1345 (59%) — 133823 candidatos
+    [analyze] scan 850/1345 (63%) — 142573 candidatos
+    [analyze] scan 900/1345 (66%) — 151364 candidatos
+    [analyze] scan 950/1345 (70%) — 160164 candidatos
+    [analyze] scan 1000/1345 (74%) — 168964 candidatos
+    [analyze] scan 1050/1345 (78%) — 177764 candidatos
+    [analyze] scan 1100/1345 (81%) — 186564 candidatos
+    [analyze] scan 1150/1345 (85%) — 195364 candidatos
+    [analyze] scan 1200/1345 (89%) — 204164 candidatos
+    [analyze] scan 1250/1345 (92%) — 212964 candidatos
+    [analyze] scan 1300/1345 (96%) — 221764 candidatos
+    [analyze] 229508 candidatos encontrados
+    Total alertas simuladas: 136
+
+══════════════════════════════════════════════════════════════════════
+ OLD (CONFIG_E6_CAL.JSON)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 136
+
+Por tipo:
+  RIDING       48  (35%)
+  HOLD         47  (34%)
+  BREAKOUT     29  (21%)
+  EXPLOSION    11  (8%)
+  PREBREAK      1  (0%)
+
+Por bucket:
+  BEST     49 — max_24h: +29.17%, drawdown: -12.10%, win >2%: 82%
+  STRONG   43 — max_24h: +13.09%, drawdown: -7.26%, win >2%: 72%
+  WATCH    44 — max_24h: +13.91%, drawdown: -7.23%, win >2%: 84%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n= 83  avg max 24h: +9.36%
+  CVD neutral              n= 47  avg max 24h: +37.52%
+  CVD bearish (<-0.05)     n=  6  avg max 24h: +10.60%
+
+OBV análisis:
+  OBV rising (>+0.05)      n=113  avg max 24h: +19.85%
+  OBV neutral              n= 23  avg max 24h: +15.69%
+
+recent_long_ok análisis:
+  True  n=110  avg max 24h: +16.16%, drawdown: -9.45%
+  False n= 26  avg max 24h: +31.77%, drawdown: -7.07%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 STOUSDT        HOLD          12 BEST    +313.23%  +0.04  +0.07    True
+    2 STOUSDT        RIDING        15 BEST    +248.51%  +0.04  +0.15   False
+    3 STOUSDT        HOLD          12 BEST    +189.27%  +0.04  +0.28    True
+    4 STOUSDT        HOLD          12 BEST    +164.35%  +0.03  +0.27    True
+    5 STOUSDT        HOLD           8 WATCH   +159.50%  +0.05  +0.13   False
+    6 STOUSDT        RIDING        11 STRONG  +143.89%  +0.04  +0.02   False
+    7 STOUSDT        HOLD          12 BEST    +109.20%  +0.04  +0.17    True
+    8 KATUSDT        HOLD          10 STRONG   +77.46%  +0.07  +2.05    True
+    9 XPLUSDT        BREAKOUT      10 STRONG   +46.57%  +0.17  +0.14    True
+   10 XPLUSDT        RIDING        11 STRONG   +30.11%  +0.05  +0.19    True
+   11 STOUSDT        BREAKOUT       6 WATCH    +27.84%  +0.01  +0.05    True
+   12 BANANAS31USDT  RIDING         9 WATCH    +27.81%  +0.02  +2.94   False
+   13 STOUSDT        RIDING         8 WATCH    +26.78%  -0.25  +0.03   False
+   14 YBUSDT         BREAKOUT       9 WATCH    +26.43%  -0.05  +0.36    True
+   15 XPLUSDT        HOLD          12 BEST     +26.08%  +0.06  +0.30    True
+   16 DUSKUSDT       BREAKOUT       8 WATCH    +25.64%  +0.17  +0.11    True
+   17 DUSKUSDT       HOLD          15 BEST     +24.01%  +0.30  +0.22    True
+   18 JTOUSDT        BREAKOUT      13 BEST     +23.56%  +0.25  +0.25    True
+   19 DUSDT          EXPLOSION      9 WATCH    +23.43%  -0.01  +0.06    True
+   20 DUSKUSDT       HOLD          12 BEST     +22.96%  +0.15  +0.09    True
+   21 DUSKUSDT       BREAKOUT      14 BEST     +22.16%  +0.10  +0.10    True
+   22 DUSKUSDT       HOLD           8 WATCH    +20.92%  +0.14  +0.10   False
+   23 VICUSDT        RIDING        12 BEST     +20.70%  +0.04  +0.03    True
+   24 STOUSDT        BREAKOUT      13 BEST     +20.63%  +0.02  +0.10    True
+   25 VICUSDT        RIDING        10 STRONG   +20.20%  -0.00  +0.06   False
+   26 ALGOUSDT       HOLD          11 STRONG   +19.82%  +0.10  +0.07    True
+   27 STOUSDT        HOLD          12 BEST     +19.24%  +0.03  +0.12    True
+   28 DUSKUSDT       RIDING        11 STRONG   +19.16%  +0.21  +0.11    True
+   29 ZBTUSDT        RIDING         8 WATCH    +19.00%  +0.11  -0.03    True
+   30 ZBTUSDT        BREAKOUT       8 WATCH    +18.17%  -0.01  +0.01   False
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n= 29)  4:1 5:1 6:1 7:1 8:3 9:3 10:3 11:6 12:2 13:3 14:2 15:3
+  EXPLOSION  (n= 11)  9:9 12:2
+  HOLD       (n= 47)  8:3 9:2 10:4 11:9 12:23 13:4 15:2
+  PREBREAK   (n=  1)  10:1
+  RIDING     (n= 48)  6:2 7:2 8:3 9:13 10:13 11:7 12:6 14:1 15:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=13, STRONG=7, WATCH=10
+  Tipos:   {'HOLD': 12, 'RIDING': 9, 'BREAKOUT': 8, 'EXPLOSION': 1}
+  Score promedio top 30: 10.7
+  Move promedio top 30: +64.55%
+
+  >>> Corriendo backtest: NEW (config_E10.json)
+    [precompute] Reutilizando indicadores cacheados (176 pares)
+
+  Simulando 336h con scans cada 15min...
+    [analyze] Extrayendo candidatos (1345 scans × 176 pares)...
+    [analyze] scan 0/1345 (0%) — 0 candidatos
+    [analyze] scan 50/1345 (3%) — 2610 candidatos
+    [analyze] scan 100/1345 (7%) — 11323 candidatos
+    [analyze] scan 150/1345 (11%) — 20073 candidatos
+    [analyze] scan 200/1345 (14%) — 28823 candidatos
+    [analyze] scan 250/1345 (18%) — 37573 candidatos
+    [analyze] scan 300/1345 (22%) — 46323 candidatos
+    [analyze] scan 350/1345 (26%) — 55073 candidatos
+    [analyze] scan 400/1345 (29%) — 63823 candidatos
+    [analyze] scan 450/1345 (33%) — 72573 candidatos
+    [analyze] scan 500/1345 (37%) — 81323 candidatos
+    [analyze] scan 550/1345 (40%) — 90073 candidatos
+    [analyze] scan 600/1345 (44%) — 98823 candidatos
+    [analyze] scan 650/1345 (48%) — 107573 candidatos
+    [analyze] scan 700/1345 (52%) — 116323 candidatos
+    [analyze] scan 750/1345 (55%) — 125073 candidatos
+    [analyze] scan 800/1345 (59%) — 133823 candidatos
+    [analyze] scan 850/1345 (63%) — 142573 candidatos
+    [analyze] scan 900/1345 (66%) — 151364 candidatos
+    [analyze] scan 950/1345 (70%) — 160164 candidatos
+    [analyze] scan 1000/1345 (74%) — 168964 candidatos
+    [analyze] scan 1050/1345 (78%) — 177764 candidatos
+    [analyze] scan 1100/1345 (81%) — 186564 candidatos
+    [analyze] scan 1150/1345 (85%) — 195364 candidatos
+    [analyze] scan 1200/1345 (89%) — 204164 candidatos
+    [analyze] scan 1250/1345 (92%) — 212964 candidatos
+    [analyze] scan 1300/1345 (96%) — 221764 candidatos
+    [analyze] 229508 candidatos encontrados
+    Total alertas simuladas: 148
+
+══════════════════════════════════════════════════════════════════════
+ NEW (CONFIG_E10.JSON)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 148
+
+Por tipo:
+  HOLD         51  (34%)
+  RIDING       48  (32%)
+  BREAKOUT     36  (24%)
+  EXPLOSION    12  (8%)
+  PREBREAK      1  (0%)
+
+Por bucket:
+  BEST     52 — max_24h: +27.75%, drawdown: -11.90%, win >2%: 83%
+  STRONG   46 — max_24h: +12.57%, drawdown: -7.41%, win >2%: 72%
+  WATCH    50 — max_24h: +15.88%, drawdown: -7.67%, win >2%: 80%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n= 89  avg max 24h: +9.03%
+  CVD neutral              n= 53  avg max 24h: +36.75%
+  CVD bearish (<-0.05)     n=  6  avg max 24h: +10.60%
+
+OBV análisis:
+  OBV rising (>+0.05)      n=123  avg max 24h: +18.90%
+  OBV neutral              n= 25  avg max 24h: +19.61%
+
+recent_long_ok análisis:
+  True  n=121  avg max 24h: +16.43%, drawdown: -9.48%
+  False n= 27  avg max 24h: +30.65%, drawdown: -7.25%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 STOUSDT        HOLD          12 BEST    +313.23%  +0.04  +0.07    True
+    2 STOUSDT        RIDING        15 BEST    +248.51%  +0.04  +0.15   False
+    3 STOUSDT        HOLD          12 BEST    +189.27%  +0.04  +0.28    True
+    4 STOUSDT        HOLD          12 BEST    +164.35%  +0.03  +0.27    True
+    5 STOUSDT        HOLD           8 WATCH   +159.50%  +0.05  +0.13   False
+    6 STOUSDT        RIDING        11 STRONG  +143.89%  +0.04  +0.02   False
+    7 DUSDT          BREAKOUT       9 WATCH   +126.15%  +0.01  +0.03    True
+    8 STOUSDT        HOLD          12 BEST    +109.20%  +0.04  +0.17    True
+    9 KATUSDT        HOLD          10 STRONG   +77.46%  +0.07  +2.05    True
+   10 DUSDT          EXPLOSION      9 WATCH    +50.87%  -0.04  +0.13    True
+   11 XPLUSDT        BREAKOUT      10 STRONG   +46.57%  +0.17  +0.14    True
+   12 XPLUSDT        RIDING        11 STRONG   +30.11%  +0.05  +0.19    True
+   13 STOUSDT        BREAKOUT       6 WATCH    +27.84%  +0.01  +0.05    True
+   14 BANANAS31USDT  RIDING         9 WATCH    +27.81%  +0.02  +2.94   False
+   15 STOUSDT        RIDING         8 WATCH    +26.78%  -0.25  +0.03   False
+   16 YBUSDT         BREAKOUT       9 WATCH    +26.43%  -0.05  +0.36    True
+   17 XPLUSDT        HOLD          12 BEST     +26.08%  +0.06  +0.30    True
+   18 DUSKUSDT       BREAKOUT       8 WATCH    +25.64%  +0.17  +0.11    True
+   19 DUSKUSDT       HOLD          15 BEST     +24.01%  +0.30  +0.22    True
+   20 JTOUSDT        BREAKOUT      13 BEST     +23.56%  +0.25  +0.25    True
+   21 DUSDT          EXPLOSION      9 WATCH    +23.43%  -0.01  +0.06    True
+   22 DUSKUSDT       HOLD          12 BEST     +22.96%  +0.15  +0.09    True
+   23 DUSKUSDT       BREAKOUT      14 BEST     +22.16%  +0.10  +0.10    True
+   24 DUSKUSDT       HOLD           8 WATCH    +20.92%  +0.14  +0.10   False
+   25 VICUSDT        RIDING        12 BEST     +20.70%  +0.04  +0.03    True
+   26 STOUSDT        BREAKOUT      13 BEST     +20.63%  +0.02  +0.10    True
+   27 VICUSDT        RIDING        10 STRONG   +20.20%  -0.00  +0.06   False
+   28 ALGOUSDT       HOLD          11 STRONG   +19.82%  +0.10  +0.07    True
+   29 STOUSDT        HOLD          12 BEST     +19.24%  +0.03  +0.12    True
+   30 DUSKUSDT       RIDING        11 STRONG   +19.16%  +0.21  +0.11    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n= 36)  2:1 4:1 5:1 6:1 7:2 8:4 9:5 10:4 11:6 12:2 13:4 14:2 15:3
+  EXPLOSION  (n= 12)  9:10 12:2
+  HOLD       (n= 51)  8:3 9:2 10:4 11:11 12:23 13:6 15:2
+  PREBREAK   (n=  1)  10:1
+  RIDING     (n= 48)  6:2 7:2 8:3 9:13 10:13 11:7 12:6 14:1 15:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=13, STRONG=7, WATCH=10
+  Tipos:   {'HOLD': 12, 'RIDING': 8, 'BREAKOUT': 8, 'EXPLOSION': 2}
+  Score promedio top 30: 10.8
+  Move promedio top 30: +69.22%
+
+══════════════════════════════════════════════════════════════════════
+ COMPARACIÓN: config_E6_cal.json  vs  config_E10.json  (14 días)
+══════════════════════════════════════════════════════════════════════
+  Métrica                          config_E6_cal.json config_E10.json
+  -------------------------------- --------------- ---------------
+  Total alertas                                136             148
+  BREAKOUT count                                29              36
+  BEST count                                    49              52
+  BEST por día (target: 10-20)                 3.5             3.7
+  STRONG count                                  43              46
+  Explosivos totales (>20%)                     25              27
+  -------------------------------- --------------- ---------------
+  ★ CATCH RATE (lo más importante):
+  Top 30 movers en BEST                        13/30             13/30
+  Top 30 movers en BEST+STRONG                 20/30             20/30
+  -------------------------------- --------------- ---------------
+  ★ CALIDAD del bucket BEST:
+  Avg max 24h BEST                         +29.17%         +27.75%
+  Avg drawdown BEST                        -12.10%         -11.90%
+  R/R BEST                                    2.41            2.33
+  Win >5% en BEST                              69%              67%
+  Win >10% en BEST                             43%              40%
+  -------------------------------- --------------- ---------------
+  Otros:
+  Avg max 24h global                       +19.15%         +19.02%
+  Avg max 24h STRONG                       +13.09%         +12.57%
+  Avg drawdown global                       -8.99%          -9.07%
+  Win >2% global                               79%              78%
+  Win >5% global                               65%              64%
+
+[4/4] Guardando resultados...
+  Guardado: C:\Users\a\scancrypto\compare_E10_w4.json
+
+DONE

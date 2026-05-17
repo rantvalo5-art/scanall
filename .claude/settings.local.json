@@ -18,7 +18,9 @@
       "PowerShell(cd C:\\\\Users\\\\a\\\\scancrypto; $env:PYTHONIOENCODING=\"utf-8\"; python backtest.py --weeks 1 --max-pairs 200 --compare config_deriv_off.json config.json --out compare_deriv.json 2>&1)",
       "PowerShell(cd C:\\\\Users\\\\a\\\\scancrypto; $env:PYTHONIOENCODING=\"utf-8\"; python backtest.py --weeks 2 --max-pairs 300 --compare config_persist_off.json config.json --out compare_persist.json 2>&1)",
       "Bash(dir log_E1.txt log_E2.txt)",
-      "Bash(type log_E1.txt)"
+      "Bash(type log_E1.txt)",
+      "Bash(PYTHONIOENCODING=utf-8 python *)",
+      "Bash(awk 'NR==813 || NR==933 || NR==945 || NR==946 || NR==993 || NR==1002 || NR==1012 || NR==1016 || NR==1017 || NR==1020 || NR==1042 || NR==1044' C:/Users/a/.claude/projects/C--Users-a-scancrypto/c4bafc09-e8b7-4642-80bc-7d8e905806a9.jsonl)"
     ]
   }
 }

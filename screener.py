@@ -82,11 +82,12 @@ BURST_THRESHOLD       = _cfg("anti_spam", "BURST_THRESHOLD")
 
 COOLDOWN_BY_STATE = CONFIG.get("cooldowns_minutes", {})
 
-ACTIVE_SIGNALS_PREBREAK = _cfg("active_signals", "PREBREAK")
-ACTIVE_SIGNALS_BREAKOUT = _cfg("active_signals", "BREAKOUT")
-ACTIVE_SIGNALS_RIDING   = _cfg("active_signals", "RIDING")
-ACTIVE_SIGNALS_FADING   = _cfg("active_signals", "FADING")
-ACTIVE_SIGNALS_HOLD     = _cfg("active_signals", "HOLD")
+ACTIVE_SIGNALS_PREBREAK  = _cfg("active_signals", "PREBREAK")
+ACTIVE_SIGNALS_BREAKOUT  = _cfg("active_signals", "BREAKOUT")
+ACTIVE_SIGNALS_RIDING    = _cfg("active_signals", "RIDING")
+ACTIVE_SIGNALS_FADING    = _cfg("active_signals", "FADING")
+ACTIVE_SIGNALS_HOLD      = _cfg("active_signals", "HOLD")
+ACTIVE_SIGNALS_EXPLOSION = _cfg("active_signals", "EXPLOSION", default=False)
 
 EMA_SLOW        = _cfg("indicators", "EMA_SLOW")
 RECENT_LOOKBACK = _cfg("indicators", "RECENT_LOOKBACK")
@@ -162,6 +163,41 @@ OUTCOMES_TRACK_ALL_CANDIDATES = _cfg("outcomes", "TRACK_ALL_CANDIDATES")
 DERIV_ENABLED         = _cfg("derivatives", "ENABLED", default=False)
 DERIV_FETCH_TIMEOUT   = _cfg("derivatives", "FUTURES_FETCH_TIMEOUT", default=10)
 DERIV_OI_LOOKBACK_MIN = _cfg("derivatives", "OI_LOOKBACK_MIN", default=30)
+
+_CAL_CFG = CONFIG.get("scoring_calibration") or {}
+
+
+def _compute_atr_threshold(atr_pct_series, mode: str, floor: float, fixed_min: float,
+                           lookback: int, rank_0_to_100: int) -> float:
+    """ATR threshold dinámico por par. mode='fixed' → fixed_min. mode='percentile' →
+    max(floor, quantile(historia, rank)), adaptando threshold al régimen de cada par."""
+    if mode != "percentile":
+        return fixed_min
+    series = atr_pct_series.iloc[-lookback:] if len(atr_pct_series) > lookback else atr_pct_series
+    series = series.dropna()
+    if len(series) < 24:
+        return floor
+    return max(floor, float(series.quantile(rank_0_to_100 / 100.0)))
+
+
+def _normalize_score(raw_score: float, signal_type: str) -> float:
+    """Percentil empírico (0.0–1.0) del score dentro del CDF hardcoded por signal type.
+    Permite ranking inter-signal justo: un score raro en PREBREAK supera a uno común en HOLD.
+    Si calibración off o signal sin CDF → fallback proporcional sobre SCORE_CAP."""
+    if not _CAL_CFG.get("ENABLED", False):
+        return float(raw_score) / SCORE_CAP
+    cdf = _CAL_CFG.get("cdf", {}).get(signal_type)
+    if not cdf:
+        return _CAL_CFG.get("FALLBACK_PERCENTILE", 0.5)
+    points = sorted((float(k), float(v)) for k, v in cdf.items())
+    if raw_score <= points[0][0]:
+        return points[0][1]
+    if raw_score >= points[-1][0]:
+        return points[-1][1]
+    for (s1, p1), (s2, p2) in zip(points, points[1:]):
+        if s1 <= raw_score <= s2:
+            return p1 + (p2 - p1) * (raw_score - s1) / (s2 - s1) if s2 > s1 else p1
+    return _CAL_CFG.get("FALLBACK_PERCENTILE", 0.5)
 
 
 # ── Supabase ───────────────────────────────────────────────────────────────────
@@ -617,6 +653,8 @@ def analyze(symbol, interval):
     low = df["low"]
     volume = df["volume"]
     price = close.iloc[-1]
+    # Cambio % de la vela actual vs la anterior (feature usada por EXPLOSION).
+    close_change_curr = safe_pct(price, close.iloc[-2]) if len(close) >= 2 else 0.0
 
     ema_slow = ta.trend.EMAIndicator(close, window=EMA_SLOW).ema_indicator()
     ema_trend_up = price > ema_slow.iloc[-1] and ema_slow.iloc[-1] > ema_slow.iloc[-4]
@@ -631,8 +669,18 @@ def analyze(symbol, interval):
 
     # ATR como % del precio — mide volatilidad real del par
     atr_indicator = ta.volatility.AverageTrueRange(high, low, close, window=14)
-    atr = atr_indicator.average_true_range().iloc[-1]
+    atr_series = atr_indicator.average_true_range()
+    atr = atr_series.iloc[-1]
     atr_pct = (atr / price * 100) if price > 0 else 0.0
+    atr_pct_series = (atr_series / close * 100).fillna(0.0)
+    atr_threshold = _compute_atr_threshold(
+        atr_pct_series,
+        _cfg("indicators", "ATR_MODE", default="fixed"),
+        _cfg("indicators", "ATR_MIN_PCT_FLOOR", default=1.0),
+        ATR_MIN_PCT,
+        _cfg("indicators", "ATR_PERCENTILE_LOOKBACK", default=168),
+        _cfg("indicators", "ATR_PERCENTILE_RANK", default=30),
+    )
 
     vol_mean = volume.iloc[-21:-1].mean()
     vol_ratio = vol_mean and (volume.iloc[-1] / vol_mean) or 0.0
@@ -811,11 +859,13 @@ def analyze(symbol, interval):
         "width_curr": width_curr,
         "width_expansion": width_expansion,
         "atr_pct": atr_pct,
+        "atr_threshold": atr_threshold,
         "vol_ratio": vol_ratio,
         "vol_ratio_prev": vol_ratio_prev,
         "vol_growth": vol_growth,
         "strong_close": strong_close,
         "candle_body_pct": candle_body_pct,
+        "close_change_curr": close_change_curr,
         "recent_max": recent_max,
         "near_recent_max": near_recent_max,
         "breakout": breakout,
@@ -860,33 +910,76 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     if not tf5 or not tf15 or not tf1h:
         return None
 
-    # Resistencia es siempre un gate duro (el precio debe tener espacio o estar en breakout).
+    # Gates universales (aplican a TODOS los signals incl. EXPLOSION).
     if not tf1h.get("not_near_resistance"):
         return None
-
-    # EMA gate — configurable: hard filter (default) o penalización suave.
-    # EMA_GATE_HARD=true (default): corta aquí como antes.
-    # EMA_GATE_HARD=false: permite señales sin tendencia confirmada, aplica EMA_SOFT_PENALTY al score.
-    _ema_gate_hard = _cfg("indicators", "EMA_GATE_HARD", default=True)
-    if not tf1h.get("ema_trend_up") and _ema_gate_hard:
-        return None
-
-    # Filtro ATR: descartar pares muertos (volatilidad insuficiente en 1h)
-    if tf1h.get("atr_pct", 0) < ATR_MIN_PCT:
-        return None
-
-    # Filtro de estructura mayor (lookback 60h en 1h): el precio debe estar cerca o arriba
-    # del máximo de las últimas ~60 velas 1h. Si está enterrado bajo un máximo mayor reciente,
-    # el "breakout" es probablemente un bounce dentro de tendencia bajista.
     if not tf1h.get("major_struct_ok", True):
-        return None
+        if not (_cfg("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False) and tf15.get("breakout", False)):
+            return None
 
     candidates = []
-
     _persist_on = _cfg("persistence", "ENABLED", default=False)
 
+    # ── EXPLOSION ──────────────────────────────────────────────────────────────
+    # Detector agresivo de pumps explosivos en 5m. Bypaaa EMA/ATR gates — su
+    # criterio (vol_ratio ≥ 5, body ≥ 0.85, close_change ≥ 2.5%, BB expansion ≥ 0.5)
+    # ya es restrictivo por construcción. Captura los pumps que PREBREAK/BREAKOUT
+    # pierden por timing o gates duros (low-ATR, V-reversals, blast candles).
+    if ACTIVE_SIGNALS_EXPLOSION:
+        ex_min_vol  = _cfg("scoring_explosion", "MIN_VOL_RATIO", default=5.0)
+        ex_min_body = _cfg("scoring_explosion", "MIN_BODY_PCT", default=0.85)
+        ex_min_chg  = _cfg("scoring_explosion", "MIN_CLOSE_CHANGE", default=0.025)
+        ex_min_bb   = _cfg("scoring_explosion", "MIN_BB_EXPANSION", default=0.5)
+        explosion_ok = (
+            tf5.get("vol_ratio", 0)         >= ex_min_vol
+            and tf5.get("candle_body_pct", 0) >= ex_min_body
+            and tf5.get("close_change_curr", 0) >= ex_min_chg
+            and tf5.get("width_expansion", 0)   >= ex_min_bb
+        )
+        if explosion_ok and not in_cooldown(symbol, "EXPLOSION", last_seen):
+            ex_base = _cfg("scoring_explosion", "BASE_SCORE", default=12)
+            ex_late_max = _cfg("scoring_explosion", "LATE_ENTRY_MAX_DIST", default=0.03)
+            ex_late_pen = _cfg("scoring_explosion", "LATE_ENTRY_PENALTY", default=-3)
+            score = ex_base
+            reasons = [
+                f"vol 5m {tf5['vol_ratio']:.1f}x",
+                f"body {tf5['candle_body_pct']:.0%}",
+                f"close 5m +{tf5['close_change_curr']:.2%}",
+                f"BB expansion +{tf5['width_expansion']:.0%}",
+            ]
+            if tf5.get("breakout_distance", 0) > ex_late_max:
+                score += ex_late_pen
+                reasons.append(f"⚠ ya extendido {tf5['breakout_distance']:.2%} sobre máximo")
+            score = max(0, min(score, SCORE_CAP))
+            candidates.append({
+                "symbol": symbol,
+                "label": "EXPLOSION",
+                "history_tf": "EXPLOSION",
+                "score": score,
+                "priority": 5,
+                "bucket": final_bucket(score),
+                "reasons": reasons,
+                "late": False,
+                "timeframe": "5m",
+                "immediate": score >= IMMEDIATE_MIN_SCORE,
+                "price": tf5["price"],
+                "ref_price": tf5.get("recent_max", tf5["price"]),
+                "obv_slope": tf15.get("obv_slope"),
+                "cvd_ratio": tf15.get("cvd_ratio"),
+                "recent_long_ok": tf15.get("recent_long_ok"),
+            })
+
+    # Gates para signals tradicionales (PREBREAK/BREAKOUT/RIDING/HOLD/FADING).
+    # EMA hard: corta acá. EMA soft: aplica penalty después al score.
+    _ema_gate_hard = _cfg("indicators", "EMA_GATE_HARD", default=True)
+    _ema_blocks = (not tf1h.get("ema_trend_up")) and _ema_gate_hard
+    _atr_blocks = tf1h.get("atr_pct", 0) < tf1h.get("atr_threshold", ATR_MIN_PCT)
+    _trad_signals_eligible = not (_ema_blocks or _atr_blocks)
+    if not _trad_signals_eligible and not candidates:
+        return None
+
     # ── PRE-BREAK ──────────────────────────────────────────────────────────────
-    if ACTIVE_SIGNALS_PREBREAK:
+    if _trad_signals_eligible and ACTIVE_SIGNALS_PREBREAK:
         _pre_vol_bars = _cfg("persistence", "PREBREAK_VOL_BARS", default=1) if _persist_on else 1
         _vol_ok_pre = tf5.get("vol_ratio", 0) >= PREBREAK_MIN_VOL_RATIO
         if _pre_vol_bars >= 2:
@@ -973,7 +1066,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             })
 
     # ── BREAKOUT ───────────────────────────────────────────────────────────────
-    if ACTIVE_SIGNALS_BREAKOUT:
+    if _trad_signals_eligible and ACTIVE_SIGNALS_BREAKOUT:
         # Filtro OBV>=0 ahora opcional vía config. En v3 era hardcoded True.
         require_obv_nonneg = _cfg("breakout", "BREAKOUT_REQUIRE_OBV_NON_NEGATIVE", default=True)
         breakout_ok = (
@@ -1152,7 +1245,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             })
 
     # ── RIDING ─────────────────────────────────────────────────────────────────
-    if ACTIVE_SIGNALS_RIDING:
+    if _trad_signals_eligible and ACTIVE_SIGNALS_RIDING:
         riding_gain = tf15.get("riding_gain") or 0.0
         riding_ok = (
             tf15.get("riding_above_zone")
@@ -1278,7 +1371,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             })
 
     # ── FADING ─────────────────────────────────────────────────────────────────
-    if ACTIVE_SIGNALS_FADING:
+    if _trad_signals_eligible and ACTIVE_SIGNALS_FADING:
         fading_reversal = tf15.get("fading_reversal") or 0.0
         fading_ok = (
             tf15.get("riding_bars_since") is not None
@@ -1326,7 +1419,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             })
 
     # ── HOLD ───────────────────────────────────────────────────────────────────
-    if ACTIVE_SIGNALS_HOLD:
+    if _trad_signals_eligible and ACTIVE_SIGNALS_HOLD:
         require_obv = _cfg("hold", "HOLD_REQUIRE_OBV_RISING", default=False)
         require_cvd = _cfg("hold", "HOLD_REQUIRE_CVD_BULLISH", default=False)
         _hold_obv_bars = _cfg("persistence", "HOLD_OBV_BARS", default=1) if _persist_on else 1
@@ -1442,10 +1535,12 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 c["immediate"] = False
 
     # Penalización suave por EMA 1h no alcista (solo cuando EMA_GATE_HARD=false).
-    # Se aplica a todos los candidatos: la señal puede dispararse pero queda descontada.
+    # Se aplica a candidatos tradicionales — EXPLOSION queda exenta (bypassa EMA por diseño).
     if not _ema_gate_hard and not tf1h.get("ema_trend_up"):
         _ema_pen = int(_cfg("indicators", "EMA_SOFT_PENALTY", default=-2))
         for c in candidates:
+            if c.get("history_tf") == "EXPLOSION":
+                continue
             c["score"] = max(0, c["score"] + _ema_pen)
             c["bucket"] = final_bucket(c["score"])
 
@@ -1457,7 +1552,10 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             c["score"] = SCORE_CAP
             c["bucket"] = final_bucket(c["score"])
 
-    candidates.sort(key=lambda x: (x["score"], x["priority"]), reverse=True)
+    candidates.sort(
+        key=lambda x: (_normalize_score(x["score"], x["history_tf"]), x["priority"], x["score"]),
+        reverse=True,
+    )
     return candidates[0]
 
 
@@ -1520,13 +1618,22 @@ def dedupe_and_rank(alerts):
             best[alert["symbol"]] = alert
         elif alert["history_tf"] == "FADING" and cur["history_tf"] != "FADING":
             best[alert["symbol"]] = alert
-        elif cur["history_tf"] != "FADING" and (alert["score"], alert["priority"]) > (cur["score"], cur["priority"]):
+        elif cur["history_tf"] != "FADING" and (
+            _normalize_score(alert["score"], alert["history_tf"]),
+            alert["priority"],
+            alert["score"],
+        ) > (
+            _normalize_score(cur["score"], cur["history_tf"]),
+            cur["priority"],
+            cur["score"],
+        ):
             best[alert["symbol"]] = alert
     ranked = list(best.values())
     ranked.sort(key=lambda x: (
         1 if x["history_tf"] == "FADING" else 0,
-        x["score"],
+        _normalize_score(x["score"], x["history_tf"]),
         x["priority"],
+        x["score"],
     ), reverse=True)
     return ranked[:TOP_ALERT_COUNT]
 
@@ -1559,11 +1666,12 @@ def main():
 
     # Resumen de señales activas para el log
     active_names = []
-    if ACTIVE_SIGNALS_PREBREAK: active_names.append("PRE-BREAK")
-    if ACTIVE_SIGNALS_BREAKOUT: active_names.append("BREAKOUT")
-    if ACTIVE_SIGNALS_RIDING:   active_names.append("RIDING")
-    if ACTIVE_SIGNALS_FADING:   active_names.append("FADING")
-    if ACTIVE_SIGNALS_HOLD:     active_names.append("HOLD")
+    if ACTIVE_SIGNALS_PREBREAK:  active_names.append("PRE-BREAK")
+    if ACTIVE_SIGNALS_BREAKOUT:  active_names.append("BREAKOUT")
+    if ACTIVE_SIGNALS_RIDING:    active_names.append("RIDING")
+    if ACTIVE_SIGNALS_FADING:    active_names.append("FADING")
+    if ACTIVE_SIGNALS_HOLD:      active_names.append("HOLD")
+    if ACTIVE_SIGNALS_EXPLOSION: active_names.append("EXPLOSION")
 
     print(f"[{now}] Escaneando {len(pairs)} pares USDT ({' + '.join(INTERVALS)}) con {MAX_WORKERS} workers...")
     print(f"Señales activas: {', '.join(active_names) if active_names else 'NINGUNA'}")

@@ -82,6 +82,39 @@ class Config:
         return cur
 
 
+def _compute_atr_threshold(atr_pct_series, mode: str, floor: float, fixed_min: float,
+                           lookback: int, rank_0_to_100: int) -> float:
+    """ATR threshold dinámico por par. mode='fixed' → fixed_min. mode='percentile' →
+    max(floor, quantile(historia, rank)), adaptando threshold al régimen de cada par."""
+    if mode != "percentile":
+        return fixed_min
+    series = atr_pct_series.iloc[-lookback:] if len(atr_pct_series) > lookback else atr_pct_series
+    series = series.dropna()
+    if len(series) < 24:
+        return floor
+    return max(floor, float(series.quantile(rank_0_to_100 / 100.0)))
+
+
+def _normalize_score(raw_score: float, signal_type: str, cal_cfg: dict, score_cap: float) -> float:
+    """Percentil empírico (0.0–1.0) del score dentro del CDF hardcoded por signal type.
+    Permite ranking inter-signal justo: un score raro en PREBREAK supera a uno común en HOLD.
+    Si calibración off o signal sin CDF → fallback proporcional sobre score_cap."""
+    if not cal_cfg or not cal_cfg.get("ENABLED", False):
+        return float(raw_score) / score_cap
+    cdf = cal_cfg.get("cdf", {}).get(signal_type)
+    if not cdf:
+        return cal_cfg.get("FALLBACK_PERCENTILE", 0.5)
+    points = sorted((float(k), float(v)) for k, v in cdf.items())
+    if raw_score <= points[0][0]:
+        return points[0][1]
+    if raw_score >= points[-1][0]:
+        return points[-1][1]
+    for (s1, p1), (s2, p2) in zip(points, points[1:]):
+        if s1 <= raw_score <= s2:
+            return p1 + (p2 - p1) * (raw_score - s1) / (s2 - s1) if s2 > s1 else p1
+    return cal_cfg.get("FALLBACK_PERCENTILE", 0.5)
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # FETCH DE DATOS
 # ════════════════════════════════════════════════════════════════════════════
@@ -487,6 +520,8 @@ def analyze_at_time(df_full, end_idx, cfg):
     low = df["low"]
     volume = df["volume"]
     price = close.iloc[-1]
+    # Cambio % de la vela actual vs la anterior (feature usada por EXPLOSION).
+    close_change_curr = safe_pct(price, close.iloc[-2]) if len(close) >= 2 else 0.0
 
     ema_slow = ta.trend.EMAIndicator(close, window=EMA_SLOW).ema_indicator()
     ema_trend_up = price > ema_slow.iloc[-1] and ema_slow.iloc[-1] > ema_slow.iloc[-4]
@@ -499,11 +534,27 @@ def analyze_at_time(df_full, end_idx, cfg):
     width_prev = ((hband.iloc[-2] - lband.iloc[-2]) / mavg.iloc[-2]) if mavg.iloc[-2] else 0.0
     width_expansion = safe_pct(width_curr, width_prev)
 
-    atr = ta.volatility.AverageTrueRange(high, low, close, window=14).average_true_range().iloc[-1]
+    atr_series = ta.volatility.AverageTrueRange(high, low, close, window=14).average_true_range()
+    atr = atr_series.iloc[-1]
     atr_pct = (atr / price * 100) if price > 0 else 0.0
+    atr_pct_series = (atr_series / close * 100).fillna(0.0)
+    atr_threshold = _compute_atr_threshold(
+        atr_pct_series,
+        cfg.g("indicators", "ATR_MODE", default="fixed"),
+        cfg.g("indicators", "ATR_MIN_PCT_FLOOR", default=1.0),
+        cfg.g("indicators", "ATR_MIN_PCT"),
+        cfg.g("indicators", "ATR_PERCENTILE_LOOKBACK", default=168),
+        cfg.g("indicators", "ATR_PERCENTILE_RANK", default=30),
+    )
 
     vol_mean = volume.iloc[-21:-1].mean()
     vol_ratio = (volume.iloc[-1] / vol_mean) if vol_mean else 0.0
+    # vol_ratio una barra atrás (para persistence check en PREBREAK).
+    if len(volume) >= 22:
+        vol_mean_prev = volume.iloc[-22:-2].mean()
+        vol_ratio_prev = (volume.iloc[-2] / vol_mean_prev) if vol_mean_prev else 0.0
+    else:
+        vol_ratio_prev = 0.0
     vol_recent = volume.iloc[-3:].mean()
     vol_prev = volume.iloc[-6:-3].mean()
     vol_growth = (vol_recent / vol_prev) if vol_prev else 0.0
@@ -520,9 +571,17 @@ def analyze_at_time(df_full, end_idx, cfg):
         obv_ref = obv.iloc[-OBV_SLOPE_LOOKBACK]
         obv_slope = (obv_now - obv_ref) / abs(obv_now) if abs(obv_now) > 1e-12 else 0.0
         obv_rising = obv_slope >= OBV_RISING_MIN
+        # obv_slope una barra atrás (para persistence check en HOLD).
+        if len(obv) >= OBV_SLOPE_LOOKBACK + 1:
+            obv_prev = obv.iloc[-2]
+            obv_ref_prev = obv.iloc[-(OBV_SLOPE_LOOKBACK + 1)]
+            obv_slope_prev = (obv_prev - obv_ref_prev) / abs(obv_prev) if abs(obv_prev) > 1e-12 else 0.0
+        else:
+            obv_slope_prev = 0.0
     except Exception:
         obv_slope = 0.0
         obv_rising = False
+        obv_slope_prev = 0.0
 
     try:
         if "taker_buy_base" in df.columns:
@@ -628,11 +687,13 @@ def analyze_at_time(df_full, end_idx, cfg):
         "width_curr": width_curr,
         "width_expansion": width_expansion,
         "atr_pct": atr_pct,
+        "atr_threshold": atr_threshold,
         "vol_ratio": vol_ratio,
-        "vol_ratio_prev": 0.0,
+        "vol_ratio_prev": vol_ratio_prev,
         "vol_growth": vol_growth,
         "strong_close": strong_close,
         "candle_body_pct": candle_body_pct,
+        "close_change_curr": close_change_curr,
         "recent_max": recent_max,
         "near_recent_max": near_recent_max,
         "breakout": breakout,
@@ -640,7 +701,7 @@ def analyze_at_time(df_full, end_idx, cfg):
         "recent_max_long": recent_max_long,
         "recent_long_ok": recent_long_ok,
         "obv_slope": obv_slope,
-        "obv_slope_prev": 0.0,
+        "obv_slope_prev": obv_slope_prev,
         "obv_rising": obv_rising,
         "cvd_ratio": cvd_ratio,
         "cvd_bullish": cvd_bullish,
@@ -686,6 +747,11 @@ def _indicator_key(cfg):
         "MAJOR_STRUCT_LOOKBACK": cfg.g("hold", "MAJOR_STRUCT_LOOKBACK"),
         "HOLD_LOOKBACK_BARS": cfg.g("hold", "HOLD_LOOKBACK_BARS"),
         "RIDING_LOOKBACK_BARS": cfg.g("riding", "RIDING_LOOKBACK_BARS"),
+        "ATR_MODE":                cfg.g("indicators", "ATR_MODE", default="fixed"),
+        "ATR_PERCENTILE_RANK":     cfg.g("indicators", "ATR_PERCENTILE_RANK", default=30),
+        "ATR_PERCENTILE_LOOKBACK": cfg.g("indicators", "ATR_PERCENTILE_LOOKBACK", default=168),
+        "ATR_MIN_PCT_FLOOR":       cfg.g("indicators", "ATR_MIN_PCT_FLOOR", default=1.0),
+        "ATR_MIN_PCT":             cfg.g("indicators", "ATR_MIN_PCT"),
     }, sort_keys=True)
 
 
@@ -702,8 +768,9 @@ def _analyze_key(cfg):
         "PREBREAK_NEAR_MAX":       cfg.g("prebreak", "PREBREAK_NEAR_MAX"),
         "ONE_H_RESIST_BUFFER":     cfg.g("hold", "ONE_H_RESIST_BUFFER"),
         "MAJOR_STRUCT_LOOKBACK":   cfg.g("hold", "MAJOR_STRUCT_LOOKBACK"),
-        "MAJOR_STRUCT_MAX_DIST":   cfg.g("hold", "MAJOR_STRUCT_MAX_DIST"),
-        "HOLD_LOOKBACK_BARS":      cfg.g("hold", "HOLD_LOOKBACK_BARS"),
+        "MAJOR_STRUCT_MAX_DIST":           cfg.g("hold", "MAJOR_STRUCT_MAX_DIST"),
+        "MAJOR_STRUCT_BYPASS_ON_BREAKOUT": cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False),
+        "HOLD_LOOKBACK_BARS":              cfg.g("hold", "HOLD_LOOKBACK_BARS"),
         "HOLD_RECENT_BREAK_MAX_BARS": cfg.g("hold", "HOLD_RECENT_BREAK_MAX_BARS"),
         "HOLD_ZONE_BUFFER":        cfg.g("hold", "HOLD_ZONE_BUFFER"),
         "HOLD_PULLBACK_MAX":       cfg.g("hold", "HOLD_PULLBACK_MAX"),
@@ -714,6 +781,11 @@ def _analyze_key(cfg):
         "FADING_BELOW_ZONE":       cfg.g("fading", "FADING_BELOW_ZONE"),
         "DERIV_ENABLED":           cfg.g("derivatives", "ENABLED", default=False),
         "DERIV_OI_LOOKBACK_MIN":   cfg.g("derivatives", "OI_LOOKBACK_MIN", default=30),
+        "ATR_MIN_PCT":             cfg.g("indicators", "ATR_MIN_PCT"),
+        "ATR_MODE":                cfg.g("indicators", "ATR_MODE", default="fixed"),
+        "ATR_PERCENTILE_RANK":     cfg.g("indicators", "ATR_PERCENTILE_RANK", default=30),
+        "ATR_PERCENTILE_LOOKBACK": cfg.g("indicators", "ATR_PERCENTILE_LOOKBACK", default=168),
+        "ATR_MIN_PCT_FLOOR":       cfg.g("indicators", "ATR_MIN_PCT_FLOOR", default=1.0),
     }, sort_keys=True)
 
 
@@ -744,6 +816,18 @@ def precompute_indicators(df, cfg):
     df["_bb_width"] = df["_bb_width"].fillna(0.0)
 
     df["_atr"] = ta.volatility.AverageTrueRange(high, low, close, window=14).average_true_range()
+    df["_atr_pct"] = (df["_atr"] / df["close"] * 100).fillna(0.0)
+    atr_mode = cfg.g("indicators", "ATR_MODE", default="fixed")
+    if atr_mode == "percentile":
+        _atr_lookback = cfg.g("indicators", "ATR_PERCENTILE_LOOKBACK", default=168)
+        _atr_rank    = cfg.g("indicators", "ATR_PERCENTILE_RANK", default=30) / 100.0
+        _atr_floor   = cfg.g("indicators", "ATR_MIN_PCT_FLOOR", default=1.0)
+        df["_atr_threshold"] = (
+            df["_atr_pct"].rolling(_atr_lookback, min_periods=24).quantile(_atr_rank)
+            .clip(lower=_atr_floor).fillna(_atr_floor)
+        )
+    else:
+        df["_atr_threshold"] = cfg.g("indicators", "ATR_MIN_PCT")
 
     df["_vol_mean20"] = volume.rolling(20).mean().shift(1)
     df["_vol_ratio"] = volume / df["_vol_mean20"].replace(0, np.nan)
@@ -803,6 +887,8 @@ def analyze_at_index(df, end_idx, cfg):
     FADING_BELOW_ZONE = cfg.g("fading", "FADING_BELOW_ZONE")
 
     price = float(df["close"].iat[end_idx])
+    # Cambio % de la vela actual vs la anterior (feature usada por EXPLOSION).
+    close_change_curr = (price / float(df["close"].iat[end_idx - 1]) - 1) if end_idx >= 1 and float(df["close"].iat[end_idx - 1]) > 0 else 0.0
 
     # EMA
     ema_val = df["_ema_slow"].iat[end_idx]
@@ -821,6 +907,8 @@ def analyze_at_index(df, end_idx, cfg):
     atr_raw = df["_atr"].iat[end_idx]
     atr = float(atr_raw) if pd.notna(atr_raw) else 0.0
     atr_pct = (atr / price * 100) if price > 0 else 0.0
+    atr_thresh_raw = df["_atr_threshold"].iat[end_idx] if "_atr_threshold" in df.columns else cfg.g("indicators", "ATR_MIN_PCT")
+    atr_threshold = float(atr_thresh_raw) if pd.notna(atr_thresh_raw) else cfg.g("indicators", "ATR_MIN_PCT")
 
     # Volume
     vol_mean_raw = df["_vol_mean20"].iat[end_idx]
@@ -978,11 +1066,13 @@ def analyze_at_index(df, end_idx, cfg):
         "width_curr": width_curr,
         "width_expansion": width_expansion,
         "atr_pct": atr_pct,
+        "atr_threshold": atr_threshold,
         "vol_ratio": vol_ratio,
         "vol_ratio_prev": vol_ratio_prev,
         "vol_growth": vol_growth,
         "strong_close": strong_close,
         "candle_body_pct": candle_body_pct,
+        "close_change_curr": close_change_curr,
         "recent_max": recent_max,
         "near_recent_max": near_recent_max,
         "breakout": breakout,
@@ -1045,24 +1135,63 @@ def classify(symbol, tf_data, cfg, counts_history=None):
     tf15["obv_rising"]  = tf15.get("obv_slope", 0) >= cfg.g("indicators", "OBV_RISING_MIN", default=0.05)
     tf15["cvd_bullish"] = tf15.get("cvd_ratio", 0) >= cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05)
 
+    # Gates universales (aplican a TODOS los signals incl. EXPLOSION).
     if not tf1h.get("not_near_resistance"):
         return None
-    _ema_gate_hard = cfg.g("indicators", "EMA_GATE_HARD", default=True)
-    if not tf1h.get("ema_trend_up") and _ema_gate_hard:
-        return None
-    if tf1h.get("atr_pct", 0) < cfg.g("indicators", "ATR_MIN_PCT"):
-        return None
     if not tf1h.get("major_struct_ok", True):
-        return None
+        if not (cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False) and tf15.get("breakout", False)):
+            return None
 
     candidates = []
     SCORE_CAP = cfg.g("scoring", "SCORE_CAP")
     LATE_REPEAT_COUNT = cfg.g("history", "LATE_REPEAT_COUNT", default=1)
+    _cal_cfg = cfg.raw.get("scoring_calibration") or {}
 
     _persist_on = cfg.g("persistence", "ENABLED", default=False)
 
+    # ── EXPLOSION ─────────────────────────────────────────────────────────
+    # Detector agresivo de pumps explosivos en 5m. Bypaaa EMA y ATR gates
+    # — su criterio (vol_ratio ≥ 5, body ≥ 0.85, close_change ≥ 2.5%, BB
+    # expansion ≥ 0.5) ya es restrictivo por construcción. Captura los
+    # pumps que PREBREAK/BREAKOUT pierden por timing o gates duros.
+    if cfg.g("active_signals", "EXPLOSION", default=False):
+        ex_min_vol  = cfg.g("scoring_explosion", "MIN_VOL_RATIO", default=5.0)
+        ex_min_body = cfg.g("scoring_explosion", "MIN_BODY_PCT", default=0.85)
+        ex_min_chg  = cfg.g("scoring_explosion", "MIN_CLOSE_CHANGE", default=0.025)
+        ex_min_bb   = cfg.g("scoring_explosion", "MIN_BB_EXPANSION", default=0.5)
+        if (tf5.get("vol_ratio", 0)         >= ex_min_vol
+            and tf5.get("candle_body_pct", 0) >= ex_min_body
+            and tf5.get("close_change_curr", 0) >= ex_min_chg
+            and tf5.get("width_expansion", 0)   >= ex_min_bb):
+            ex_base = cfg.g("scoring_explosion", "BASE_SCORE", default=12)
+            ex_late_max = cfg.g("scoring_explosion", "LATE_ENTRY_MAX_DIST", default=0.03)
+            ex_late_pen = cfg.g("scoring_explosion", "LATE_ENTRY_PENALTY", default=-3)
+            score = ex_base
+            if tf5.get("breakout_distance", 0) > ex_late_max:
+                score += ex_late_pen
+            score = min(max(score, 0), SCORE_CAP)
+            candidates.append({
+                "label": "EXPLOSION", "history_tf": "EXPLOSION", "score": score,
+                "priority": 5, "bucket": final_bucket(score, cfg),
+                "timeframe": "5m", "price": tf5["price"],
+                "ref_price": tf5.get("recent_max", tf5["price"]),
+                "obv_slope": tf15.get("obv_slope"),
+                "cvd_ratio": tf15.get("cvd_ratio"),
+                "recent_long_ok": tf15.get("recent_long_ok"),
+            })
+
+    # Gates para signals tradicionales (PREBREAK/BREAKOUT/RIDING/HOLD/FADING).
+    # EXPLOSION ya pudo haber disparado antes — si EMA/ATR bloquean, devolvemos
+    # EXPLOSION solo (si existe) en lugar de None.
+    _ema_gate_hard = cfg.g("indicators", "EMA_GATE_HARD", default=True)
+    _ema_blocks = (not tf1h.get("ema_trend_up")) and _ema_gate_hard
+    _atr_blocks = tf1h.get("atr_pct", 0) < tf1h.get("atr_threshold", cfg.g("indicators", "ATR_MIN_PCT"))
+    _trad_signals_eligible = not (_ema_blocks or _atr_blocks)
+    if not _trad_signals_eligible and not candidates:
+        return None
+
     # ── PREBREAK ──────────────────────────────────────────────────────────
-    if cfg.g("active_signals", "PREBREAK"):
+    if _trad_signals_eligible and cfg.g("active_signals", "PREBREAK"):
         _pre_vol_bars = cfg.g("persistence", "PREBREAK_VOL_BARS", default=1) if _persist_on else 1
         _vol_ok_pre = tf5.get("vol_ratio", 0) >= cfg.g("prebreak", "PREBREAK_MIN_VOL_RATIO")
         if _pre_vol_bars >= 2:
@@ -1117,7 +1246,7 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             })
 
     # ── BREAKOUT ──────────────────────────────────────────────────────────
-    if cfg.g("active_signals", "BREAKOUT"):
+    if _trad_signals_eligible and cfg.g("active_signals", "BREAKOUT"):
         require_obv_nn = cfg.g("breakout", "BREAKOUT_REQUIRE_OBV_NON_NEGATIVE", default=True)
         if (tf15.get("breakout")
             and tf15.get("vol_ratio", 0) >= cfg.g("breakout", "BREAKOUT_MIN_VOL_RATIO")
@@ -1232,7 +1361,7 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             })
 
     # ── RIDING ────────────────────────────────────────────────────────────
-    if cfg.g("active_signals", "RIDING"):
+    if _trad_signals_eligible and cfg.g("active_signals", "RIDING"):
         rg = tf15.get("riding_gain") or 0.0
         if (tf15.get("riding_above_zone")
             and tf15.get("riding_vol_ok")
@@ -1325,7 +1454,7 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             })
 
     # ── HOLD ──────────────────────────────────────────────────────────────
-    if cfg.g("active_signals", "HOLD"):
+    if _trad_signals_eligible and cfg.g("active_signals", "HOLD"):
         _require_obv_hold = cfg.g("hold", "HOLD_REQUIRE_OBV_RISING", default=False)
         _hold_obv_bars = cfg.g("persistence", "HOLD_OBV_BARS", default=1) if _persist_on else 1
         _obv_ok_hold = (not _require_obv_hold) or tf15.get("obv_rising", False)
@@ -1409,9 +1538,12 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 c["immediate"] = False
 
     # Penalización suave por EMA 1h no alcista (solo cuando EMA_GATE_HARD=false).
+    # EXPLOSION queda exenta: tiene su criterio propio agresivo y bypassa EMA por diseño.
     if not _ema_gate_hard and not tf1h.get("ema_trend_up"):
         _ema_pen = int(cfg.g("indicators", "EMA_SOFT_PENALTY", default=-2))
         for c in candidates:
+            if c.get("history_tf") == "EXPLOSION":
+                continue
             c["score"] = max(0, c["score"] + _ema_pen)
             c["bucket"] = final_bucket(c["score"], cfg)
 
@@ -1422,7 +1554,10 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             c["score"] = SCORE_CAP
             c["bucket"] = final_bucket(c["score"], cfg)
 
-    candidates.sort(key=lambda x: (x["score"], x["priority"]), reverse=True)
+    candidates.sort(
+        key=lambda x: (_normalize_score(x["score"], x["history_tf"], _cal_cfg, SCORE_CAP), x["priority"], x["score"]),
+        reverse=True,
+    )
     return candidates[0]
 
 
@@ -1949,7 +2084,14 @@ def main():
                              "Cada variante se escribe al terminar y se salta si ya existe.")
     parser.add_argument("--end-date", default=None,
                         help="YYYY-MM-DD: fin del backtest (default: ahora). Útil para validación multi-ventana.")
+    parser.add_argument("--quick", action="store_true",
+                        help="Modo dev rápido: fuerza weeks=1 y max-pairs=100. Útil para iterar.")
     args = parser.parse_args()
+
+    if args.quick:
+        args.weeks     = min(args.weeks, 1)
+        args.max_pairs = min(args.max_pairs, 100)
+        print(f"  [quick] weeks={args.weeks}, max-pairs={args.max_pairs}")
 
     global _NO_CACHE
     _NO_CACHE = args.no_cache

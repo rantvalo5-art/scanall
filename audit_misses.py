@@ -133,18 +133,25 @@ def classify_explain(symbol, tf_data, cfg):
     tf15["cvd_bullish"] = tf15.get("cvd_ratio", 0)  >= cvd_min
     tf_data = {**tf_data, "15m": tf15}
 
-    if not tf1h.get("ema_trend_up"):
-        return None, "pre_ema_trend"
+    # Pre-gates universales (aplican a TODOS los signals incl. EXPLOSION).
     if not tf1h.get("not_near_resistance"):
         return None, "pre_resist"
-    if tf1h.get("atr_pct", 0) < cfg.g("indicators", "ATR_MIN_PCT"):
-        return None, "pre_atr"
     if not tf1h.get("major_struct_ok", True):
-        return None, "pre_major_struct"
+        if not (cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False) and tf15.get("breakout", False)):
+            return None, "pre_major_struct"
 
+    # classify() puede disparar EXPLOSION aún cuando EMA/ATR fallan (bypaaa por diseño).
+    # Intentamos classify primero; si devuelve None, recién entonces atribuimos el miss
+    # a EMA/ATR o a un check específico de los signals tradicionales.
     result = classify(symbol, tf_data, cfg)
     if result is not None:
         return result, None
+
+    ema_gate_hard = cfg.g("indicators", "EMA_GATE_HARD", default=True)
+    if ema_gate_hard and not tf1h.get("ema_trend_up"):
+        return None, "pre_ema_trend"
+    if tf1h.get("atr_pct", 0) < tf1h.get("atr_threshold", cfg.g("indicators", "ATR_MIN_PCT")):
+        return None, "pre_atr"
     return None, _get_signal_fail_reason(tf5, tf15, cfg)
 
 
@@ -266,12 +273,17 @@ def cmd_catch_rate(args, cfg):
 
     # 5. Pasada del screener
     print(f"\n[5/5] Evaluando cobertura del screener...")
+    # Cache (sym, bar) → (alert, reason). Compartido entre los 3 thresholds y entre
+    # eventos con ventanas pre-pump solapadas — el resultado del classify es determinístico
+    # para un mismo (sym, bar, cfg).
+    classify_cache = {}
     results = {}
     for label, threshold, window in MOVER_THRESHOLDS:
         events = mover_events[label]
         caught = []
         missed_list = []
         reasons = Counter()
+        caught_by_signal = Counter()
 
         for sym, pump_t, gain_pct in events:
             sym_prep = prepared.get(sym)
@@ -283,18 +295,25 @@ def cmd_catch_rate(args, cfg):
 
             # Revisar ventana [-PRE_PUMP_WINDOW .. 0] antes del pump
             caught_this = False
+            caught_signal = None
             last_reason = "data_missing"
             for offset in range(-PRE_PUMP_WINDOW, 1):
                 bar = pump_t + offset
                 if bar < 0:
                     continue
-                tf_data = get_tf_data_at(sym_prep, bar, cfg)
-                if tf_data is None:
-                    last_reason = "data_missing"
-                    continue
-                alert, reason = classify_explain(sym, tf_data, cfg)
+                cache_key = (sym, bar)
+                if cache_key in classify_cache:
+                    alert, reason = classify_cache[cache_key]
+                else:
+                    tf_data = get_tf_data_at(sym_prep, bar, cfg)
+                    if tf_data is None:
+                        alert, reason = None, "data_missing"
+                    else:
+                        alert, reason = classify_explain(sym, tf_data, cfg)
+                    classify_cache[cache_key] = (alert, reason)
                 if alert is not None:
                     caught_this = True
+                    caught_signal = alert.get("history_tf") or "unknown"
                     break
                 last_reason = reason or "unknown"
 
@@ -304,6 +323,7 @@ def cmd_catch_rate(args, cfg):
 
             if caught_this:
                 caught.append((sym, pump_t, gain_pct))
+                caught_by_signal[caught_signal] += 1
             else:
                 reasons[last_reason] += 1
                 missed_list.append({"symbol": sym, "ts": ts_iso,
@@ -314,12 +334,13 @@ def cmd_catch_rate(args, cfg):
         missed_list.sort(key=lambda x: x["gain_pct"], reverse=True)
 
         results[label] = {
-            "total_movers":  total,
-            "caught":        len(caught),
-            "missed":        len(missed_list),
-            "catch_rate":    round(catch_rate, 1),
-            "miss_reasons":  dict(reasons),
-            "top_misses":    missed_list[:20],
+            "total_movers":     total,
+            "caught":           len(caught),
+            "missed":           len(missed_list),
+            "catch_rate":       round(catch_rate, 1),
+            "miss_reasons":     dict(reasons),
+            "caught_by_signal": dict(caught_by_signal),
+            "top_misses":       missed_list[:20],
         }
 
     # ── Reporte stdout ───────────────────────────────────────────────────────
@@ -332,6 +353,12 @@ def cmd_catch_rate(args, cfg):
         print(f"\n  [{label}]")
         print(f"    Total movers  : {r['total_movers']}")
         print(f"    Pescados      : {r['caught']}  ({r['catch_rate']:.1f}%)")
+        if r.get("caught_by_signal"):
+            total_c = sum(r["caught_by_signal"].values())
+            print(f"    Pescados por signal:")
+            for signal, n in sorted(r["caught_by_signal"].items(), key=lambda x: -x[1]):
+                pct = n * 100 / total_c if total_c else 0
+                print(f"      {signal:<14} {n:>4}  ({pct:.0f}%)")
         print(f"    Perdidos      : {r['missed']}")
         if r["miss_reasons"]:
             total_miss = sum(r["miss_reasons"].values())
@@ -440,11 +467,15 @@ def cmd_post_mortem(args, cfg):
     print("\n─── PRE-GATES (1h) ─────────────────────────────────────────────")
     tf1h = tf_data["1h"]
     atr_min = cfg.g("indicators", "ATR_MIN_PCT")
+    atr_threshold = tf1h.get("atr_threshold", atr_min)
     gates = [
-        ("ema_trend_up",          tf1h.get("ema_trend_up")),
-        ("not_near_resistance",   tf1h.get("not_near_resistance")),
-        (f"atr_pct >= {atr_min}", tf1h.get("atr_pct", 0) >= atr_min),
-        ("major_struct_ok",       tf1h.get("major_struct_ok", True)),
+        ("ema_trend_up",                         tf1h.get("ema_trend_up")),
+        ("not_near_resistance",                  tf1h.get("not_near_resistance")),
+        (f"atr_pct >= {atr_threshold:.3f} (threshold)", tf1h.get("atr_pct", 0) >= atr_threshold),
+        ("major_struct_ok", tf1h.get("major_struct_ok", True) or (
+            cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False)
+            and tf_data.get("15m", {}).get("breakout", False)
+        )),
     ]
     all_pass = True
     for name, val in gates:
@@ -755,6 +786,8 @@ def main():
     p_cr = sub.add_parser("catch-rate", help="Catch-rate real vs universo de movers")
     p_cr.add_argument("--days",      type=int, default=7,   help="Días a analizar (default 7)")
     p_cr.add_argument("--max-pairs", type=int, default=400, help="Máximo de pares (default 400)")
+    p_cr.add_argument("--quick",     action="store_true",
+                      help="Modo dev rápido: fuerza max-pairs=100 y days=7. Útil para iterar.")
 
     p_pm = sub.add_parser("post-mortem", help="Replay analyze+classify para símbolo+timestamp")
     p_pm.add_argument("symbol",    help="Símbolo ej. BTCUSDT")
@@ -777,6 +810,11 @@ def main():
 
     args = parser.parse_args()
     cfg  = Config(Path(args.config))
+
+    if args.cmd == "catch-rate" and getattr(args, "quick", False):
+        args.max_pairs = min(args.max_pairs, 100)
+        args.days      = min(args.days, 7)
+        print(f"  [quick] max-pairs={args.max_pairs}, days={args.days}")
 
     if args.cmd == "catch-rate":
         cmd_catch_rate(args, cfg)

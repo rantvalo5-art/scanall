@@ -1,0 +1,218 @@
+Período backtest: 2026-05-09 21:00:00+00:00 → 2026-05-16 21:00:00+00:00 (1 semana(s), 7d)
+Scan interval simulado: 15 min
+
+[1/4] Sin snapshots; usando top pares actuales por volumen...
+  50 pares calificantes hoy (top 50 por volumen)
+
+[2/4] Descargando klines históricas...
+
+  Descargando 50 pares × 3 timeframes = 150 requests
+  Rango: 2026-05-06 a 2026-05-16 (3d buffer + período)
+    50/150 descargados...
+    100/150 descargados...
+    150/150 descargados...
+  50/50 pares con data completa en los 3 TF
+
+[3/4] Ejecutando simulación...
+
+  >>> Corriendo backtest: OLD (config.json)
+    [precompute] Calculando indicadores para 50 pares...
+
+  Simulando 168h con scans cada 15min...
+    [analyze] Extrayendo candidatos (673 scans × 50 pares)...
+    [analyze] scan 0/673 (0%) — 0 candidatos
+    [analyze] scan 50/673 (7%) — 735 candidatos
+    [analyze] scan 100/673 (14%) — 3185 candidatos
+    [analyze] scan 150/673 (22%) — 5635 candidatos
+    [analyze] scan 200/673 (29%) — 8085 candidatos
+    [analyze] scan 250/673 (37%) — 10535 candidatos
+    [analyze] scan 300/673 (44%) — 12985 candidatos
+    [analyze] scan 350/673 (52%) — 15435 candidatos
+    [analyze] scan 400/673 (59%) — 17885 candidatos
+    [analyze] scan 450/673 (66%) — 20335 candidatos
+    [analyze] scan 500/673 (74%) — 22785 candidatos
+    [analyze] scan 550/673 (81%) — 25235 candidatos
+    [analyze] scan 600/673 (89%) — 27685 candidatos
+    [analyze] scan 650/673 (96%) — 30135 candidatos
+    [analyze] 31213 candidatos encontrados
+    Total alertas simuladas: 25
+
+══════════════════════════════════════════════════════════════════════
+ OLD (CONFIG.JSON)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 25
+
+Por tipo:
+  RIDING       10  (40%)
+  HOLD          9  (36%)
+  BREAKOUT      6  (24%)
+
+Por bucket:
+  BEST      9 — max_24h: +23.73%, drawdown: -12.28%, win >2%: 67%
+  STRONG   10 — max_24h: +37.22%, drawdown: -14.37%, win >2%: 80%
+  WATCH     6 — max_24h: +23.63%, drawdown: -7.04%, win >2%: 83%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n=  9  avg max 24h: +28.68%
+  CVD neutral              n= 14  avg max 24h: +31.98%
+  CVD bearish (<-0.05)     n=  2  avg max 24h: +10.89%
+
+OBV análisis:
+  OBV rising (>+0.05)      n= 22  avg max 24h: +27.19%
+  OBV neutral              n=  2  avg max 24h: +18.02%
+  OBV falling (<-0.05)     n=  1  avg max 24h: +93.38%
+
+recent_long_ok análisis:
+  True  n= 20  avg max 24h: +25.00%, drawdown: -13.33%
+  False n=  5  avg max 24h: +45.52%, drawdown: -5.99%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 OSMOUSDT       BREAKOUT      10 STRONG  +130.05%  +0.03  +0.89    True
+    2 SAGAUSDT       HOLD          12 BEST    +106.71%  +0.08  +0.26    True
+    3 SAGAUSDT       RIDING        10 STRONG  +101.68%  -0.05  +0.33   False
+    4 OSMOUSDT       RIDING         9 WATCH    +93.38%  +0.05  -0.06   False
+    5 SAGAUSDT       HOLD          12 BEST     +56.69%  +0.05  +0.67    True
+    6 SAGAUSDT       BREAKOUT      10 STRONG   +51.42%  +0.01  +0.72    True
+    7 SAGAUSDT       HOLD          11 STRONG   +47.26%  +0.05  +0.31    True
+    8 OSMOUSDT       HOLD          12 BEST     +37.69%  +0.07  +0.70    True
+    9 CGPTUSDT       RIDING        10 STRONG   +18.17%  -0.01  +0.04    True
+   10 CGPTUSDT       RIDING         6 WATCH    +17.86%  -0.04  +0.04   False
+   11 CGPTUSDT       BREAKOUT      10 STRONG   +14.07%  -0.04  +0.10    True
+   12 CGPTUSDT       RIDING         6 WATCH    +11.28%  -0.07  +0.17   False
+   13 CGPTUSDT       RIDING         6 WATCH    +10.51%  -0.05  +0.34    True
+   14 FFUSDT         RIDING         9 WATCH     +6.79%  -0.04  +0.27    True
+   15 OSMOUSDT       HOLD          12 BEST      +4.54%  +0.05  +0.18    True
+   16 FFUSDT         BREAKOUT      11 STRONG    +4.50%  -0.01  +0.30    True
+   17 SUIUSDT        RIDING        10 STRONG    +3.39%  +0.04  +0.32   False
+   18 LUNCUSDT       HOLD          13 BEST      +2.42%  +0.19  +0.12    True
+   19 FFUSDT         BREAKOUT      12 BEST      +2.08%  +0.04  +0.52    True
+   20 FFUSDT         RIDING         9 WATCH     +1.97%  -0.00  +0.35    True
+   21 SUIUSDT        RIDING        11 STRONG    +1.56%  -0.02  +0.10    True
+   22 FFUSDT         HOLD          13 BEST      +1.55%  +0.05  +0.10    True
+   23 FFUSDT         HOLD          12 BEST      +1.15%  +0.06  +0.06    True
+   24 CHIPUSDT       BREAKOUT      12 BEST      +0.75%  -0.01  +0.55    True
+   25 OSMOUSDT       HOLD          11 STRONG    +0.08%  +0.09  +0.80    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n=  6)  10:3 11:1 12:2
+  HOLD       (n=  9)  11:2 12:5 13:2
+  RIDING     (n= 10)  6:3 9:3 10:3 11:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=9, STRONG=10, WATCH=6
+  Tipos:   {'BREAKOUT': 6, 'HOLD': 9, 'RIDING': 10}
+  Score promedio top 30: 10.4
+  Move promedio top 30: +24.25%
+
+  >>> Corriendo backtest: NEW (config.json)
+    [precompute] Reutilizando indicadores cacheados (50 pares)
+
+  Simulando 168h con scans cada 15min...
+    [analyze] Reutilizando 31213 candidatos cacheados (673 scans)
+    Total alertas simuladas: 25
+
+══════════════════════════════════════════════════════════════════════
+ NEW (CONFIG.JSON)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 25
+
+Por tipo:
+  RIDING       10  (40%)
+  HOLD          9  (36%)
+  BREAKOUT      6  (24%)
+
+Por bucket:
+  BEST      9 — max_24h: +23.73%, drawdown: -12.28%, win >2%: 67%
+  STRONG   10 — max_24h: +37.22%, drawdown: -14.37%, win >2%: 80%
+  WATCH     6 — max_24h: +23.63%, drawdown: -7.04%, win >2%: 83%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n=  9  avg max 24h: +28.68%
+  CVD neutral              n= 14  avg max 24h: +31.98%
+  CVD bearish (<-0.05)     n=  2  avg max 24h: +10.89%
+
+OBV análisis:
+  OBV rising (>+0.05)      n= 22  avg max 24h: +27.19%
+  OBV neutral              n=  2  avg max 24h: +18.02%
+  OBV falling (<-0.05)     n=  1  avg max 24h: +93.38%
+
+recent_long_ok análisis:
+  True  n= 20  avg max 24h: +25.00%, drawdown: -13.33%
+  False n=  5  avg max 24h: +45.52%, drawdown: -5.99%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 OSMOUSDT       BREAKOUT      10 STRONG  +130.05%  +0.03  +0.89    True
+    2 SAGAUSDT       HOLD          12 BEST    +106.71%  +0.08  +0.26    True
+    3 SAGAUSDT       RIDING        10 STRONG  +101.68%  -0.05  +0.33   False
+    4 OSMOUSDT       RIDING         9 WATCH    +93.38%  +0.05  -0.06   False
+    5 SAGAUSDT       HOLD          12 BEST     +56.69%  +0.05  +0.67    True
+    6 SAGAUSDT       BREAKOUT      10 STRONG   +51.42%  +0.01  +0.72    True
+    7 SAGAUSDT       HOLD          11 STRONG   +47.26%  +0.05  +0.31    True
+    8 OSMOUSDT       HOLD          12 BEST     +37.69%  +0.07  +0.70    True
+    9 CGPTUSDT       RIDING        10 STRONG   +18.17%  -0.01  +0.04    True
+   10 CGPTUSDT       RIDING         6 WATCH    +17.86%  -0.04  +0.04   False
+   11 CGPTUSDT       BREAKOUT      10 STRONG   +14.07%  -0.04  +0.10    True
+   12 CGPTUSDT       RIDING         6 WATCH    +11.28%  -0.07  +0.17   False
+   13 CGPTUSDT       RIDING         6 WATCH    +10.51%  -0.05  +0.34    True
+   14 FFUSDT         RIDING         9 WATCH     +6.79%  -0.04  +0.27    True
+   15 OSMOUSDT       HOLD          12 BEST      +4.54%  +0.05  +0.18    True
+   16 FFUSDT         BREAKOUT      11 STRONG    +4.50%  -0.01  +0.30    True
+   17 SUIUSDT        RIDING        10 STRONG    +3.39%  +0.04  +0.32   False
+   18 LUNCUSDT       HOLD          13 BEST      +2.42%  +0.19  +0.12    True
+   19 FFUSDT         BREAKOUT      12 BEST      +2.08%  +0.04  +0.52    True
+   20 FFUSDT         RIDING         9 WATCH     +1.97%  -0.00  +0.35    True
+   21 SUIUSDT        RIDING        11 STRONG    +1.56%  -0.02  +0.10    True
+   22 FFUSDT         HOLD          13 BEST      +1.55%  +0.05  +0.10    True
+   23 FFUSDT         HOLD          12 BEST      +1.15%  +0.06  +0.06    True
+   24 CHIPUSDT       BREAKOUT      12 BEST      +0.75%  -0.01  +0.55    True
+   25 OSMOUSDT       HOLD          11 STRONG    +0.08%  +0.09  +0.80    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n=  6)  10:3 11:1 12:2
+  HOLD       (n=  9)  11:2 12:5 13:2
+  RIDING     (n= 10)  6:3 9:3 10:3 11:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=9, STRONG=10, WATCH=6
+  Tipos:   {'BREAKOUT': 6, 'HOLD': 9, 'RIDING': 10}
+  Score promedio top 30: 10.4
+  Move promedio top 30: +24.25%
+
+══════════════════════════════════════════════════════════════════════
+ COMPARACIÓN: config.json  vs  config.json  (7 días)
+══════════════════════════════════════════════════════════════════════
+  Métrica                              config.json     config.json
+  -------------------------------- --------------- ---------------
+  Total alertas                                 25              25
+  BREAKOUT count                                 6               6
+  BEST count                                     9               9
+  BEST por día (target: 10-20)                 1.3             1.3
+  STRONG count                                  10              10
+  Explosivos totales (>20%)                      8               8
+  -------------------------------- --------------- ---------------
+  ★ CATCH RATE (lo más importante):
+  Top 30 movers en BEST                         9/30              9/30
+  Top 30 movers en BEST+STRONG                 19/30             19/30
+  -------------------------------- --------------- ---------------
+  ★ CALIDAD del bucket BEST:
+  Avg max 24h BEST                         +23.73%         +23.73%
+  Avg drawdown BEST                        -12.28%         -12.28%
+  R/R BEST                                    1.93            1.93
+  Win >5% en BEST                              33%              33%
+  Win >10% en BEST                             33%              33%
+  -------------------------------- --------------- ---------------
+  Otros:
+  Avg max 24h global                       +29.10%         +29.10%
+  Avg max 24h STRONG                       +37.22%         +37.22%
+  Avg drawdown global                      -11.86%         -11.86%
+  Win >2% global                               76%              76%
+  Win >5% global                               56%              56%
+
+[4/4] Guardando resultados...
+  Guardado: C:\Users\a\scancrypto\smoke_atr_fixed.json
+
+DONE
