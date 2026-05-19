@@ -1,0 +1,109 @@
+
+=== POST-MORTEM: DOGSUSDT @ 2026-05-06T22:14:00+00:00 ===
+
+Descargando klines para DOGSUSDT...
+
+  Descargando 1 pares × 3 timeframes = 3 requests
+  Rango: 2026-04-24 a 2026-05-07 (3d buffer + período)
+  1/1 pares con data completa en los 3 TF
+  Bar 15m: idx=1222, close_time=2026-05-06T21:59:59.999000+00:00
+
+─── FEATURES POR TIMEFRAME ─────────────────────────────────────
+
+  [5m]
+    price                            +0.0001
+    ema_trend_up                     True
+    atr_pct                          +0.9470
+    vol_ratio                        +0.1209
+    vol_growth                       +0.6258
+    strong_close                     False
+    candle_body_pct                  +0.4000
+    width_curr                       +0.0316
+    width_expansion                  -0.0285
+    recent_max                       +0.0001
+    near_recent_max                  False
+    breakout                         False
+    breakout_distance                -0.0168
+    recent_long_ok                   False
+    obv_slope                        +0.0003
+    obv_rising                       False
+    cvd_ratio                        +0.1242
+    cvd_bullish                      True
+    not_near_resistance              True
+    dist_to_res                      +0.0170
+    major_struct_ok                  True
+    hold_recent_break                False
+    hold_kept_zone                   False
+    hold_pullback_ok                 False
+    hold_strong                      False
+    riding_gain                      -0.0084
+    riding_above_zone                True
+    riding_vol_ok                    False
+    riding_bars_since                13
+
+  [15m]
+    price                            +0.0001
+    ema_trend_up                     True
+    atr_pct                          +2.0276
+    vol_ratio                        +0.3203
+    vol_growth                       +0.5541
+    strong_close                     False
+    candle_body_pct                  +0.2500
+    width_curr                       +0.0545
+    width_expansion                  -0.1158
+    recent_max                       +0.0001
+    near_recent_max                  False
+    breakout                         False
+    breakout_distance                -0.0168
+    recent_long_ok                   False
+    obv_slope                        +0.0111
+    obv_rising                       False
+    cvd_ratio                        +0.1501
+    cvd_bullish                      True
+    not_near_resistance              True
+    dist_to_res                      +0.0307
+    major_struct_ok                  True
+    hold_recent_break                False
+    hold_kept_zone                   False
+    hold_pullback_ok                 False
+    hold_strong                      False
+    riding_gain                      -0.0184
+    riding_above_zone                True
+    riding_vol_ok                    False
+    riding_bars_since                20
+
+  [1h]
+    price                            +0.0001
+    ema_trend_up                     True
+    atr_pct                          +6.1682
+    vol_ratio                        +0.2218
+    vol_growth                       +0.3580
+    strong_close                     False
+    candle_body_pct                  +0.2778
+    width_curr                       +0.2317
+    width_expansion                  -0.0763
+    recent_max                       +0.0001
+    near_recent_max                  False
+    breakout                         False
+    breakout_distance                -0.1106
+    recent_long_ok                   False
+    obv_slope                        -0.1477
+    obv_rising                       False
+    cvd_ratio                        -0.0214
+    cvd_bullish                      False
+    not_near_resistance              True
+    dist_to_res                      +0.1925
+    major_struct_ok                  False
+    hold_recent_break                False
+    hold_kept_zone                   False
+    hold_pullback_ok                 False
+    hold_strong                      False
+
+─── PRE-GATES (1h) ─────────────────────────────────────────────
+  ✓ ema_trend_up                             True
+  ✓ not_near_resistance                      True
+  ✓ atr_pct >= 2.500 (threshold)             True
+  ✗ major_struct_ok                          False
+
+─── CLASIFICACIÓN ──────────────────────────────────────────────
+  ✗ Sin señal — bloqueado en pre-gate: pre_major_struct

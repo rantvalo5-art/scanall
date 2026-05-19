@@ -1,0 +1,101 @@
+
+=== POST-MORTEM: OSMOUSDT @ 2026-05-12T18:59:00+00:00 ===
+
+Descargando klines para OSMOUSDT...
+
+  Descargando 1 pares × 3 timeframes = 3 requests
+  Rango: 2026-04-30 a 2026-05-13 (3d buffer + período)
+  1/1 pares con data completa en los 3 TF
+  Bar 15m: idx=1222, close_time=2026-05-12T18:44:59.999000+00:00
+
+─── FEATURES POR TIMEFRAME ─────────────────────────────────────
+
+  [5m]
+    price                            +0.0609
+    ema_trend_up                     False
+    atr_pct                          +1.1129
+    vol_ratio                        +0.2478
+    vol_growth                       +2.3402
+    strong_close                     False
+    candle_body_pct                  +0.5000
+    width_curr                       +0.0699
+    width_expansion                  -0.0466
+    recent_max                       +0.0631
+    near_recent_max                  False
+    breakout                         False
+    breakout_distance                -0.0349
+    recent_long_ok                   False
+    obv_slope                        +0.0020
+    obv_rising                       False
+    cvd_ratio                        -0.0275
+    cvd_bullish                      False
+    not_near_resistance              True
+    dist_to_res                      +0.0542
+    major_struct_ok                  False
+    hold_recent_break                False
+    hold_kept_zone                   False
+    hold_pullback_ok                 False
+    hold_strong                      False
+
+  [15m]
+    price                            +0.0609
+    ema_trend_up                     False
+    atr_pct                          +2.5487
+    vol_ratio                        +0.4285
+    vol_growth                       +0.2543
+    strong_close                     False
+    candle_body_pct                  +0.2000
+    width_curr                       +0.1836
+    width_expansion                  -0.0202
+    recent_max                       +0.0700
+    near_recent_max                  False
+    breakout                         False
+    breakout_distance                -0.1300
+    recent_long_ok                   False
+    obv_slope                        -0.0473
+    obv_rising                       False
+    cvd_ratio                        -0.1762
+    cvd_bullish                      False
+    not_near_resistance              True
+    dist_to_res                      +0.1790
+    major_struct_ok                  False
+    hold_recent_break                False
+    hold_kept_zone                   False
+    hold_pullback_ok                 False
+    hold_strong                      False
+
+  [1h]
+    price                            +0.0601
+    ema_trend_up                     False
+    atr_pct                          +8.7329
+    vol_ratio                        +1.1640
+    vol_growth                       +1.1786
+    strong_close                     False
+    candle_body_pct                  +0.5000
+    width_curr                       +0.3812
+    width_expansion                  +0.0132
+    recent_max                       +0.0849
+    near_recent_max                  False
+    breakout                         False
+    breakout_distance                -0.2921
+    recent_long_ok                   False
+    obv_slope                        -0.0819
+    obv_rising                       False
+    cvd_ratio                        -0.0678
+    cvd_bullish                      False
+    not_near_resistance              True
+    dist_to_res                      +0.6473
+    major_struct_ok                  False
+    hold_recent_break                False
+    hold_kept_zone                   False
+    hold_pullback_ok                 False
+    hold_strong                      False
+
+─── PRE-GATES (1h) ─────────────────────────────────────────────
+  ✗ ema_trend_up                             False
+  ✓ not_near_resistance                      True
+  ✓ atr_pct >= 2.500 (threshold)             True
+  ✗ major_struct_ok                          False
+
+─── CLASIFICACIÓN ──────────────────────────────────────────────
+  ✗ Sin señal — bloqueado en pre-gate: pre_major_struct

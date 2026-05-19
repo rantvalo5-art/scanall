@@ -1,0 +1,154 @@
+
+=== CATCH-RATE AUDIT — últimos 14 días ===
+  Período: 2026-05-03 → 2026-05-17
+
+[1/5] Obteniendo universo (vol >= 1M USDT)...
+  194 pares activos
+
+[2/5] Descargando klines (194 pares)...
+
+  Descargando 194 pares × 3 timeframes = 582 requests
+  Rango: 2026-04-30 a 2026-05-17 (3d buffer + período)
+    50/582 descargados...
+    100/582 descargados...
+    150/582 descargados...
+    200/582 descargados...
+    250/582 descargados...
+    300/582 descargados...
+    350/582 descargados...
+    400/582 descargados...
+    450/582 descargados...
+    500/582 descargados...
+    550/582 descargados...
+  194/194 pares con data completa en los 3 TF
+  194 pares con datos completos
+
+[3/5] Precomputando indicadores...
+  194 pares listos
+
+[4/5] Detectando pump-starts...
+  5pct_4h: 1580 pump-starts detectados
+  10pct_24h: 484 pump-starts detectados
+  15pct_24h: 243 pump-starts detectados
+
+[5/5] Evaluando cobertura del screener...
+
+══════════════════════════════════════════════════════════════════════
+ RESULTADO — CATCH RATE
+══════════════════════════════════════════════════════════════════════
+
+  [5pct_4h]
+    Total movers  : 1580
+    Pescados      : 46  (2.9%)
+    Pescados por signal:
+      HOLD             23  (50%)
+      RIDING           11  (24%)
+      BREAKOUT         10  (22%)
+      EXPLOSION         2  (4%)
+    Perdidos      : 1534
+    Causas de miss:
+      pre_major_struct                539  (35%)
+      pre_atr                         356  (23%)
+      pre_ema_trend                   247  (16%)
+      pre_resist                      171  (11%)
+      bo:breakout                     106  (7%)
+      data_missing                     68  (4%)
+      ri:vol_ok                        10  (1%)
+      ri:above_zone                     7  (0%)
+      ri:gain_range                     7  (0%)
+      bo:vol_ratio                      7  (0%)
+      bo:strong_close                   5  (0%)
+      ho:cooldown_or_active             4  (0%)
+      pre:near_max                      2  (0%)
+      bo:distance                       2  (0%)
+      ri:cooldown_or_active             1  (0%)
+      bo:bb_exp                         1  (0%)
+      bo:5m_close                       1  (0%)
+
+    Top 10 misses más grandes:
+        # Symbol             Gain  Razón                        Timestamp
+        1 DUSDT           +101.2%  pre_major_struct             2026-05-07T04:29
+        2 OSMOUSDT         +88.3%  bo:breakout                  2026-05-11T08:29
+        3 VICUSDT          +67.0%  pre_atr                      2026-05-12T12:44
+        4 OSMOUSDT         +61.5%  pre_resist                   2026-05-10T11:14
+        5 STXUSDT          +58.8%  pre_atr                      2026-05-05T18:59
+        6 DOGSUSDT         +56.6%  pre_major_struct             2026-05-06T22:14
+        7 DOGSUSDT         +49.5%  pre_atr                      2026-05-04T21:59
+        8 OSMOUSDT         +48.4%  pre_major_struct             2026-05-10T23:59
+        9 TSTUSDT          +48.2%  bo:breakout                  2026-05-04T08:44
+       10 AIUSDT           +46.7%  pre_major_struct             2026-05-14T03:44
+
+  [10pct_24h]
+    Total movers  : 484
+    Pescados      : 12  (2.5%)
+    Pescados por signal:
+      HOLD              5  (42%)
+      RIDING            3  (25%)
+      BREAKOUT          3  (25%)
+      EXPLOSION         1  (8%)
+    Perdidos      : 472
+    Causas de miss:
+      pre_major_struct                147  (31%)
+      pre_ema_trend                   137  (29%)
+      pre_atr                          86  (18%)
+      pre_resist                       49  (10%)
+      data_missing                     33  (7%)
+      bo:breakout                      13  (3%)
+      ri:above_zone                     2  (0%)
+      pre:near_max                      1  (0%)
+      bo:distance                       1  (0%)
+      ri:cooldown_or_active             1  (0%)
+      ri:gain_range                     1  (0%)
+      ho:cooldown_or_active             1  (0%)
+
+    Top 10 misses más grandes:
+        # Symbol             Gain  Razón                        Timestamp
+        1 OSMOUSDT        +158.2%  pre_resist                   2026-05-10T15:29
+        2 TSTUSDT         +123.9%  data_missing                 2026-05-03T18:14
+        3 DOGSUSDT        +114.4%  pre_resist                   2026-05-04T21:29
+        4 LAYERUSDT       +106.7%  pre_atr                      2026-05-09T18:44
+        5 NILUSDT         +106.0%  ri:cooldown_or_active        2026-05-07T08:44
+        6 DUSDT           +103.0%  pre_major_struct             2026-05-07T04:44
+        7 DOGSUSDT         +79.0%  pre_major_struct             2026-05-06T23:59
+        8 SAGAUSDT         +68.8%  pre_resist                   2026-05-11T05:59
+        9 TSTUSDT          +67.7%  pre_major_struct             2026-05-07T07:14
+       10 OSMOUSDT         +62.9%  pre_atr                      2026-05-09T15:14
+
+  [15pct_24h]
+    Total movers  : 243
+    Pescados      : 9  (3.7%)
+    Pescados por signal:
+      HOLD              5  (56%)
+      BREAKOUT          2  (22%)
+      EXPLOSION         1  (11%)
+      RIDING            1  (11%)
+    Perdidos      : 234
+    Causas de miss:
+      pre_major_struct                 90  (38%)
+      pre_ema_trend                    49  (21%)
+      pre_atr                          43  (18%)
+      pre_resist                       19  (8%)
+      data_missing                     17  (7%)
+      bo:breakout                       6  (3%)
+      ri:gain_range                     4  (2%)
+      ri:above_zone                     2  (1%)
+      bo:distance                       1  (0%)
+      bo:bb_exp                         1  (0%)
+      ho:cooldown_or_active             1  (0%)
+      ri:cooldown_or_active             1  (0%)
+
+    Top 10 misses más grandes:
+        # Symbol             Gain  Razón                        Timestamp
+        1 OSMOUSDT        +158.2%  pre_resist                   2026-05-10T15:29
+        2 NILUSDT         +136.9%  pre_atr                      2026-05-07T03:29
+        3 TSTUSDT         +123.9%  data_missing                 2026-05-03T18:14
+        4 LAYERUSDT       +113.5%  pre_atr                      2026-05-09T21:29
+        5 DOGSUSDT        +105.3%  pre_atr                      2026-05-04T23:44
+        6 SAGAUSDT        +104.4%  ri:gain_range                2026-05-12T07:14
+        7 EDENUSDT         +78.9%  pre_major_struct             2026-05-16T15:59
+        8 DUSDT            +78.8%  bo:distance                  2026-05-07T05:44
+        9 OSMOUSDT         +62.9%  pre_atr                      2026-05-09T15:14
+       10 COSUSDT          +58.5%  pre_atr                      2026-05-12T17:29
+
+  Resultado guardado en: C:\Users\a\scancrypto\.audit_results\catch_rate_20260517_1842.json
+  Post-mortem de un miss: python audit_misses.py post-mortem SYMBOL TIMESTAMP

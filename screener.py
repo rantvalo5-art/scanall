@@ -774,13 +774,16 @@ def analyze(symbol, interval):
     # un máximo mayor, probablemente es un bounce dentro de tendencia bajista.
     # major_struct_ok = True si el precio rompió el máximo mayor o está cerca de tocarlo.
     if len(high) >= MAJOR_STRUCT_LOOKBACK + 2:
-        major_struct_max = high.iloc[-(MAJOR_STRUCT_LOOKBACK + 2):-2].max()
+        _mm_slice_s = high.iloc[-(MAJOR_STRUCT_LOOKBACK + 2):-2]
+        major_struct_max = float(_mm_slice_s.max())
         major_struct_dist = (major_struct_max - price) / price if price > 0 else 0.0
         major_struct_ok = major_struct_dist <= MAJOR_STRUCT_MAX_DIST
+        bars_since_major_max = MAJOR_STRUCT_LOOKBACK + 1 - int(_mm_slice_s.values.argmax())
     else:
         major_struct_max = None
         major_struct_dist = None
         major_struct_ok = True  # sin datos suficientes, no penalizar
+        bars_since_major_max = None
 
     recent_break_idx = None
     recent_break_ref = None
@@ -882,6 +885,7 @@ def analyze(symbol, interval):
         "major_struct_max": major_struct_max,
         "major_struct_dist": major_struct_dist,
         "major_struct_ok": major_struct_ok,
+        "bars_since_major_max": bars_since_major_max,
         "hold_recent_break": hold_recent_break,
         "hold_kept_zone": hold_kept_zone,
         "hold_pullback_ok": hold_pullback_ok,
@@ -914,7 +918,23 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     if not tf1h.get("not_near_resistance"):
         return None
     if not tf1h.get("major_struct_ok", True):
-        if not (_cfg("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False) and tf15.get("breakout", False)):
+        _bypass_brk = _cfg("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False) and tf15.get("breakout", False)
+        _bypass_pre = _cfg("hold", "MAJOR_STRUCT_BYPASS_ON_STRONG_PRE", default=False) and tf15.get("cvd_bullish", False) and tf15.get("obv_rising", False)
+        _bypass_vol = tf1h.get("vol_ratio", 0) >= _cfg("hold", "MAJOR_STRUCT_BYPASS_VOL_RATIO_1H", default=999.0)
+        _age_thr    = _cfg("hold", "MAJOR_STRUCT_BYPASS_AGE_BARS", default=999)
+        _bsm        = tf1h.get("bars_since_major_max")
+        _bypass_age = _bsm is not None and _bsm >= _age_thr
+        _soft_dist  = _cfg("hold", "MAJOR_STRUCT_BYPASS_SOFTZONE_DIST", default=0.0)
+        _soft_max   = _cfg("hold", "MAJOR_STRUCT_BYPASS_SOFTZONE_HOLD_MAX_BARS", default=0)
+        _msd        = tf1h.get("major_struct_dist")
+        _bsb        = tf15.get("bars_since_break")
+        _bypass_soft = (
+            _soft_dist > 0 and _soft_max > 0
+            and _msd is not None and _msd <= _soft_dist
+            and tf15.get("hold_recent_break", False)
+            and _bsb is not None and _bsb <= _soft_max
+        )
+        if not (_bypass_brk or _bypass_pre or _bypass_vol or _bypass_age or _bypass_soft):
             return None
 
     candidates = []
@@ -973,7 +993,25 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     # EMA hard: corta acá. EMA soft: aplica penalty después al score.
     _ema_gate_hard = _cfg("indicators", "EMA_GATE_HARD", default=True)
     _ema_blocks = (not tf1h.get("ema_trend_up")) and _ema_gate_hard
-    _atr_blocks = tf1h.get("atr_pct", 0) < tf1h.get("atr_threshold", ATR_MIN_PCT)
+    _atr_pct_v       = tf1h.get("atr_pct", 0)
+    _atr_threshold_v = tf1h.get("atr_threshold", ATR_MIN_PCT)
+    _atr_blocks = _atr_pct_v < _atr_threshold_v
+    _atr_ratio  = (_atr_pct_v / _atr_threshold_v) if _atr_threshold_v > 0 else 0.0
+    if _atr_blocks:
+        if _cfg("indicators", "ATR_BYPASS_ON_EXPLOSION_CRITERIA", default=False) and (
+                tf15.get("vol_ratio", 0)         >= _cfg("indicators", "ATR_BYPASS_EX_VOL_15M",  default=_cfg("scoring_explosion", "MIN_VOL_RATIO",    default=5.0))
+                and tf15.get("candle_body_pct", 0)   >= _cfg("indicators", "ATR_BYPASS_EX_BODY_15M", default=_cfg("scoring_explosion", "MIN_BODY_PCT",     default=0.85))
+                and tf15.get("close_change_curr", 0) >= _cfg("indicators", "ATR_BYPASS_EX_CHG_15M",  default=_cfg("scoring_explosion", "MIN_CLOSE_CHANGE", default=0.025))
+                and tf15.get("width_expansion", 0)   >= _cfg("indicators", "ATR_BYPASS_EX_BB_15M",   default=_cfg("scoring_explosion", "MIN_BB_EXPANSION", default=0.5))):
+            _atr_blocks = False
+        elif (tf15.get("vol_ratio", 0) >= _cfg("indicators", "ATR_BYPASS_VOL_RATIO_15M", default=999.0)
+              and tf15.get("width_expansion", 0) >= _cfg("indicators", "ATR_BYPASS_BB_EXP_15M_MIN", default=0.0)):
+            _atr_blocks = False
+        elif (_cfg("indicators", "ATR_BYPASS_NEAR_COMPOUND", default=False)
+              and _atr_ratio >= _cfg("indicators", "ATR_BYPASS_NEAR_RATIO_MIN", default=0.80)
+              and tf15.get("vol_ratio", 0) >= _cfg("indicators", "ATR_BYPASS_NEAR_VOL15M_MIN", default=2.0)
+              and tf5.get("close_change_curr", 0) >= _cfg("indicators", "ATR_BYPASS_NEAR_CHANGE5M_MIN", default=0.005)):
+            _atr_blocks = False
     _trad_signals_eligible = not (_ema_blocks or _atr_blocks)
     if not _trad_signals_eligible and not candidates:
         return None

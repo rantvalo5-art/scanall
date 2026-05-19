@@ -32,6 +32,7 @@ from backtest import (
     download_all_klines,
     precompute_indicators,
     analyze_at_index,
+    _build_analyze_params,
     find_idx_at_or_before,
     classify,
 )
@@ -137,7 +138,23 @@ def classify_explain(symbol, tf_data, cfg):
     if not tf1h.get("not_near_resistance"):
         return None, "pre_resist"
     if not tf1h.get("major_struct_ok", True):
-        if not (cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False) and tf15.get("breakout", False)):
+        _bypass_brk = cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False) and tf15.get("breakout", False)
+        _bypass_pre = cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_STRONG_PRE", default=False) and tf15.get("cvd_bullish", False) and tf15.get("obv_rising", False)
+        _bypass_vol = tf1h.get("vol_ratio", 0) >= cfg.g("hold", "MAJOR_STRUCT_BYPASS_VOL_RATIO_1H", default=999.0)
+        _age_thr    = cfg.g("hold", "MAJOR_STRUCT_BYPASS_AGE_BARS", default=999)
+        _bsm        = tf1h.get("bars_since_major_max")
+        _bypass_age = _bsm is not None and _bsm >= _age_thr
+        _soft_dist  = cfg.g("hold", "MAJOR_STRUCT_BYPASS_SOFTZONE_DIST", default=0.0)
+        _soft_max   = cfg.g("hold", "MAJOR_STRUCT_BYPASS_SOFTZONE_HOLD_MAX_BARS", default=0)
+        _msd        = tf1h.get("major_struct_dist")
+        _bsb        = tf15.get("bars_since_break")
+        _bypass_soft = (
+            _soft_dist > 0 and _soft_max > 0
+            and _msd is not None and _msd <= _soft_dist
+            and tf15.get("hold_recent_break", False)
+            and _bsb is not None and _bsb <= _soft_max
+        )
+        if not (_bypass_brk or _bypass_pre or _bypass_vol or _bypass_age or _bypass_soft):
             return None, "pre_major_struct"
 
     # classify() puede disparar EXPLOSION aún cuando EMA/ATR fallan (bypaaa por diseño).
@@ -150,7 +167,26 @@ def classify_explain(symbol, tf_data, cfg):
     ema_gate_hard = cfg.g("indicators", "EMA_GATE_HARD", default=True)
     if ema_gate_hard and not tf1h.get("ema_trend_up"):
         return None, "pre_ema_trend"
-    if tf1h.get("atr_pct", 0) < tf1h.get("atr_threshold", cfg.g("indicators", "ATR_MIN_PCT")):
+    _atr_pct_v_a      = tf1h.get("atr_pct", 0)
+    _atr_threshold_v_a = tf1h.get("atr_threshold", cfg.g("indicators", "ATR_MIN_PCT"))
+    _atr_blocks_audit = _atr_pct_v_a < _atr_threshold_v_a
+    _atr_ratio_a      = (_atr_pct_v_a / _atr_threshold_v_a) if _atr_threshold_v_a > 0 else 0.0
+    if _atr_blocks_audit:
+        if cfg.g("indicators", "ATR_BYPASS_ON_EXPLOSION_CRITERIA", default=False) and (
+                tf15.get("vol_ratio", 0)         >= cfg.g("indicators", "ATR_BYPASS_EX_VOL_15M",  default=cfg.g("scoring_explosion", "MIN_VOL_RATIO",    default=5.0))
+                and tf15.get("candle_body_pct", 0)   >= cfg.g("indicators", "ATR_BYPASS_EX_BODY_15M", default=cfg.g("scoring_explosion", "MIN_BODY_PCT",     default=0.85))
+                and tf15.get("close_change_curr", 0) >= cfg.g("indicators", "ATR_BYPASS_EX_CHG_15M",  default=cfg.g("scoring_explosion", "MIN_CLOSE_CHANGE", default=0.025))
+                and tf15.get("width_expansion", 0)   >= cfg.g("indicators", "ATR_BYPASS_EX_BB_15M",   default=cfg.g("scoring_explosion", "MIN_BB_EXPANSION", default=0.5))):
+            _atr_blocks_audit = False
+        elif (tf15.get("vol_ratio", 0) >= cfg.g("indicators", "ATR_BYPASS_VOL_RATIO_15M", default=999.0)
+              and tf15.get("width_expansion", 0) >= cfg.g("indicators", "ATR_BYPASS_BB_EXP_15M_MIN", default=0.0)):
+            _atr_blocks_audit = False
+        elif (cfg.g("indicators", "ATR_BYPASS_NEAR_COMPOUND", default=False)
+              and _atr_ratio_a >= cfg.g("indicators", "ATR_BYPASS_NEAR_RATIO_MIN", default=0.80)
+              and tf15.get("vol_ratio", 0) >= cfg.g("indicators", "ATR_BYPASS_NEAR_VOL15M_MIN", default=2.0)
+              and tf5.get("close_change_curr", 0) >= cfg.g("indicators", "ATR_BYPASS_NEAR_CHANGE5M_MIN", default=0.005)):
+            _atr_blocks_audit = False
+    if _atr_blocks_audit:
         return None, "pre_atr"
     return None, _get_signal_fail_reason(tf5, tf15, cfg)
 
@@ -212,9 +248,10 @@ def get_tf_data_at(prepared_sym, bar_idx_15m, cfg):
     if idx_5m < 80 or idx_1h < 80 or bar_idx_15m < 80:
         return None
 
-    r5  = analyze_at_index(df_5m,  idx_5m,       cfg)
-    r15 = analyze_at_index(df_15m, bar_idx_15m,  cfg)
-    r1h = analyze_at_index(df_1h,  idx_1h,       cfg)
+    params = _build_analyze_params(cfg)
+    r5  = analyze_at_index(df_5m,  idx_5m,       params)
+    r15 = analyze_at_index(df_15m, bar_idx_15m,  params)
+    r1h = analyze_at_index(df_1h,  idx_1h,       params)
 
     if r5 is None or r15 is None or r1h is None:
         return None
@@ -325,6 +362,52 @@ def cmd_catch_rate(args, cfg):
                 caught.append((sym, pump_t, gain_pct))
                 caught_by_signal[caught_signal] += 1
             else:
+                if last_reason == "pre_ema_trend":
+                    df_1h = sym_prep.get("1h")
+                    if df_1h is not None and "_ema_slow" in df_1h.columns:
+                        ts_ms_bar = int(df_15m["close_time"].iat[bar])
+                        idx_1h_bar = find_idx_at_or_before(df_1h, ts_ms_bar)
+                        if idx_1h_bar >= 5:
+                            ema_now   = float(df_1h["_ema_slow"].iat[idx_1h_bar])
+                            ema_prev  = float(df_1h["_ema_slow"].iat[idx_1h_bar - 3])
+                            price_now = float(df_1h["close"].iat[idx_1h_bar])
+                            price_above = price_now > ema_now
+                            ema_rising  = ema_now > ema_prev
+                            recent_cross = False
+                            if price_above:
+                                for _k in range(1, 6):
+                                    if idx_1h_bar - _k < 0:
+                                        break
+                                    c_k = float(df_1h["close"].iat[idx_1h_bar - _k])
+                                    e_k = float(df_1h["_ema_slow"].iat[idx_1h_bar - _k])
+                                    if c_k <= e_k:
+                                        recent_cross = True
+                                        break
+                            if recent_cross:
+                                last_reason = "pre_ema:recent_cross"
+                            elif price_above and not ema_rising:
+                                last_reason = "pre_ema:price_only"
+                            elif (not price_above) and ema_rising:
+                                last_reason = "pre_ema:ema_only"
+                            else:
+                                last_reason = "pre_ema:both_fail"
+                if last_reason == "pre_atr":
+                    df_1h = sym_prep.get("1h")
+                    if df_1h is not None and "_atr_pct" in df_1h.columns and "_atr_threshold" in df_1h.columns:
+                        ts_ms_bar = int(df_15m["close_time"].iat[bar])
+                        idx_1h_bar = find_idx_at_or_before(df_1h, ts_ms_bar)
+                        if idx_1h_bar >= 0:
+                            atr_now = float(df_1h["_atr_pct"].iat[idx_1h_bar])
+                            thr_now = float(df_1h["_atr_threshold"].iat[idx_1h_bar])
+                            ratio   = atr_now / thr_now if thr_now > 0 else 0.0
+                            vr_15m  = float(df_15m["_vol_ratio"].iat[bar]) if "_vol_ratio" in df_15m.columns else 0.0
+                            if ratio >= 0.80:
+                                sub = "pre_atr:near"
+                            elif ratio >= 0.50:
+                                sub = "pre_atr:mid"
+                            else:
+                                sub = "pre_atr:far"
+                            last_reason = sub + ("+vol15m" if vr_15m >= 2.0 else "")
                 reasons[last_reason] += 1
                 missed_list.append({"symbol": sym, "ts": ts_iso,
                                     "gain_pct": round(gain_pct, 2), "reason": last_reason})
@@ -443,7 +526,7 @@ def cmd_post_mortem(args, cfg):
     print("\n─── FEATURES POR TIMEFRAME ─────────────────────────────────────")
     FIELDS = [
         "price", "ema_trend_up", "atr_pct", "vol_ratio", "vol_growth",
-        "strong_close", "candle_body_pct", "width_curr", "width_expansion",
+        "strong_close", "candle_body_pct", "close_change_curr", "width_curr", "width_expansion",
         "recent_max", "near_recent_max", "breakout", "breakout_distance",
         "recent_long_ok", "obv_slope", "obv_rising", "cvd_ratio", "cvd_bullish",
         "not_near_resistance", "dist_to_res", "major_struct_ok", "major_struct_dist",
@@ -483,6 +566,48 @@ def cmd_post_mortem(args, cfg):
         print(f"  {mark} {name:<40} {val}")
         if not val:
             all_pass = False
+
+    # ── Major struct breakdown (para evaluar hipótesis M1-M5) ───────────────
+    print("\n─── MAJOR STRUCT BREAKDOWN (1h) ────────────────────────────────")
+    df_1h = sym_prep.get("1h")
+    if df_1h is not None:
+        idx_1h     = find_idx_at_or_before(df_1h, ts_ms)
+        ms_lookback = cfg.g("hold", "MAJOR_STRUCT_LOOKBACK")
+        ms_start   = max(0, idx_1h - ms_lookback - 1)
+        ms_end     = max(0, idx_1h - 1)
+        if ms_end > ms_start:
+            window_high = df_1h["high"].iloc[ms_start:ms_end]
+            max_rel = int(window_high.values.argmax())
+            max_pos = ms_start + max_rel
+            bars_since_max = idx_1h - max_pos
+            h_v = float(df_1h["high"].iat[max_pos])
+            l_v = float(df_1h["low"].iat[max_pos])
+            o_v = float(df_1h["open"].iat[max_pos])
+            c_v = float(df_1h["close"].iat[max_pos])
+            body_pct = abs(c_v - o_v) / max(h_v - l_v, 1e-12)
+            vol_at_max = float(df_1h["_vol_ratio"].iat[max_pos]) if "_vol_ratio" in df_1h.columns else float("nan")
+            post_lows = df_1h["low"].iloc[max_pos + 1:idx_1h + 1]
+            post_min  = float(post_lows.min()) if len(post_lows) > 0 else h_v
+            drawdown  = (h_v - post_min) / h_v
+            cs = idx_1h - 25
+            ce = idx_1h - 5
+            if ce > cs > 0:
+                cwin  = df_1h["close"].iloc[cs:ce]
+                cmean = float(cwin.mean())
+                consol_std = float(cwin.std() / cmean) if cmean > 0 else 0.0
+            else:
+                consol_std = float("nan")
+            curr_price = float(df_1h["close"].iat[idx_1h])
+            ms_dist = (h_v - curr_price) / curr_price if curr_price > 0 else 0.0
+            max_dist_thr = cfg.g("hold", "MAJOR_STRUCT_MAX_DIST")
+            print(f"  major_struct_dist             {ms_dist:>+.4f}  (thr={max_dist_thr} → {'BLOQUEADO' if ms_dist > max_dist_thr else 'OK'})")
+            print(f"  bars_since_max  (M2)          {bars_since_max:>5}    (>30 = max viejo)")
+            print(f"  body_pct_at_max (M1)          {body_pct:>+.4f}  (<0.30 = wick → no es resistencia real)")
+            print(f"  vol_ratio_at_max (M4)         {vol_at_max:>+.4f}  (<2.0 = sin volumen → no es zona de oferta)")
+            print(f"  drawdown_post_max (M5)        {drawdown:>+.4f}  (>0.30 = reset profundo → nuevo ciclo)")
+            print(f"  consol_std_pct (M3)           {consol_std:>+.4f}  (<0.015 = consolidación previa → distribución completa)")
+        else:
+            print("  (ventana insuficiente para calcular)")
 
     # ── Clasificación ────────────────────────────────────────────────────────
     print("\n─── CLASIFICACIÓN ──────────────────────────────────────────────")

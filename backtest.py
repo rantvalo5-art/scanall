@@ -43,7 +43,7 @@ import ta
 SCAN_INTERVAL_MIN = 15
 OUTCOME_OFFSETS_MIN = [15, 60, 240, 1440]
 OUTCOME_NAMES = ["price_15m", "price_1h", "price_4h", "price_24h"]
-MAX_DOWNLOAD_WORKERS = 8
+MAX_DOWNLOAD_WORKERS = 20
 MAX_PAIRS = 200
 
 BINANCE_DATA_URL = "https://data-api.binance.vision/api/v3"
@@ -621,11 +621,15 @@ def analyze_at_time(df_full, end_idx, cfg):
     not_near_resistance = dist_to_res > ONE_H_RESIST_BUFFER or breakout
 
     if len(high) >= MAJOR_STRUCT_LOOKBACK + 2:
-        major_max = high.iloc[-(MAJOR_STRUCT_LOOKBACK + 2):-2].max()
+        _mm_slice_a = high.iloc[-(MAJOR_STRUCT_LOOKBACK + 2):-2]
+        major_max = float(_mm_slice_a.max())
         major_dist = (major_max - price) / price if price > 0 else 0.0
         major_struct_ok = major_dist <= MAJOR_STRUCT_MAX_DIST
+        bars_since_major_max = MAJOR_STRUCT_LOOKBACK + 1 - int(np.argmax(_mm_slice_a.values))
     else:
+        major_dist = None
         major_struct_ok = True
+        bars_since_major_max = None
 
     hold_recent_break = False
     hold_kept_zone = False
@@ -708,6 +712,8 @@ def analyze_at_time(df_full, end_idx, cfg):
         "not_near_resistance": not_near_resistance,
         "dist_to_res": dist_to_res,
         "major_struct_ok": major_struct_ok,
+        "major_struct_dist": major_dist,
+        "bars_since_major_max": bars_since_major_max,
         "hold_recent_break": hold_recent_break,
         "hold_kept_zone": hold_kept_zone,
         "hold_pullback_ok": hold_pullback_ok,
@@ -769,7 +775,8 @@ def _analyze_key(cfg):
         "ONE_H_RESIST_BUFFER":     cfg.g("hold", "ONE_H_RESIST_BUFFER"),
         "MAJOR_STRUCT_LOOKBACK":   cfg.g("hold", "MAJOR_STRUCT_LOOKBACK"),
         "MAJOR_STRUCT_MAX_DIST":           cfg.g("hold", "MAJOR_STRUCT_MAX_DIST"),
-        "MAJOR_STRUCT_BYPASS_ON_BREAKOUT": cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False),
+        "MAJOR_STRUCT_BYPASS_ON_BREAKOUT":   cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False),
+        "MAJOR_STRUCT_BYPASS_ON_STRONG_PRE": cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_STRONG_PRE", default=False),
         "HOLD_LOOKBACK_BARS":              cfg.g("hold", "HOLD_LOOKBACK_BARS"),
         "HOLD_RECENT_BREAK_MAX_BARS": cfg.g("hold", "HOLD_RECENT_BREAK_MAX_BARS"),
         "HOLD_ZONE_BUFFER":        cfg.g("hold", "HOLD_ZONE_BUFFER"),
@@ -786,6 +793,7 @@ def _analyze_key(cfg):
         "ATR_PERCENTILE_RANK":     cfg.g("indicators", "ATR_PERCENTILE_RANK", default=30),
         "ATR_PERCENTILE_LOOKBACK": cfg.g("indicators", "ATR_PERCENTILE_LOOKBACK", default=168),
         "ATR_MIN_PCT_FLOOR":       cfg.g("indicators", "ATR_MIN_PCT_FLOOR", default=1.0),
+        "ATR_BYPASS_ON_EXPLOSION_CRITERIA": cfg.g("indicators", "ATR_BYPASS_ON_EXPLOSION_CRITERIA", default=False),
     }, sort_keys=True)
 
 
@@ -859,32 +867,62 @@ def precompute_indicators(df, cfg):
     return df
 
 
-def analyze_at_index(df, end_idx, cfg):
-    """Lee indicadores precomputados en O(1). df debe venir de precompute_indicators()."""
+def _build_analyze_params(cfg):
+    """Extrae todos los parámetros de cfg usados por analyze_at_index a un dict plano,
+    evitando repetir cfg.g() en cada llamada del hot loop (806k+ veces en un compare 2w)."""
+    return {
+        "RECENT_LOOKBACK":           cfg.g("indicators", "RECENT_LOOKBACK"),
+        "RECENT_LOOKBACK_LONG":      cfg.g("indicators", "RECENT_LOOKBACK_LONG", default=25),
+        "RECENT_LONG_PROXIMITY":     cfg.g("indicators", "RECENT_LONG_PROXIMITY", default=0.01),
+        "OBV_SLOPE_LOOKBACK":        cfg.g("indicators", "OBV_SLOPE_LOOKBACK", default=10),
+        "OBV_RISING_MIN":            cfg.g("indicators", "OBV_RISING_MIN", default=0.05),
+        "CVD_LOOKBACK":              cfg.g("indicators", "CVD_LOOKBACK", default=10),
+        "CVD_BULLISH_MIN":           cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05),
+        "BREAKOUT_BUFFER":           cfg.g("breakout", "BREAKOUT_BUFFER"),
+        "PREBREAK_NEAR_MAX":         cfg.g("prebreak", "PREBREAK_NEAR_MAX"),
+        "ONE_H_RESIST_BUFFER":       cfg.g("hold", "ONE_H_RESIST_BUFFER"),
+        "MAJOR_STRUCT_LOOKBACK":     cfg.g("hold", "MAJOR_STRUCT_LOOKBACK"),
+        "MAJOR_STRUCT_MAX_DIST":     cfg.g("hold", "MAJOR_STRUCT_MAX_DIST"),
+        "HOLD_LOOKBACK_BARS":        cfg.g("hold", "HOLD_LOOKBACK_BARS"),
+        "HOLD_RECENT_BREAK_MAX_BARS":cfg.g("hold", "HOLD_RECENT_BREAK_MAX_BARS"),
+        "HOLD_ZONE_BUFFER":          cfg.g("hold", "HOLD_ZONE_BUFFER"),
+        "HOLD_PULLBACK_MAX":         cfg.g("hold", "HOLD_PULLBACK_MAX"),
+        "STRONG_CLOSE_MIN":          cfg.g("hold", "STRONG_CLOSE_MIN"),
+        "RIDING_LOOKBACK_BARS":      cfg.g("riding", "RIDING_LOOKBACK_BARS"),
+        "RIDING_ZONE_BUFFER":        cfg.g("riding", "RIDING_ZONE_BUFFER"),
+        "RIDING_MIN_VOL_RATIO":      cfg.g("riding", "RIDING_MIN_VOL_RATIO"),
+        "FADING_BELOW_ZONE":         cfg.g("fading", "FADING_BELOW_ZONE"),
+        "ATR_MIN_PCT":               cfg.g("indicators", "ATR_MIN_PCT"),
+    }
+
+
+def analyze_at_index(df, end_idx, params):
+    """Lee indicadores precomputados en O(1). df debe venir de precompute_indicators().
+    params: dict pre-construido con _build_analyze_params(cfg)."""
     if end_idx < 80:
         return None
 
-    RECENT_LOOKBACK = cfg.g("indicators", "RECENT_LOOKBACK")
-    RECENT_LOOKBACK_LONG = cfg.g("indicators", "RECENT_LOOKBACK_LONG", default=25)
-    RECENT_LONG_PROXIMITY = cfg.g("indicators", "RECENT_LONG_PROXIMITY", default=0.01)
-    OBV_SLOPE_LOOKBACK = cfg.g("indicators", "OBV_SLOPE_LOOKBACK", default=10)
-    OBV_RISING_MIN = cfg.g("indicators", "OBV_RISING_MIN", default=0.05)
-    CVD_LOOKBACK = cfg.g("indicators", "CVD_LOOKBACK", default=10)
-    CVD_BULLISH_MIN = cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05)
-    BREAKOUT_BUFFER = cfg.g("breakout", "BREAKOUT_BUFFER")
-    PREBREAK_NEAR_MAX = cfg.g("prebreak", "PREBREAK_NEAR_MAX")
-    ONE_H_RESIST_BUFFER = cfg.g("hold", "ONE_H_RESIST_BUFFER")
-    MAJOR_STRUCT_LOOKBACK = cfg.g("hold", "MAJOR_STRUCT_LOOKBACK")
-    MAJOR_STRUCT_MAX_DIST = cfg.g("hold", "MAJOR_STRUCT_MAX_DIST")
-    HOLD_LOOKBACK_BARS = cfg.g("hold", "HOLD_LOOKBACK_BARS")
-    HOLD_RECENT_BREAK_MAX_BARS = cfg.g("hold", "HOLD_RECENT_BREAK_MAX_BARS")
-    HOLD_ZONE_BUFFER = cfg.g("hold", "HOLD_ZONE_BUFFER")
-    HOLD_PULLBACK_MAX = cfg.g("hold", "HOLD_PULLBACK_MAX")
-    STRONG_CLOSE_MIN = cfg.g("hold", "STRONG_CLOSE_MIN")
-    RIDING_LOOKBACK_BARS = cfg.g("riding", "RIDING_LOOKBACK_BARS")
-    RIDING_ZONE_BUFFER = cfg.g("riding", "RIDING_ZONE_BUFFER")
-    RIDING_MIN_VOL_RATIO = cfg.g("riding", "RIDING_MIN_VOL_RATIO")
-    FADING_BELOW_ZONE = cfg.g("fading", "FADING_BELOW_ZONE")
+    RECENT_LOOKBACK = params["RECENT_LOOKBACK"]
+    RECENT_LOOKBACK_LONG = params["RECENT_LOOKBACK_LONG"]
+    RECENT_LONG_PROXIMITY = params["RECENT_LONG_PROXIMITY"]
+    OBV_SLOPE_LOOKBACK = params["OBV_SLOPE_LOOKBACK"]
+    OBV_RISING_MIN = params["OBV_RISING_MIN"]
+    CVD_LOOKBACK = params["CVD_LOOKBACK"]
+    CVD_BULLISH_MIN = params["CVD_BULLISH_MIN"]
+    BREAKOUT_BUFFER = params["BREAKOUT_BUFFER"]
+    PREBREAK_NEAR_MAX = params["PREBREAK_NEAR_MAX"]
+    ONE_H_RESIST_BUFFER = params["ONE_H_RESIST_BUFFER"]
+    MAJOR_STRUCT_LOOKBACK = params["MAJOR_STRUCT_LOOKBACK"]
+    MAJOR_STRUCT_MAX_DIST = params["MAJOR_STRUCT_MAX_DIST"]
+    HOLD_LOOKBACK_BARS = params["HOLD_LOOKBACK_BARS"]
+    HOLD_RECENT_BREAK_MAX_BARS = params["HOLD_RECENT_BREAK_MAX_BARS"]
+    HOLD_ZONE_BUFFER = params["HOLD_ZONE_BUFFER"]
+    HOLD_PULLBACK_MAX = params["HOLD_PULLBACK_MAX"]
+    STRONG_CLOSE_MIN = params["STRONG_CLOSE_MIN"]
+    RIDING_LOOKBACK_BARS = params["RIDING_LOOKBACK_BARS"]
+    RIDING_ZONE_BUFFER = params["RIDING_ZONE_BUFFER"]
+    RIDING_MIN_VOL_RATIO = params["RIDING_MIN_VOL_RATIO"]
+    FADING_BELOW_ZONE = params["FADING_BELOW_ZONE"]
 
     price = float(df["close"].iat[end_idx])
     # Cambio % de la vela actual vs la anterior (feature usada por EXPLOSION).
@@ -907,8 +945,8 @@ def analyze_at_index(df, end_idx, cfg):
     atr_raw = df["_atr"].iat[end_idx]
     atr = float(atr_raw) if pd.notna(atr_raw) else 0.0
     atr_pct = (atr / price * 100) if price > 0 else 0.0
-    atr_thresh_raw = df["_atr_threshold"].iat[end_idx] if "_atr_threshold" in df.columns else cfg.g("indicators", "ATR_MIN_PCT")
-    atr_threshold = float(atr_thresh_raw) if pd.notna(atr_thresh_raw) else cfg.g("indicators", "ATR_MIN_PCT")
+    atr_thresh_raw = df["_atr_threshold"].iat[end_idx] if "_atr_threshold" in df.columns else params["ATR_MIN_PCT"]
+    atr_threshold = float(atr_thresh_raw) if pd.notna(atr_thresh_raw) else params["ATR_MIN_PCT"]
 
     # Volume
     vol_mean_raw = df["_vol_mean20"].iat[end_idx]
@@ -988,8 +1026,13 @@ def analyze_at_index(df, end_idx, cfg):
     if pd.notna(mm_raw) and end_idx >= MAJOR_STRUCT_LOOKBACK + 1:
         major_dist = (float(mm_raw) - price) / price if price > 0 else 0.0
         major_struct_ok = major_dist <= MAJOR_STRUCT_MAX_DIST
+        _lb_start = end_idx - MAJOR_STRUCT_LOOKBACK - 1
+        _mm_slice = df["high"].values[_lb_start:end_idx - 1]
+        bars_since_major_max = end_idx - (_lb_start + int(np.argmax(_mm_slice)))
     else:
         major_struct_ok = True
+        major_dist = None
+        bars_since_major_max = None
 
     # HOLD lookback (vectorizado sobre slice de arrays numpy)
     hold_recent_break = False
@@ -1087,6 +1130,8 @@ def analyze_at_index(df, end_idx, cfg):
         "not_near_resistance": not_near_resistance,
         "dist_to_res": dist_to_res,
         "major_struct_ok": major_struct_ok,
+        "major_struct_dist": major_dist,
+        "bars_since_major_max": bars_since_major_max,
         "hold_recent_break": hold_recent_break,
         "hold_kept_zone": hold_kept_zone,
         "hold_pullback_ok": hold_pullback_ok,
@@ -1139,7 +1184,23 @@ def classify(symbol, tf_data, cfg, counts_history=None):
     if not tf1h.get("not_near_resistance"):
         return None
     if not tf1h.get("major_struct_ok", True):
-        if not (cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False) and tf15.get("breakout", False)):
+        _bypass_brk = cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False) and tf15.get("breakout", False)
+        _bypass_pre = cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_STRONG_PRE", default=False) and tf15.get("cvd_bullish", False) and tf15.get("obv_rising", False)
+        _bypass_vol = tf1h.get("vol_ratio", 0) >= cfg.g("hold", "MAJOR_STRUCT_BYPASS_VOL_RATIO_1H", default=999.0)
+        _age_thr    = cfg.g("hold", "MAJOR_STRUCT_BYPASS_AGE_BARS", default=999)
+        _bsm        = tf1h.get("bars_since_major_max")
+        _bypass_age = _bsm is not None and _bsm >= _age_thr
+        _soft_dist  = cfg.g("hold", "MAJOR_STRUCT_BYPASS_SOFTZONE_DIST", default=0.0)
+        _soft_max   = cfg.g("hold", "MAJOR_STRUCT_BYPASS_SOFTZONE_HOLD_MAX_BARS", default=0)
+        _msd        = tf1h.get("major_struct_dist")
+        _bsb        = tf15.get("bars_since_break")
+        _bypass_soft = (
+            _soft_dist > 0 and _soft_max > 0
+            and _msd is not None and _msd <= _soft_dist
+            and tf15.get("hold_recent_break", False)
+            and _bsb is not None and _bsb <= _soft_max
+        )
+        if not (_bypass_brk or _bypass_pre or _bypass_vol or _bypass_age or _bypass_soft):
             return None
 
     candidates = []
@@ -1185,7 +1246,25 @@ def classify(symbol, tf_data, cfg, counts_history=None):
     # EXPLOSION solo (si existe) en lugar de None.
     _ema_gate_hard = cfg.g("indicators", "EMA_GATE_HARD", default=True)
     _ema_blocks = (not tf1h.get("ema_trend_up")) and _ema_gate_hard
-    _atr_blocks = tf1h.get("atr_pct", 0) < tf1h.get("atr_threshold", cfg.g("indicators", "ATR_MIN_PCT"))
+    _atr_pct_v      = tf1h.get("atr_pct", 0)
+    _atr_threshold_v = tf1h.get("atr_threshold", cfg.g("indicators", "ATR_MIN_PCT"))
+    _atr_blocks = _atr_pct_v < _atr_threshold_v
+    _atr_ratio  = (_atr_pct_v / _atr_threshold_v) if _atr_threshold_v > 0 else 0.0
+    if _atr_blocks:
+        if cfg.g("indicators", "ATR_BYPASS_ON_EXPLOSION_CRITERIA", default=False) and (
+                tf15.get("vol_ratio", 0)         >= cfg.g("indicators", "ATR_BYPASS_EX_VOL_15M",  default=cfg.g("scoring_explosion", "MIN_VOL_RATIO",    default=5.0))
+                and tf15.get("candle_body_pct", 0)   >= cfg.g("indicators", "ATR_BYPASS_EX_BODY_15M", default=cfg.g("scoring_explosion", "MIN_BODY_PCT",     default=0.85))
+                and tf15.get("close_change_curr", 0) >= cfg.g("indicators", "ATR_BYPASS_EX_CHG_15M",  default=cfg.g("scoring_explosion", "MIN_CLOSE_CHANGE", default=0.025))
+                and tf15.get("width_expansion", 0)   >= cfg.g("indicators", "ATR_BYPASS_EX_BB_15M",   default=cfg.g("scoring_explosion", "MIN_BB_EXPANSION", default=0.5))):
+            _atr_blocks = False
+        elif (tf15.get("vol_ratio", 0) >= cfg.g("indicators", "ATR_BYPASS_VOL_RATIO_15M", default=999.0)
+              and tf15.get("width_expansion", 0) >= cfg.g("indicators", "ATR_BYPASS_BB_EXP_15M_MIN", default=0.0)):
+            _atr_blocks = False
+        elif (cfg.g("indicators", "ATR_BYPASS_NEAR_COMPOUND", default=False)
+              and _atr_ratio >= cfg.g("indicators", "ATR_BYPASS_NEAR_RATIO_MIN", default=0.80)
+              and tf15.get("vol_ratio", 0) >= cfg.g("indicators", "ATR_BYPASS_NEAR_VOL15M_MIN", default=2.0)
+              and tf5.get("close_change_curr", 0) >= cfg.g("indicators", "ATR_BYPASS_NEAR_CHANGE5M_MIN", default=0.005)):
+            _atr_blocks = False
     _trad_signals_eligible = not (_ema_blocks or _atr_blocks)
     if not _trad_signals_eligible and not candidates:
         return None
@@ -1623,6 +1702,9 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
     deriv_enabled = bool(derivatives) and cfg.g("derivatives", "ENABLED", default=False)
     deriv_lookback = cfg.g("derivatives", "OI_LOOKBACK_MIN", default=30)
 
+    # Pre-cachear parámetros de cfg una sola vez (evita ~24M cfg.g() en el hot loop)
+    params = _build_analyze_params(cfg)
+
     # Precalcular índices de barras por (sym, TF) con searchsorted vectorizado.
     scan_ts_arr = np.asarray(scan_ts, dtype=np.int64)
     bar_idx_cache = {}
@@ -1658,7 +1740,7 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
         return [s for s in snapshot_pairs[best] if s in klines]
 
     # ── Función pura que procesa UN símbolo en UN scan ──
-    def _process_symbol(i, ts_ms, sym, active_pairs_set):
+    def _process_symbol(i, ts_ms, sym):
         """Procesa un símbolo en un scan. Retorna candidato o None."""
         by_tf = bar_idx_cache.get(sym, {})
         tf_data = {}
@@ -1675,7 +1757,7 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
             sym_prep = (prepared.get(sym) or {}) if prepared else {}
             prep_df = sym_prep.get(tf)
             df = prep_df if prep_df is not None else klines.get(sym, {}).get(tf)
-            result = analyze_at_index(df, idx, cfg) if prep_df is not None \
+            result = analyze_at_index(df, idx, params) if prep_df is not None \
                      else analyze_at_time(df, idx, cfg)
             if result is None:
                 valid = False
@@ -1691,28 +1773,25 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
         idx_15m = int(by_tf["15m"][i])
         return (i, ts_ms, sym, tf_data, idx_15m)
 
-    total_scans = len(scan_ts)
-    all_candidates = []
-
-    # ── Bucle sobre scans, pero cada scan dispara tareas en paralelo ──
+    # ── Lista plana de tareas: un Parallel para todas las combinaciones scan×símbolo ──
+    # Evita crear/destruir el thread pool 1344 veces (overhead ~100ms cada una).
+    all_tasks = []
     for i, ts_ms in enumerate(scan_ts):
-        active_pairs = pairs_for_scan(ts_ms)
-        if not active_pairs:
-            continue
+        for sym in pairs_for_scan(ts_ms):
+            all_tasks.append((i, ts_ms, sym))
 
-        # Paralelizar sobre los símbolos activos en este scan
-        results = Parallel(n_jobs=-1, prefer="threads")(
-            delayed(_process_symbol)(i, ts_ms, sym, set(active_pairs))
-            for sym in active_pairs
-        )
+    total_tasks = len(all_tasks)
+    total_scans = len(scan_ts)
+    print(f"    [analyze] {total_scans} scans × ~{len(klines)} pares = {total_tasks} tareas")
 
-        for cand in results:
-            if cand is not None:
-                all_candidates.append(cand)
+    raw = Parallel(n_jobs=-1, prefer="threads")(
+        delayed(_process_symbol)(i, ts_ms, sym)
+        for i, ts_ms, sym in all_tasks
+    )
 
-        if i % 50 == 0:
-            print(f"    [analyze] scan {i}/{total_scans} ({i*100//max(total_scans,1)}%) — {len(all_candidates)} candidatos")
-
+    # joblib preserva el orden de los inputs → all_tasks ya está ordenado por scan index
+    all_candidates = [cand for cand in raw if cand is not None]
+    print(f"    [analyze] {len(all_candidates)} candidatos encontrados")
     return all_candidates
 
 
@@ -2047,10 +2126,16 @@ def run_backtest(cfg, weeks, klines, start_dt, end_dt, snapshot_pairs=None,
         prepared = prepared_cache[key]
     else:
         print(f"    [precompute] Calculando indicadores para {len(klines)} pares...")
-        prepared = {
-            sym: {tf: precompute_indicators(tfs[tf], cfg) for tf in ("5m", "15m", "1h") if tf in tfs}
-            for sym, tfs in klines.items()
-        }
+        n_workers = min(8, len(klines))
+        futures_prep = {}
+        with ThreadPoolExecutor(max_workers=n_workers) as ex:
+            for sym, tfs in klines.items():
+                for tf in ("5m", "15m", "1h"):
+                    if tf in tfs:
+                        futures_prep[(sym, tf)] = ex.submit(precompute_indicators, tfs[tf], cfg)
+        prepared = {}
+        for (sym, tf), fut in futures_prep.items():
+            prepared.setdefault(sym, {})[tf] = fut.result()
         if prepared_cache is not None:
             prepared_cache[key] = prepared
     alerts = simulate(cfg, klines, start_dt, end_dt, snapshot_pairs,

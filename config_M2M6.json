@@ -50,17 +50,8 @@
     "OBV_RISING_MIN": 0.024,
     "CVD_LOOKBACK": 10,
     "CVD_BULLISH_MIN": 0.024,
-    "ATR_BYPASS_ON_EXPLOSION_CRITERIA": true,
-    "ATR_BYPASS_EX_VOL_15M": 5.0,
-    "ATR_BYPASS_EX_BODY_15M": 0.65,
-    "ATR_BYPASS_EX_CHG_15M": 0.025,
-    "ATR_BYPASS_EX_BB_15M": 0.30,
-    "ATR_BYPASS_VOL_RATIO_15M": 999.0,
-    "ATR_BYPASS_BB_EXP_15M_MIN": 0.0,
-    "ATR_BYPASS_NEAR_COMPOUND": false,
-    "ATR_BYPASS_NEAR_RATIO_MIN": 0.80,
-    "ATR_BYPASS_NEAR_VOL15M_MIN": 2.0,
-    "ATR_BYPASS_NEAR_CHANGE5M_MIN": 0.005
+    "ATR_BYPASS_ON_EXPLOSION_CRITERIA": false,
+    "ATR_BYPASS_VOL_RATIO_15M": 999.0
   },
   "prebreak": {
     "PREBREAK_NEAR_MAX": 0.008,
@@ -82,16 +73,18 @@
     "HOLD_RECENT_BREAK_MAX_BARS": 5,
     "HOLD_ZONE_BUFFER": 0.003,
     "HOLD_PULLBACK_MAX": 0.03,
-    "STRONG_CLOSE_MIN": 0.70,
+    "STRONG_CLOSE_MIN": 0.7,
     "ONE_H_RESIST_LOOKBACK": 24,
     "ONE_H_RESIST_BUFFER": 0.015,
     "MAJOR_STRUCT_LOOKBACK": 60,
-    "MAJOR_STRUCT_MAX_DIST": 0.10,
+    "MAJOR_STRUCT_MAX_DIST": 0.1,
     "MAJOR_STRUCT_BYPASS_ON_BREAKOUT": true,
     "HOLD_REQUIRE_OBV_RISING": true,
     "HOLD_REQUIRE_CVD_BULLISH": true,
     "MAJOR_STRUCT_BYPASS_VOL_RATIO_1H": 999.0,
-    "MAJOR_STRUCT_BYPASS_AGE_BARS": 35
+    "MAJOR_STRUCT_BYPASS_AGE_BARS": 35,
+    "MAJOR_STRUCT_BYPASS_SOFTZONE_DIST": 0.13,
+    "MAJOR_STRUCT_BYPASS_SOFTZONE_HOLD_MAX_BARS": 4
   },
   "riding": {
     "RIDING_LOOKBACK_BARS": 20,
@@ -241,11 +234,50 @@
     "MIN_SAMPLES_PER_SIGNAL": 30,
     "FALLBACK_PERCENTILE": 0.5,
     "cdf": {
-      "HOLD":      {"8":0.05,"9":0.08,"10":0.12,"11":0.46,"12":0.78,"13":0.90,"14":0.92,"15":1.0},
-      "RIDING":    {"3":0.01,"6":0.05,"8":0.13,"9":0.28,"10":0.50,"11":0.66,"12":0.83,"13":1.0},
-      "BREAKOUT":  {"4":0.01,"6":0.05,"7":0.10,"8":0.17,"9":0.27,"10":0.39,"11":0.50,"12":0.65,"13":0.83,"14":0.90,"15":1.0},
-      "PREBREAK":  {"6":0.20,"7":0.30,"8":0.50,"11":0.85,"15":1.0},
-      "EXPLOSION": {"9":0.55,"12":1.0}
+      "HOLD": {
+        "8": 0.05,
+        "9": 0.08,
+        "10": 0.12,
+        "11": 0.46,
+        "12": 0.78,
+        "13": 0.9,
+        "14": 0.92,
+        "15": 1.0
+      },
+      "RIDING": {
+        "3": 0.01,
+        "6": 0.05,
+        "8": 0.13,
+        "9": 0.28,
+        "10": 0.5,
+        "11": 0.66,
+        "12": 0.83,
+        "13": 1.0
+      },
+      "BREAKOUT": {
+        "4": 0.01,
+        "6": 0.05,
+        "7": 0.1,
+        "8": 0.17,
+        "9": 0.27,
+        "10": 0.39,
+        "11": 0.5,
+        "12": 0.65,
+        "13": 0.83,
+        "14": 0.9,
+        "15": 1.0
+      },
+      "PREBREAK": {
+        "6": 0.2,
+        "7": 0.3,
+        "8": 0.5,
+        "11": 0.85,
+        "15": 1.0
+      },
+      "EXPLOSION": {
+        "9": 0.55,
+        "12": 1.0
+      }
     }
   }
 }

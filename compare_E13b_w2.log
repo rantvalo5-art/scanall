@@ -1,0 +1,232 @@
+Período backtest: 2026-04-18 00:00:00+00:00 → 2026-05-02 00:00:00+00:00 (2 semana(s), 14d)
+Scan interval simulado: 15 min
+
+[1/4] Sin snapshots; usando top pares actuales por volumen...
+  200 pares calificantes hoy (top 200 por volumen)
+
+[2/4] Descargando klines históricas...
+
+  Descargando 200 pares × 3 timeframes = 600 requests
+  Rango: 2026-04-15 a 2026-05-02 (3d buffer + período)
+    50/600 descargados...
+    100/600 descargados...
+    150/600 descargados...
+    200/600 descargados...
+    250/600 descargados...
+    300/600 descargados...
+    350/600 descargados...
+    400/600 descargados...
+    450/600 descargados...
+    500/600 descargados...
+    550/600 descargados...
+  198/200 pares con data completa en los 3 TF
+
+[3/4] Ejecutando simulación...
+
+  >>> Corriendo backtest: OLD (config.json)
+    [precompute] Calculando indicadores para 198 pares...
+
+  Simulando 336h con scans cada 15min...
+    [analyze] Extrayendo candidatos (1345 scans × 198 pares)...
+    [analyze] 1345 scans × ~198 pares = 266310 tareas
+    [analyze] 258554 candidatos encontrados
+    [analyze] 258554 candidatos encontrados
+    Total alertas simuladas: 219
+
+══════════════════════════════════════════════════════════════════════
+ OLD (CONFIG.JSON)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 219
+
+Por tipo:
+  HOLD         81  (36%)
+  BREAKOUT     61  (27%)
+  RIDING       60  (27%)
+  EXPLOSION    16  (7%)
+  PREBREAK      1  (0%)
+
+Por bucket:
+  BEST     94 — max_24h: +12.87%, drawdown: -10.27%, win >2%: 87%
+  STRONG   58 — max_24h: +8.10%, drawdown: -11.72%, win >2%: 79%
+  WATCH    67 — max_24h: +17.10%, drawdown: -9.31%, win >2%: 75%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n=133  avg max 24h: +11.57%
+  CVD neutral              n= 72  avg max 24h: +16.88%
+  CVD bearish (<-0.05)     n= 14  avg max 24h: +5.06%
+
+OBV análisis:
+  OBV rising (>+0.05)      n=174  avg max 24h: +13.72%
+  OBV neutral              n= 40  avg max 24h: +10.45%
+  OBV falling (<-0.05)     n=  5  avg max 24h: +3.96%
+
+recent_long_ok análisis:
+  True  n=179  avg max 24h: +12.33%, drawdown: -10.71%
+  False n= 40  avg max 24h: +15.42%, drawdown: -8.80%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 KATUSDT        BREAKOUT       8 WATCH    +97.49%  +0.00  +0.10    True
+    2 SPKUSDT        RIDING         9 WATCH    +86.65%  +0.01  +0.23   False
+    3 SPKUSDT        RIDING         9 WATCH    +72.91%  +0.00  +0.32   False
+    4 PHBUSDT        BREAKOUT      12 BEST     +72.09%  +0.18  +0.13    True
+    5 KATUSDT        BREAKOUT       8 WATCH    +69.71%  +0.00  +0.15    True
+    6 KATUSDT        HOLD          12 BEST     +69.65%  +0.03  +0.65    True
+    7 EDUUSDT        BREAKOUT       9 WATCH    +62.59%  +0.11  +0.28    True
+    8 ORCAUSDT       HOLD           9 WATCH    +58.58%  +0.04  +0.35   False
+    9 BOMEUSDT       RIDING        13 BEST     +56.62%  +0.05  +0.05   False
+   10 ENSOUSDT       EXPLOSION     12 BEST     +55.29%  +0.19  +0.36    True
+   11 MOVRUSDT       BREAKOUT      10 STRONG   +54.81%  +0.07  +0.24    True
+   12 ORCAUSDT       EXPLOSION      9 WATCH    +49.96%  +0.17  +0.18    True
+   13 BOMEUSDT       BREAKOUT       8 WATCH    +49.09%  +0.09  +0.12   False
+   14 DUSDT          BREAKOUT       6 WATCH    +48.87%  +0.03  +0.10    True
+   15 DUSDT          BREAKOUT       6 WATCH    +48.14%  -0.02  +0.04    True
+   16 ORCAUSDT       BREAKOUT       9 WATCH    +46.10%  +0.03  +0.43    True
+   17 SPKUSDT        BREAKOUT      10 STRONG   +45.96%  +0.04  +0.14    True
+   18 DUSDT          BREAKOUT       5 WATCH    +44.29%  +0.02  +0.07    True
+   19 ZBTUSDT        BREAKOUT      14 BEST     +39.64%  +0.06  +0.21   False
+   20 EDUUSDT        HOLD          12 BEST     +39.00%  +0.12  +0.42    True
+   21 SPKUSDT        EXPLOSION     12 BEST     +38.59%  +0.20  +0.51    True
+   22 ORCAUSDT       HOLD          12 BEST     +36.82%  +0.15  +0.07    True
+   23 DOGSUSDT       EXPLOSION      9 WATCH    +33.92%  +0.14  +0.04    True
+   24 ENSOUSDT       BREAKOUT       9 WATCH    +33.40%  +0.11  +0.34    True
+   25 SPKUSDT        HOLD          15 BEST     +31.32%  +0.03  +0.41    True
+   26 APEUSDT        BREAKOUT      12 BEST     +31.03%  +0.09  +0.04    True
+   27 BIOUSDT        BREAKOUT       8 WATCH    +30.88%  -0.00  +0.00    True
+   28 SPKUSDT        RIDING        10 STRONG   +30.47%  +0.06  +3.44    True
+   29 SPKUSDT        RIDING        12 BEST     +28.17%  +0.09  +0.42   False
+   30 DUSDT          BREAKOUT      11 STRONG   +27.80%  +0.03  +0.03    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n= 61)  3:1 5:3 6:4 7:2 8:7 9:7 10:6 11:7 12:9 13:7 14:2 15:6
+  EXPLOSION  (n= 16)  9:12 12:4
+  HOLD       (n= 81)  8:2 9:3 10:2 11:18 12:39 13:9 14:1 15:7
+  PREBREAK   (n=  1)  8:1
+  RIDING     (n= 60)  5:2 6:2 7:3 8:8 9:10 10:15 11:10 12:5 13:4 15:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=11, STRONG=4, WATCH=15
+  Tipos:   {'BREAKOUT': 16, 'RIDING': 5, 'HOLD': 5, 'EXPLOSION': 4}
+  Score promedio top 30: 10.0
+  Move promedio top 30: +49.66%
+
+  >>> Corriendo backtest: NEW (config_E13b.json)
+    [precompute] Reutilizando indicadores cacheados (198 pares)
+
+  Simulando 336h con scans cada 15min...
+    [analyze] Reutilizando 258554 candidatos cacheados (1345 scans)
+    Total alertas simuladas: 283
+
+══════════════════════════════════════════════════════════════════════
+ NEW (CONFIG_E13B.JSON)
+══════════════════════════════════════════════════════════════════════
+
+Total alertas: 283
+
+Por tipo:
+  HOLD        109  (38%)
+  BREAKOUT     97  (34%)
+  RIDING       60  (21%)
+  EXPLOSION    16  (5%)
+  PREBREAK      1  (0%)
+
+Por bucket:
+  BEST    101 — max_24h: +13.07%, drawdown: -9.94%, win >2%: 89%
+  STRONG   79 — max_24h: +8.22%, drawdown: -10.47%, win >2%: 78%
+  WATCH   103 — max_24h: +14.17%, drawdown: -8.46%, win >2%: 76%
+
+CVD análisis:
+  CVD bullish (>+0.05)     n=176  avg max 24h: +11.24%
+  CVD neutral              n= 86  avg max 24h: +15.01%
+  CVD bearish (<-0.05)     n= 21  avg max 24h: +7.58%
+
+OBV análisis:
+  OBV rising (>+0.05)      n=217  avg max 24h: +12.40%
+  OBV neutral              n= 61  avg max 24h: +11.78%
+  OBV falling (<-0.05)     n=  5  avg max 24h: +3.96%
+
+recent_long_ok análisis:
+  True  n=237  avg max 24h: +11.82%, drawdown: -9.70%
+  False n= 46  avg max 24h: +13.62%, drawdown: -8.76%
+
+TOP 30 movers detectados:
+    # Symbol         Type       Score Bucket    max24h     cvd     obv long_ok
+    1 KATUSDT        BREAKOUT       8 WATCH    +97.49%  +0.00  +0.10    True
+    2 SPKUSDT        RIDING         9 WATCH    +86.65%  +0.01  +0.23   False
+    3 SPKUSDT        RIDING         9 WATCH    +72.91%  +0.00  +0.32   False
+    4 PHBUSDT        BREAKOUT      12 BEST     +72.09%  +0.18  +0.13    True
+    5 KATUSDT        BREAKOUT       8 WATCH    +69.71%  +0.00  +0.15    True
+    6 KATUSDT        HOLD          12 BEST     +69.65%  +0.03  +0.65    True
+    7 EDUUSDT        BREAKOUT       9 WATCH    +62.59%  +0.11  +0.28    True
+    8 EDUUSDT        BREAKOUT       7 WATCH    +59.72%  -0.10  +0.03    True
+    9 ORCAUSDT       HOLD           9 WATCH    +58.58%  +0.04  +0.35   False
+   10 BOMEUSDT       RIDING        13 BEST     +56.62%  +0.05  +0.05   False
+   11 ENSOUSDT       EXPLOSION     12 BEST     +55.29%  +0.19  +0.36    True
+   12 MOVRUSDT       BREAKOUT      10 STRONG   +54.81%  +0.07  +0.24    True
+   13 ORCAUSDT       EXPLOSION      9 WATCH    +49.96%  +0.17  +0.18    True
+   14 BOMEUSDT       BREAKOUT       8 WATCH    +49.09%  +0.09  +0.12   False
+   15 DUSDT          BREAKOUT       6 WATCH    +48.87%  +0.03  +0.10    True
+   16 DUSDT          BREAKOUT       6 WATCH    +48.14%  -0.02  +0.04    True
+   17 ORCAUSDT       BREAKOUT       9 WATCH    +46.10%  +0.03  +0.43    True
+   18 SPKUSDT        BREAKOUT      10 STRONG   +45.96%  +0.04  +0.14    True
+   19 DUSDT          BREAKOUT       5 WATCH    +44.29%  +0.02  +0.07    True
+   20 ORCAUSDT       BREAKOUT       3 WATCH    +44.02%  +0.13  +0.03    True
+   21 ZBTUSDT        BREAKOUT      14 BEST     +39.64%  +0.06  +0.21   False
+   22 EDUUSDT        HOLD          12 BEST     +39.00%  +0.12  +0.42    True
+   23 SPKUSDT        EXPLOSION     12 BEST     +38.59%  +0.20  +0.51    True
+   24 ORCAUSDT       HOLD          12 BEST     +36.82%  +0.15  +0.07    True
+   25 DOGSUSDT       EXPLOSION      9 WATCH    +33.92%  +0.14  +0.04    True
+   26 ENSOUSDT       BREAKOUT       9 WATCH    +33.40%  +0.11  +0.34    True
+   27 ORCAUSDT       HOLD          12 BEST     +31.40%  +0.15  +0.42    True
+   28 SPKUSDT        HOLD          15 BEST     +31.32%  +0.03  +0.41    True
+   29 APEUSDT        BREAKOUT      12 BEST     +31.03%  +0.09  +0.04    True
+   30 BIOUSDT        BREAKOUT       8 WATCH    +30.88%  -0.00  +0.00    True
+
+Distribución de scores por signal_type (todos los alerts):
+  BREAKOUT   (n= 97)  0:1 1:1 2:1 3:5 4:2 5:5 6:6 7:9 8:8 9:14 10:10 11:10 12:10 13:7 14:2 15:6
+  EXPLOSION  (n= 16)  9:12 12:4
+  HOLD       (n=109)  7:3 8:3 9:7 10:14 11:20 12:45 13:9 14:2 15:6
+  PREBREAK   (n=  1)  8:1
+  RIDING     (n= 60)  5:2 6:2 7:3 8:8 9:10 10:14 11:11 12:5 13:4 15:1
+
+Top 30 movers — desglose:
+  Buckets: BEST=11, STRONG=2, WATCH=17
+  Tipos:   {'BREAKOUT': 17, 'RIDING': 3, 'HOLD': 6, 'EXPLOSION': 4}
+  Score promedio top 30: 9.6
+  Move promedio top 30: +51.28%
+
+══════════════════════════════════════════════════════════════════════
+ COMPARACIÓN: config.json  vs  config_E13b.json  (14 días)
+══════════════════════════════════════════════════════════════════════
+  Métrica                              config.json config_E13b.json
+  -------------------------------- --------------- ---------------
+  Total alertas                                219             283
+  BREAKOUT count                                61              97
+  BEST count                                    94             101
+  BEST por día (target: 10-20)                 6.7             7.2
+  STRONG count                                  58              79
+  Explosivos totales (>20%)                     36              44
+  -------------------------------- --------------- ---------------
+  ★ CATCH RATE (lo más importante):
+  Top 30 movers en BEST                        11/30             11/30
+  Top 30 movers en BEST+STRONG                 15/30             13/30
+  -------------------------------- --------------- ---------------
+  ★ CALIDAD del bucket BEST:
+  Avg max 24h BEST                         +12.87%         +13.07%
+  Avg drawdown BEST                        -10.27%          -9.94%
+  R/R BEST                                    1.25            1.31
+  Win >5% en BEST                              70%              69%
+  Win >10% en BEST                             39%              42%
+  -------------------------------- --------------- ---------------
+  Otros:
+  Avg max 24h global                       +12.90%         +12.11%
+  Avg max 24h STRONG                        +8.10%          +8.22%
+  Avg drawdown global                      -10.36%          -9.55%
+  Win >2% global                               81%              81%
+  Win >5% global                               62%              60%
+
+[4/4] Guardando resultados...
+  Guardado: C:\Users\a\scancrypto\compare_E13b_w2.json
+
+DONE
