@@ -2,7 +2,7 @@ name: Update Outcomes
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/15 * * * *" # cada 15 min
+    - cron: "0 * * * *" # cada 15 min
 jobs:
   update:
     runs-on: self-hosted
