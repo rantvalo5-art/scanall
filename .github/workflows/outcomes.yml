@@ -5,7 +5,7 @@ on:
     - cron: "*/15 * * * *" # cada 15 min
 jobs:
   update:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 20
     steps:
       - name: Checkout

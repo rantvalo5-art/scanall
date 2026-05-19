@@ -136,7 +136,14 @@ def classify_explain(symbol, tf_data, cfg):
 
     # Pre-gates universales (aplican a TODOS los signals incl. EXPLOSION).
     if not tf1h.get("not_near_resistance"):
-        return None, "pre_resist"
+        _bypass_resist = (
+            cfg.g("hold", "RESIST_BYPASS_ON_15M_BREAKOUT", default=False)
+            and tf15.get("breakout", False)
+            and tf15.get("vol_ratio", 0) >= cfg.g("hold", "RESIST_BYPASS_MIN_VOL_15M", default=999.0)
+            and (tf15.get("bars_since_break") or 999) <= cfg.g("hold", "RESIST_BYPASS_MAX_BARS_SINCE_BREAK", default=0)
+        )
+        if not _bypass_resist:
+            return None, "pre_resist"
     if not tf1h.get("major_struct_ok", True):
         _bypass_brk = cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False) and tf15.get("breakout", False)
         _bypass_pre = cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_STRONG_PRE", default=False) and tf15.get("cvd_bullish", False) and tf15.get("obv_rising", False)
@@ -166,7 +173,13 @@ def classify_explain(symbol, tf_data, cfg):
 
     ema_gate_hard = cfg.g("indicators", "EMA_GATE_HARD", default=True)
     if ema_gate_hard and not tf1h.get("ema_trend_up"):
-        return None, "pre_ema_trend"
+        _ema_bypassed = cfg.g("indicators", "EMA_BYPASS_ON_EXPLOSION_CRITERIA", default=False) and (
+                tf15.get("vol_ratio", 0)         >= cfg.g("indicators", "EMA_BYPASS_EX_VOL_15M",  default=5.0)
+                and tf15.get("candle_body_pct", 0)   >= cfg.g("indicators", "EMA_BYPASS_EX_BODY_15M", default=0.85)
+                and tf15.get("close_change_curr", 0) >= cfg.g("indicators", "EMA_BYPASS_EX_CHG_15M",  default=0.025)
+                and tf15.get("width_expansion", 0)   >= cfg.g("indicators", "EMA_BYPASS_EX_BB_15M",   default=0.5))
+        if not _ema_bypassed:
+            return None, "pre_ema_trend"
     _atr_pct_v_a      = tf1h.get("atr_pct", 0)
     _atr_threshold_v_a = tf1h.get("atr_threshold", cfg.g("indicators", "ATR_MIN_PCT"))
     _atr_blocks_audit = _atr_pct_v_a < _atr_threshold_v_a

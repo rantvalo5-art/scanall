@@ -1182,7 +1182,14 @@ def classify(symbol, tf_data, cfg, counts_history=None):
 
     # Gates universales (aplican a TODOS los signals incl. EXPLOSION).
     if not tf1h.get("not_near_resistance"):
-        return None
+        _bypass_resist = (
+            cfg.g("hold", "RESIST_BYPASS_ON_15M_BREAKOUT", default=False)
+            and tf15.get("breakout", False)
+            and tf15.get("vol_ratio", 0) >= cfg.g("hold", "RESIST_BYPASS_MIN_VOL_15M", default=999.0)
+            and (tf15.get("bars_since_break") or 999) <= cfg.g("hold", "RESIST_BYPASS_MAX_BARS_SINCE_BREAK", default=0)
+        )
+        if not _bypass_resist:
+            return None
     if not tf1h.get("major_struct_ok", True):
         _bypass_brk = cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_BREAKOUT", default=False) and tf15.get("breakout", False)
         _bypass_pre = cfg.g("hold", "MAJOR_STRUCT_BYPASS_ON_STRONG_PRE", default=False) and tf15.get("cvd_bullish", False) and tf15.get("obv_rising", False)
@@ -1246,6 +1253,14 @@ def classify(symbol, tf_data, cfg, counts_history=None):
     # EXPLOSION solo (si existe) en lugar de None.
     _ema_gate_hard = cfg.g("indicators", "EMA_GATE_HARD", default=True)
     _ema_blocks = (not tf1h.get("ema_trend_up")) and _ema_gate_hard
+    _ema_bypassed_by_explosion = False
+    if _ema_blocks and cfg.g("indicators", "EMA_BYPASS_ON_EXPLOSION_CRITERIA", default=False) and (
+            tf15.get("vol_ratio", 0)         >= cfg.g("indicators", "EMA_BYPASS_EX_VOL_15M",  default=5.0)
+            and tf15.get("candle_body_pct", 0)   >= cfg.g("indicators", "EMA_BYPASS_EX_BODY_15M", default=0.85)
+            and tf15.get("close_change_curr", 0) >= cfg.g("indicators", "EMA_BYPASS_EX_CHG_15M",  default=0.025)
+            and tf15.get("width_expansion", 0)   >= cfg.g("indicators", "EMA_BYPASS_EX_BB_15M",   default=0.5)):
+        _ema_blocks = False
+        _ema_bypassed_by_explosion = True
     _atr_pct_v      = tf1h.get("atr_pct", 0)
     _atr_threshold_v = tf1h.get("atr_threshold", cfg.g("indicators", "ATR_MIN_PCT"))
     _atr_blocks = _atr_pct_v < _atr_threshold_v
@@ -1396,7 +1411,8 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 climax_signals += 1
             if tf15.get("candle_body_pct", 0) >= climax_body_min:
                 climax_signals += 1
-            if climax_signals >= climax_thresh:
+            _climax_late_only = cfg.g("indicators", "CLIMAX_REQUIRES_LATE_ENTRY", default=False)
+            if climax_signals >= climax_thresh and (not _climax_late_only or tf15["breakout_distance"] >= late_min):
                 score += climax_pen
 
             if tf15["breakout_distance"] <= early_max:
@@ -1485,7 +1501,9 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 score += vol_ok_b
             if tf15.get("strong_close"):
                 score += close_b
-            if tf1h.get("ema_trend_up"):
+            _ema_up_effective = tf1h.get("ema_trend_up") or (
+                _ema_bypassed_by_explosion and cfg.g("indicators", "EMA_BYPASS_GRANTS_TREND_BONUS", default=False))
+            if _ema_up_effective:
                 score += ema_b
             if tf1h.get("dist_to_res", 0) > dist_high_min:
                 score += dist_high_b

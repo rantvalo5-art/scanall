@@ -10,7 +10,7 @@ on:
   #   types: [run-screener]
 jobs:
   scan:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 12
     steps:
       - name: Checkout
