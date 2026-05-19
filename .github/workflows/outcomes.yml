@@ -21,4 +21,6 @@ jobs:
       - name: Run update_outcomes
         env:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: python update_outcomes.py
+        run: 
+          source venv/bin/activate
+          python update_outcomes.py
