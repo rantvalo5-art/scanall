@@ -16,11 +16,11 @@ jobs:
       #  with:
       #    python-version: "3.11"
       #    cache: "pip"
-      - name: Install dependencies
-        run: pip install requests pandas==2.2.3
+      #- name: Install dependencies
+      #  run: pip install requests pandas==2.2.3
       - name: Run update_outcomes
         env:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run: 
-          source venv/bin/activate
+        run: |
+          source ~/scanall/venv/bin/activate
           python update_outcomes.py
