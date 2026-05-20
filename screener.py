@@ -87,7 +87,8 @@ ACTIVE_SIGNALS_BREAKOUT  = _cfg("active_signals", "BREAKOUT")
 ACTIVE_SIGNALS_RIDING    = _cfg("active_signals", "RIDING")
 ACTIVE_SIGNALS_FADING    = _cfg("active_signals", "FADING")
 ACTIVE_SIGNALS_HOLD      = _cfg("active_signals", "HOLD")
-ACTIVE_SIGNALS_EXPLOSION = _cfg("active_signals", "EXPLOSION", default=False)
+ACTIVE_SIGNALS_EXPLOSION         = _cfg("active_signals", "EXPLOSION", default=False)
+ACTIVE_SIGNALS_EXPLOSION_FORMING = _cfg("active_signals", "EXPLOSION_FORMING", default=False)
 
 EMA_SLOW        = _cfg("indicators", "EMA_SLOW")
 RECENT_LOOKBACK = _cfg("indicators", "RECENT_LOOKBACK")
@@ -148,6 +149,12 @@ STRONG_MIN_SCORE    = _cfg("scoring", "STRONG_MIN_SCORE")
 IMMEDIATE_MIN_SCORE = _cfg("scoring", "IMMEDIATE_MIN_SCORE")
 FORMING_CANDLE_PENALTY = _cfg("scoring", "FORMING_CANDLE_PENALTY")
 SCORE_CAP           = _cfg("scoring", "SCORE_CAP")
+
+# Thresholds separados para candidatos en vela forming (EXPLOSION_FORMING).
+# Se usan en lugar de BEST/STRONG/IMMEDIATE_MIN_SCORE para no tocar el path closed.
+BEST_MIN_SCORE_FORMING      = _cfg("scoring", "BEST_MIN_SCORE_FORMING",      default=9)
+STRONG_MIN_SCORE_FORMING    = _cfg("scoring", "STRONG_MIN_SCORE_FORMING",    default=8)
+IMMEDIATE_MIN_SCORE_FORMING = _cfg("scoring", "IMMEDIATE_MIN_SCORE_FORMING", default=9)
 
 CHART_ENABLED = _cfg("chart", "ENABLED")
 CHART_BARS    = _cfg("chart", "BARS")
@@ -590,6 +597,14 @@ def final_bucket(score):
     return "WATCH"
 
 
+def final_bucket_forming(score):
+    if score >= BEST_MIN_SCORE_FORMING:
+        return "BEST"
+    if score >= STRONG_MIN_SCORE_FORMING:
+        return "STRONG"
+    return "WATCH"
+
+
 # ── Contexto de mercado (BTC) ─────────────────────────────────────────────────
 def get_btc_context():
     """Régimen de BTC en 4h para el header del batch."""
@@ -642,7 +657,52 @@ def analyze(symbol, interval):
     # la descartamos. El resto del análisis usa iloc[-1] = última vela cerrada.
     last_close_time_ms = int(df["close_time"].iloc[-1])
     now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-    if now_ms < last_close_time_ms:
+    _is_forming_candle = now_ms < last_close_time_ms
+
+    # Extraer features de la vela en formación ANTES del drop, solo si el flag está activo
+    # y el TF es 5m (único TF donde EXPLOSION_FORMING opera).
+    _forming_data = None
+    if ACTIVE_SIGNALS_EXPLOSION_FORMING and interval == "5m" and _is_forming_candle:
+        _f_open_ms    = int(df["open_time"].iloc[-1])
+        _candle_ms    = 5 * 60 * 1000
+        _elapsed_frac = max(min((now_ms - _f_open_ms) / _candle_ms, 1.0), 0.01)
+        _f_close = float(df["close"].iloc[-1])
+        _f_open  = float(df["open"].iloc[-1])
+        _f_high  = float(df["high"].iloc[-1])
+        _f_low   = float(df["low"].iloc[-1])
+        _f_vol   = float(df["volume"].iloc[-1])
+        # Vol pace ratio: proyecta el volumen parcial a vela completa, normalizado por media
+        _f_vm    = float(df["volume"].iloc[-21:-1].mean())
+        _f_vpr   = (_f_vol / _elapsed_frac) / _f_vm if _f_vm > 0 else 0.0
+        # Body y cambio (válidos sobre vela forming)
+        _f_rng   = max(_f_high - _f_low, 1e-12)
+        _f_body  = abs(_f_close - _f_open) / _f_rng
+        _f_prev  = float(df["close"].iloc[-2]) if len(df) >= 2 else _f_close
+        _f_chg   = safe_pct(_f_close, _f_prev)
+        # BB expansion con vela forming incluida
+        _f_bb  = ta.volatility.BollingerBands(df["close"], window=20, window_dev=2)
+        _f_hb  = _f_bb.bollinger_hband()
+        _f_lb  = _f_bb.bollinger_lband()
+        _f_ma  = _f_bb.bollinger_mavg()
+        _f_wc  = ((_f_hb.iloc[-1] - _f_lb.iloc[-1]) / _f_ma.iloc[-1]) if _f_ma.iloc[-1] else 0.0
+        _f_wp  = ((_f_hb.iloc[-2] - _f_lb.iloc[-2]) / _f_ma.iloc[-2]) if _f_ma.iloc[-2] else 0.0
+        _f_bbx = safe_pct(_f_wc, _f_wp)
+        # Recent max de velas cerradas (excluye forming y la vela previa al mismo)
+        _f_closed_h = df["high"].iloc[:-1]
+        _f_rm = (_f_closed_h.iloc[-(RECENT_LOOKBACK + 1):-1].max()
+                 if len(_f_closed_h) >= RECENT_LOOKBACK + 2 else _f_closed_h.max())
+        _f_bkdist = safe_pct(_f_close, _f_rm) if _f_rm > 0 else 0.0
+        _forming_data = {
+            "price":            _f_close,
+            "vol_ratio":        _f_vpr,
+            "candle_body_pct":  _f_body,
+            "close_change_curr": _f_chg,
+            "width_expansion":  _f_bbx,
+            "breakout_distance": _f_bkdist,
+            "elapsed_frac":     _elapsed_frac,
+        }
+
+    if _is_forming_candle:
         df = df.iloc[:-1].reset_index(drop=True)
 
     if len(df) < 80:
@@ -903,6 +963,8 @@ def analyze(symbol, interval):
         "candle_status": candle_status,
         # df completo guardado SOLO para generar charts después; no se usa en classify
         "_df": df,
+        # features de vela forming (solo 5m cuando EXPLOSION_FORMING=true y vela no cerró)
+        "_forming": _forming_data,
     }
 
 
@@ -994,6 +1056,59 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "obv_slope": tf15.get("obv_slope"),
                 "cvd_ratio": tf15.get("cvd_ratio"),
                 "recent_long_ok": tf15.get("recent_long_ok"),
+            })
+
+    # ── EXPLOSION (vela forming) ───────────────────────────────────────────────
+    # Mismo criterio que EXPLOSION cerrado pero sobre la vela 5m en progreso.
+    # Vol ratio = pace-scaled (volumen parcial / fracción transcurrida / media histórica).
+    # El penalty de forming (-FORMING_CANDLE_PENALTY) lo aplica el bloque de penalización
+    # más abajo. El candidato se marca con _is_forming=True para que ese bloque lo sepa.
+    tf5_forming = tf5.get("_forming")
+    if ACTIVE_SIGNALS_EXPLOSION_FORMING and tf5_forming:
+        ex_min_vol  = _cfg("scoring_explosion", "MIN_VOL_RATIO", default=5.0)
+        ex_min_body = _cfg("scoring_explosion", "MIN_BODY_PCT", default=0.85)
+        ex_min_chg  = _cfg("scoring_explosion", "MIN_CLOSE_CHANGE", default=0.025)
+        ex_min_bb   = _cfg("scoring_explosion", "MIN_BB_EXPANSION", default=0.5)
+        explosion_forming_ok = (
+            tf5_forming.get("vol_ratio", 0)          >= ex_min_vol
+            and tf5_forming.get("candle_body_pct", 0)  >= ex_min_body
+            and tf5_forming.get("close_change_curr", 0) >= ex_min_chg
+            and tf5_forming.get("width_expansion", 0)   >= ex_min_bb
+        )
+        if explosion_forming_ok and not in_cooldown(symbol, "EXPLOSION", last_seen):
+            ex_base     = _cfg("scoring_explosion", "BASE_SCORE", default=12)
+            ex_late_max = _cfg("scoring_explosion", "LATE_ENTRY_MAX_DIST", default=0.03)
+            ex_late_pen = _cfg("scoring_explosion", "LATE_ENTRY_PENALTY", default=-3)
+            score   = ex_base
+            elapsed = tf5_forming["elapsed_frac"]
+            reasons = [
+                f"vol 5m (pace) {tf5_forming['vol_ratio']:.1f}x",
+                f"body {tf5_forming['candle_body_pct']:.0%}",
+                f"close 5m +{tf5_forming['close_change_curr']:.2%}",
+                f"BB expansion +{tf5_forming['width_expansion']:.0%}",
+                f"vela forming ({elapsed:.0%} transcurrido)",
+            ]
+            if tf5_forming.get("breakout_distance", 0) > ex_late_max:
+                score += ex_late_pen
+                reasons.append(f"⚠ ya extendido {tf5_forming['breakout_distance']:.2%} sobre máximo")
+            score = max(0, min(score, SCORE_CAP))
+            candidates.append({
+                "symbol":       symbol,
+                "label":        "EXPLOSION",
+                "history_tf":   "EXPLOSION",
+                "score":        score,
+                "priority":     5,
+                "bucket":       final_bucket_forming(score - FORMING_CANDLE_PENALTY),
+                "reasons":      reasons,
+                "late":         False,
+                "timeframe":    "5m",
+                "immediate":    (score - FORMING_CANDLE_PENALTY) >= IMMEDIATE_MIN_SCORE_FORMING,
+                "price":        tf5_forming["price"],
+                "ref_price":    tf5.get("recent_max", tf5_forming["price"]),
+                "obv_slope":    tf15.get("obv_slope"),
+                "cvd_ratio":    tf15.get("cvd_ratio"),
+                "recent_long_ok": tf15.get("recent_long_ok"),
+                "_is_forming":  True,
             })
 
     # Gates para signals tradicionales (PREBREAK/BREAKOUT/RIDING/HOLD/FADING).
@@ -1575,19 +1690,20 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
         return None
 
     # Asignar candle_status a cada candidate.
-    # NOTA: con el fix de recorte de vela en formación al inicio de analyze(),
-    # cs siempre debería ser "closed". El bloque de penalización queda como defensa
-    # en profundidad por si alguien en el futuro agrega un código path que produzca
-    # datos forming (ej: otra fuente de datos).
+    # Forming candidates (EXPLOSION_FORMING) se identifican por _is_forming=True.
+    # Los demás siempre son "closed" (analyze() descarta la vela viva).
     for c in candidates:
-        tf_data = tf_map.get(c["timeframe"]) or {}
-        cs = tf_data.get("candle_status", "closed")
+        if c.get("_is_forming"):
+            cs = "forming"
+        else:
+            tf_data = tf_map.get(c["timeframe"]) or {}
+            cs = tf_data.get("candle_status", "closed")
         c["candle_status"] = cs
         if cs == "forming":
             c["score"] = max(0, c["score"] - FORMING_CANDLE_PENALTY)
-            c["bucket"] = final_bucket(c["score"])
-            # Si por la penalización ya no llega a IMMEDIATE_MIN_SCORE, bajamos el flag
-            if c.get("immediate") and c["score"] < IMMEDIATE_MIN_SCORE:
+            c["bucket"] = final_bucket_forming(c["score"])
+            # Si por la penalización ya no llega al threshold forming, bajamos el flag
+            if c.get("immediate") and c["score"] < IMMEDIATE_MIN_SCORE_FORMING:
                 c["immediate"] = False
 
     # Penalización suave por EMA 1h no alcista (solo cuando EMA_GATE_HARD=false).
@@ -1728,6 +1844,7 @@ def main():
     if ACTIVE_SIGNALS_FADING:    active_names.append("FADING")
     if ACTIVE_SIGNALS_HOLD:      active_names.append("HOLD")
     if ACTIVE_SIGNALS_EXPLOSION: active_names.append("EXPLOSION")
+    if ACTIVE_SIGNALS_EXPLOSION_FORMING: active_names.append("EXPLOSION-FORMING")
 
     print(f"[{now}] Escaneando {len(pairs)} pares USDT ({' + '.join(INTERVALS)}) con {MAX_WORKERS} workers...")
     print(f"Señales activas: {', '.join(active_names) if active_names else 'NINGUNA'}")

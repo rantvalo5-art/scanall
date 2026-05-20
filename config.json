@@ -34,7 +34,8 @@
     "RIDING": true,
     "FADING": true,
     "HOLD": true,
-    "EXPLOSION": true
+    "EXPLOSION": true,
+    "EXPLOSION_FORMING": true
   },
   "indicators": {
     "EMA_SLOW": 21,
@@ -127,7 +128,10 @@
     "STRONG_MIN_SCORE": 10,
     "IMMEDIATE_MIN_SCORE": 12,
     "FORMING_CANDLE_PENALTY": 3,
-    "SCORE_CAP": 15
+    "SCORE_CAP": 15,
+    "BEST_MIN_SCORE_FORMING": 9,
+    "STRONG_MIN_SCORE_FORMING": 8,
+    "IMMEDIATE_MIN_SCORE_FORMING": 9
   },
   "scoring_prebreak": {
     "BASE_OFFSET": 4,
@@ -223,7 +227,7 @@
     "BASE_SCORE": 12,
     "MIN_VOL_RATIO": 5.0,
     "MIN_BODY_PCT": 0.85,
-    "MIN_CLOSE_CHANGE": 0.025,
+    "MIN_CLOSE_CHANGE": 0.020,
     "MIN_BB_EXPANSION": 0.5,
     "LATE_ENTRY_MAX_DIST": 0.03,
     "LATE_ENTRY_PENALTY": -3

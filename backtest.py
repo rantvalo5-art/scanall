@@ -279,6 +279,39 @@ def download_all_klines(symbols, start_dt, end_dt):
     return valid
 
 
+def download_1m_klines(symbols, start_dt, end_dt):
+    """Descarga klines 1m para la lista de símbolos. No agrega buffer extra — el caller
+    pasa las fechas exactas que necesita. Cachea igual que download_all_klines."""
+    start_ms = int(start_dt.timestamp() * 1000)
+    end_ms   = int(end_dt.timestamp() * 1000)
+    data = {}
+    print(f"\n  Descargando {len(symbols)} pares × 1m klines (para análisis forming)...")
+    completed = 0
+
+    def fetch(sym):
+        p = _cache_path("klines", sym, "1m", start_ms, end_ms)
+        cached = _cache_get(p)
+        if cached is not None:
+            return sym, cached
+        result = get_klines_range(sym, "1m", start_ms, end_ms)
+        if result is not None:
+            _cache_put(p, result)
+        return sym, result
+
+    with ThreadPoolExecutor(max_workers=MAX_DOWNLOAD_WORKERS) as ex:
+        futures = [ex.submit(fetch, s) for s in symbols]
+        for fut in as_completed(futures):
+            sym, df = fut.result()
+            if df is None or len(df) < 5:
+                continue
+            data[sym] = df
+            completed += 1
+            if completed % 50 == 0:
+                print(f"    {completed}/{len(symbols)} pares 1m descargados...")
+    print(f"  {len(data)}/{len(symbols)} pares con 1m data")
+    return data
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # FETCH DE DERIVATIVES (Binance Futures USDT-M)
 # ════════════════════════════════════════════════════════════════════════════
@@ -864,6 +897,18 @@ def precompute_indicators(df, cfg):
     # shift(1): para los loops internos de HOLD/RIDING (ref = max antes de la barra idx)
     df["_recent_max_shift1"] = high.rolling(RECENT_LOOKBACK).max().shift(1)
 
+    # Pre-extrae numpy arrays para analyze_at_index — evita ~3.3M lookups df[col] en el hot loop
+    _np_cols = [
+        "open", "high", "low", "close", "volume",
+        "_ema_slow", "_bb_width", "_atr", "_atr_threshold",
+        "_vol_mean20", "_vol_ratio", "_vol_recent3", "_vol_prev3",
+        "_obv", "_cvd", "_cvd_vol_sum",
+        "_candle_body_pct", "_close_pos",
+        "_recent_max_short", "_recent_max_long",
+        "_one_h_resist", "_major_max", "_recent_max_shift1",
+    ]
+    df.attrs["np"] = {c: df[c].to_numpy() for c in _np_cols if c in df.columns}
+
     return df
 
 
@@ -924,58 +969,60 @@ def analyze_at_index(df, end_idx, params):
     RIDING_MIN_VOL_RATIO = params["RIDING_MIN_VOL_RATIO"]
     FADING_BELOW_ZONE = params["FADING_BELOW_ZONE"]
 
-    price = float(df["close"].iat[end_idx])
+    arr = df.attrs["np"]
+
+    price = float(arr["close"][end_idx])
     # Cambio % de la vela actual vs la anterior (feature usada por EXPLOSION).
-    close_change_curr = (price / float(df["close"].iat[end_idx - 1]) - 1) if end_idx >= 1 and float(df["close"].iat[end_idx - 1]) > 0 else 0.0
+    close_change_curr = (price / float(arr["close"][end_idx - 1]) - 1) if end_idx >= 1 and float(arr["close"][end_idx - 1]) > 0 else 0.0
 
     # EMA
-    ema_val = df["_ema_slow"].iat[end_idx]
-    ema_val_prev = df["_ema_slow"].iat[end_idx - 3] if end_idx >= 3 else np.nan
+    ema_val = arr["_ema_slow"][end_idx]
+    ema_val_prev = arr["_ema_slow"][end_idx - 3] if end_idx >= 3 else np.nan
     ema_trend_up = (bool(price > ema_val and ema_val > ema_val_prev)
                     if pd.notna(ema_val) and pd.notna(ema_val_prev) else False)
 
     # BB
-    width_curr_raw = df["_bb_width"].iat[end_idx]
+    width_curr_raw = arr["_bb_width"][end_idx]
     width_curr = float(width_curr_raw) if pd.notna(width_curr_raw) else 0.0
-    width_prev_raw = df["_bb_width"].iat[end_idx - 1] if end_idx >= 1 else np.nan
+    width_prev_raw = arr["_bb_width"][end_idx - 1] if end_idx >= 1 else np.nan
     width_prev = float(width_prev_raw) if pd.notna(width_prev_raw) and width_prev_raw != 0 else 0.0
     width_expansion = safe_pct(width_curr, width_prev) if width_prev != 0 else 0.0
 
     # ATR
-    atr_raw = df["_atr"].iat[end_idx]
+    atr_raw = arr["_atr"][end_idx]
     atr = float(atr_raw) if pd.notna(atr_raw) else 0.0
     atr_pct = (atr / price * 100) if price > 0 else 0.0
-    atr_thresh_raw = df["_atr_threshold"].iat[end_idx] if "_atr_threshold" in df.columns else params["ATR_MIN_PCT"]
+    atr_thresh_raw = arr["_atr_threshold"][end_idx] if "_atr_threshold" in arr else params["ATR_MIN_PCT"]
     atr_threshold = float(atr_thresh_raw) if pd.notna(atr_thresh_raw) else params["ATR_MIN_PCT"]
 
     # Volume
-    vol_mean_raw = df["_vol_mean20"].iat[end_idx]
+    vol_mean_raw = arr["_vol_mean20"][end_idx]
     vol_mean = float(vol_mean_raw) if pd.notna(vol_mean_raw) and vol_mean_raw > 0 else 0.0
-    vol_curr = float(df["volume"].iat[end_idx])
+    vol_curr = float(arr["volume"][end_idx])
     vol_ratio = (vol_curr / vol_mean) if vol_mean > 0 else 0.0
-    vr_prev_raw = df["_vol_ratio"].iat[end_idx - 1] if end_idx >= 1 else 0.0
+    vr_prev_raw = arr["_vol_ratio"][end_idx - 1] if end_idx >= 1 else 0.0
     vol_ratio_prev = float(vr_prev_raw) if pd.notna(vr_prev_raw) else 0.0
-    vol_recent_raw = df["_vol_recent3"].iat[end_idx]
-    vol_prev_raw = df["_vol_prev3"].iat[end_idx]
+    vol_recent_raw = arr["_vol_recent3"][end_idx]
+    vol_prev_raw = arr["_vol_prev3"][end_idx]
     vol_recent = float(vol_recent_raw) if pd.notna(vol_recent_raw) else 0.0
     vol_prev = float(vol_prev_raw) if pd.notna(vol_prev_raw) and vol_prev_raw > 0 else 0.0
     vol_growth = (vol_recent / vol_prev) if vol_prev > 0 else 0.0
 
     # Candle
-    close_pos = float(df["_close_pos"].iat[end_idx])
+    close_pos = float(arr["_close_pos"][end_idx])
     strong_close = close_pos >= STRONG_CLOSE_MIN
-    candle_body_pct = float(df["_candle_body_pct"].iat[end_idx])
+    candle_body_pct = float(arr["_candle_body_pct"][end_idx])
 
     # OBV
     try:
-        obv_now = float(df["_obv"].iat[end_idx])
+        obv_now = float(arr["_obv"][end_idx])
         obv_ref_idx = max(0, end_idx - OBV_SLOPE_LOOKBACK + 1)
-        obv_ref = float(df["_obv"].iat[obv_ref_idx])
+        obv_ref = float(arr["_obv"][obv_ref_idx])
         obv_slope = (obv_now - obv_ref) / abs(obv_now) if abs(obv_now) > 1e-12 else 0.0
         obv_rising = obv_slope >= OBV_RISING_MIN
-        obv_prev = float(df["_obv"].iat[end_idx - 1]) if end_idx >= 1 else 0.0
+        obv_prev = float(arr["_obv"][end_idx - 1]) if end_idx >= 1 else 0.0
         obv_ref_prev_idx = max(0, end_idx - 1 - OBV_SLOPE_LOOKBACK + 1)
-        obv_ref_prev = float(df["_obv"].iat[obv_ref_prev_idx])
+        obv_ref_prev = float(arr["_obv"][obv_ref_prev_idx])
         obv_slope_prev = (obv_prev - obv_ref_prev) / abs(obv_prev) if abs(obv_prev) > 1e-12 else 0.0
     except Exception:
         obv_slope = 0.0
@@ -984,10 +1031,10 @@ def analyze_at_index(df, end_idx, params):
 
     # CVD
     try:
-        cvd_now = float(df["_cvd"].iat[end_idx])
+        cvd_now = float(arr["_cvd"][end_idx])
         cvd_ref_idx = max(0, end_idx - CVD_LOOKBACK + 1)
-        cvd_ref = float(df["_cvd"].iat[cvd_ref_idx])
-        vol_window = float(df["_cvd_vol_sum"].iat[end_idx])
+        cvd_ref = float(arr["_cvd"][cvd_ref_idx])
+        vol_window = float(arr["_cvd_vol_sum"][end_idx])
         cvd_ratio = (cvd_now - cvd_ref) / vol_window if vol_window > 0 else 0.0
         cvd_bullish = cvd_ratio >= CVD_BULLISH_MIN
     except Exception:
@@ -995,14 +1042,14 @@ def analyze_at_index(df, end_idx, params):
         cvd_bullish = False
 
     # Recent max (shift 2 — excluye barra actual y anterior)
-    rm_raw = df["_recent_max_short"].iat[end_idx]
+    rm_raw = arr["_recent_max_short"][end_idx]
     recent_max = float(rm_raw) if pd.notna(rm_raw) and rm_raw > 0 else 0.0
     near_recent_max = recent_max > 0 and 0 <= (recent_max - price) / recent_max <= PREBREAK_NEAR_MAX
     breakout = recent_max > 0 and price > recent_max * (1 + BREAKOUT_BUFFER)
     breakout_distance = safe_pct(price, recent_max)
 
     # Recent max long
-    rml_raw = df["_recent_max_long"].iat[end_idx]
+    rml_raw = arr["_recent_max_long"][end_idx]
     if pd.notna(rml_raw) and end_idx >= RECENT_LOOKBACK_LONG + 1:
         recent_max_long = float(rml_raw)
         if recent_max_long > 0:
@@ -1016,18 +1063,18 @@ def analyze_at_index(df, end_idx, params):
         recent_long_ok = True
 
     # Resistance
-    oh_raw = df["_one_h_resist"].iat[end_idx]
+    oh_raw = arr["_one_h_resist"][end_idx]
     one_h_resist = float(oh_raw) if pd.notna(oh_raw) else price
     dist_to_res = (one_h_resist - price) / price if price > 0 else 0.0
     not_near_resistance = dist_to_res > ONE_H_RESIST_BUFFER or breakout
 
     # Major structure
-    mm_raw = df["_major_max"].iat[end_idx]
+    mm_raw = arr["_major_max"][end_idx]
     if pd.notna(mm_raw) and end_idx >= MAJOR_STRUCT_LOOKBACK + 1:
         major_dist = (float(mm_raw) - price) / price if price > 0 else 0.0
         major_struct_ok = major_dist <= MAJOR_STRUCT_MAX_DIST
         _lb_start = end_idx - MAJOR_STRUCT_LOOKBACK - 1
-        _mm_slice = df["high"].values[_lb_start:end_idx - 1]
+        _mm_slice = arr["high"][_lb_start:end_idx - 1]
         bars_since_major_max = end_idx - (_lb_start + int(np.argmax(_mm_slice)))
     else:
         major_struct_ok = True
@@ -1041,8 +1088,8 @@ def analyze_at_index(df, end_idx, params):
     hold_strong = False
     bars_since_break = None
     hold_start = max(25, end_idx - HOLD_LOOKBACK_BARS - 1)
-    _sl_close_h = df["close"].values[hold_start:end_idx]
-    _sl_rm1_h   = df["_recent_max_shift1"].values[hold_start:end_idx]
+    _sl_close_h = arr["close"][hold_start:end_idx]
+    _sl_rm1_h   = arr["_recent_max_shift1"][hold_start:end_idx]
     _sl_local   = np.arange(len(_sl_close_h))
     _bsb_arr    = end_idx - (hold_start + _sl_local)
     _mask_h = (
@@ -1056,24 +1103,24 @@ def analyze_at_index(df, end_idx, params):
         bars_since_break = int(_bsb_arr[_hit_local])
         _ref_h     = float(_sl_rm1_h[_hit_local])
         _brk_close = float(_sl_close_h[_hit_local])
-        _post_low  = df["low"].values[_hit_abs + 1:end_idx + 1]
-        _post_cls  = df["close"].values[_hit_abs + 1:end_idx + 1]
+        _post_low  = arr["low"][_hit_abs + 1:end_idx + 1]
+        _post_cls  = arr["close"][_hit_abs + 1:end_idx + 1]
         if len(_post_low) > 0:
             hold_recent_break = True
             hold_kept_zone    = float(_post_low.min()) >= _ref_h * (1 - HOLD_ZONE_BUFFER)
             pullback          = (_brk_close - float(_post_cls.min())) / _brk_close
             hold_pullback_ok  = pullback <= HOLD_PULLBACK_MAX
-            hold_strong       = (close_position(float(df["close"].iat[end_idx]),
-                                                float(df["high"].iat[end_idx]),
-                                                float(df["low"].iat[end_idx])) >= STRONG_CLOSE_MIN)
+            hold_strong       = (close_position(float(arr["close"][end_idx]),
+                                                float(arr["high"][end_idx]),
+                                                float(arr["low"][end_idx])) >= STRONG_CLOSE_MIN)
 
     # RIDING lookback (vectorizado sobre slice de arrays numpy)
     riding_break_idx = None
     riding_break_close = None
     riding_break_ref = None
     riding_start = max(25, end_idx - RIDING_LOOKBACK_BARS - 1)
-    _sl_close_r = df["close"].values[riding_start:end_idx]
-    _sl_rm1_r   = df["_recent_max_shift1"].values[riding_start:end_idx]
+    _sl_close_r = arr["close"][riding_start:end_idx]
+    _sl_rm1_r   = arr["_recent_max_shift1"][riding_start:end_idx]
     _mask_r = (
         np.isfinite(_sl_rm1_r) & (_sl_rm1_r > 0)
         & (_sl_close_r > _sl_rm1_r * (1 + BREAKOUT_BUFFER))
@@ -1094,11 +1141,11 @@ def analyze_at_index(df, end_idx, params):
     if riding_break_idx is not None and riding_break_ref:
         riding_bars_since = end_idx - riding_break_idx
         riding_gain = safe_pct(price, riding_break_close)
-        post_highs = df["high"].iloc[riding_break_idx + 1:end_idx + 1]
+        post_highs = arr["high"][riding_break_idx + 1:end_idx + 1]
         post_break_high = float(post_highs.max()) if len(post_highs) > 0 else price
         riding_above_zone = price >= riding_break_ref * (1 - RIDING_ZONE_BUFFER)
-        vm = float(df["_vol_mean20"].iat[end_idx]) if pd.notna(df["_vol_mean20"].iat[end_idx]) else 0.0
-        vr3 = float(df["_vol_recent3"].iat[end_idx]) if pd.notna(df["_vol_recent3"].iat[end_idx]) else 0.0
+        vm = float(arr["_vol_mean20"][end_idx]) if pd.notna(arr["_vol_mean20"][end_idx]) else 0.0
+        vr3 = float(arr["_vol_recent3"][end_idx]) if pd.notna(arr["_vol_recent3"][end_idx]) else 0.0
         riding_vol_ok = vm > 0 and (vr3 / vm) >= RIDING_MIN_VOL_RATIO
         fading_reversal = safe_pct(price, post_break_high) if post_break_high else 0.0
         fading_below_zone = price < riding_break_ref * (1 - FADING_BELOW_ZONE)
@@ -1620,18 +1667,32 @@ def classify(symbol, tf_data, cfg, counts_history=None):
     if not candidates:
         return None
 
-    # FORMING_CANDLE_PENALTY (mismo comportamiento que screener.py:1279-1288).
-    # En backtest todas las velas son históricas (candle_status="closed"), así que el
-    # penalty no se dispara — pero el cableado es idéntico al screener para fidelidad.
-    FORMING_CANDLE_PENALTY = cfg.g("scoring", "FORMING_CANDLE_PENALTY", default=3)
-    IMMEDIATE_MIN_SCORE = cfg.g("scoring", "IMMEDIATE_MIN_SCORE", default=13)
+    # FORMING_CANDLE_PENALTY — mismo comportamiento que screener.py.
+    # En backtest las velas son históricas (candle_status="closed") salvo que el caller
+    # inyecte _is_forming=True en el candidato (via analyze_forming_lateness, futuro).
+    FORMING_CANDLE_PENALTY      = cfg.g("scoring", "FORMING_CANDLE_PENALTY",       default=3)
+    IMMEDIATE_MIN_SCORE         = cfg.g("scoring", "IMMEDIATE_MIN_SCORE",           default=13)
+    IMMEDIATE_MIN_SCORE_FORMING = cfg.g("scoring", "IMMEDIATE_MIN_SCORE_FORMING",   default=9)
+    BEST_MIN_SCORE_FORMING      = cfg.g("scoring", "BEST_MIN_SCORE_FORMING",        default=9)
+    STRONG_MIN_SCORE_FORMING    = cfg.g("scoring", "STRONG_MIN_SCORE_FORMING",      default=8)
+
+    def _final_bucket_forming(score):
+        if score >= BEST_MIN_SCORE_FORMING:
+            return "BEST"
+        if score >= STRONG_MIN_SCORE_FORMING:
+            return "STRONG"
+        return "WATCH"
+
     for c in candidates:
-        cs = (tf_data.get(c["timeframe"]) or {}).get("candle_status", "closed")
+        if c.get("_is_forming"):
+            cs = "forming"
+        else:
+            cs = (tf_data.get(c["timeframe"]) or {}).get("candle_status", "closed")
         c["candle_status"] = cs
         if cs == "forming":
             c["score"] = max(0, c["score"] - FORMING_CANDLE_PENALTY)
-            c["bucket"] = final_bucket(c["score"], cfg)
-            if c.get("immediate") and c["score"] < IMMEDIATE_MIN_SCORE:
+            c["bucket"] = _final_bucket_forming(c["score"])
+            if c.get("immediate") and c["score"] < IMMEDIATE_MIN_SCORE_FORMING:
                 c["immediate"] = False
 
     # Penalización suave por EMA 1h no alcista (solo cuando EMA_GATE_HARD=false).
@@ -1711,6 +1772,290 @@ def calculate_outcomes(df_15m, alert_idx, alert_price):
     outcomes["entry_price"] = alert_price
     outcomes["complete"] = max_high_24h is not None
     return outcomes
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# ANÁLISIS FORMING — lateness y fakeout sobre alertas EXPLOSION
+# ════════════════════════════════════════════════════════════════════════════
+
+def _build_partial_bar(df_1m, open_5m_ms, elapsed_min):
+    """Agrega los primeros elapsed_min minutos de una vela 5m desde 1m bars.
+    Retorna dict con OHLCV + elapsed_frac_real, o None si no hay datos 1m."""
+    end_ms = open_5m_ms + elapsed_min * 60_000
+    ot = df_1m["open_time"].values.astype(np.int64)
+    lo = np.searchsorted(ot, open_5m_ms, side="left")
+    hi = np.searchsorted(ot, end_ms, side="left")
+    if hi <= lo:
+        return None
+    bars = df_1m.iloc[lo:hi]
+    n = len(bars)
+    return {
+        "open":         float(bars["open"].iloc[0]),
+        "high":         float(bars["high"].max()),
+        "low":          float(bars["low"].min()),
+        "close":        float(bars["close"].iloc[-1]),
+        "volume":       float(bars["volume"].sum()),
+        "elapsed_frac": n / 5.0,  # 5 bars de 1m en una vela 5m
+        "n_bars":       n,
+    }
+
+
+def _check_forming_explosion(partial, prev_close, vol_mean, recent_max, cfg,
+                             width_expansion_closed=None):
+    """Aplica criterios EXPLOSION sobre una vela parcial.
+    width_expansion_closed: BB expansion calculada con el partial close incluido — replica
+    el cómputo de screener.py para el forming candle.
+    Retorna (ok: bool, features: dict)."""
+    if vol_mean <= 0 or partial is None:
+        return False, {}
+    elapsed_frac = max(partial["elapsed_frac"], 0.01)
+    vol_pace = (partial["volume"] / elapsed_frac) / vol_mean
+    rng = max(partial["high"] - partial["low"], 1e-12)
+    body = abs(partial["close"] - partial["open"]) / rng
+    chg  = (partial["close"] / prev_close - 1) if prev_close > 0 else 0.0
+    ex_min_vol  = cfg.g("scoring_explosion", "MIN_VOL_RATIO",    default=5.0)
+    ex_min_body = cfg.g("scoring_explosion", "MIN_BODY_PCT",     default=0.85)
+    ex_min_chg  = cfg.g("scoring_explosion", "MIN_CLOSE_CHANGE", default=0.025)
+    ex_min_bb   = cfg.g("scoring_explosion", "MIN_BB_EXPANSION", default=0.5)
+    bkdist = (partial["close"] / recent_max - 1) if recent_max > 0 else 0.0
+    bb_ok = (width_expansion_closed is None) or (width_expansion_closed >= ex_min_bb)
+    features = {
+        "vol_pace":              vol_pace,
+        "body":                  body,
+        "chg":                   chg,
+        "bkdist":                bkdist,
+        "elapsed_frac":          elapsed_frac,
+        "width_expansion_proxy": width_expansion_closed,
+    }
+    ok = vol_pace >= ex_min_vol and body >= ex_min_body and chg >= ex_min_chg and bb_ok
+    return ok, features
+
+
+def _forming_quality(gain, dd):
+    """Clasifica un entry por calidad basada en max_gain 24h y drawdown 24h."""
+    if gain is None or dd is None:
+        return "unknown"
+    if gain < 0.02 and dd > 0.03:
+        return "fakeout"
+    if gain >= 0.05:
+        return "good"
+    return "mid"
+
+
+def analyze_forming_lateness(alerts, klines_1m, klines, cfg,
+                             scan_minutes=(1, 2, 3, 4)):
+    """Análisis post-proceso: para cada alerta EXPLOSION cerrada, pregunta en qué
+    minuto de esa vela 5m habrían disparado los criterios de EXPLOSION_FORMING.
+
+    Parámetros:
+      alerts       — lista de alert_record producidos por simulate()
+      klines_1m    — {sym: df_1m}
+      klines       — {sym: {'5m': df_5m, ...}} (klines cerradas, ya descargadas)
+      cfg          — Config base
+      scan_minutes — en qué minutos dentro de la vela verificar (default 1..4)
+
+    Retorna lista de dicts por alerta EXPLOSION con métricas de lateness.
+    También imprime un resumen por consola."""
+    explosion_alerts = [a for a in alerts if a.get("signal_type") == "EXPLOSION"]
+    if not explosion_alerts:
+        print("  [forming] Sin alertas EXPLOSION — nada que analizar.")
+        return []
+
+    results = []
+    ex_late_max = cfg.g("scoring_explosion", "LATE_ENTRY_MAX_DIST", default=0.03)
+    RECENT_LOOKBACK = cfg.g("indicators", "RECENT_LOOKBACK", default=15)
+
+    for a in explosion_alerts:
+        sym = a["symbol"]
+        df_1m = klines_1m.get(sym)
+        df_5m = (klines.get(sym) or {}).get("5m")
+        if df_1m is None or df_5m is None:
+            continue
+
+        # Encontrar la barra 5m cerrada que produjo la alerta
+        alerted_ms = int(datetime.fromisoformat(a["alerted_at"]).timestamp() * 1000)
+        idx_5m = find_idx_at_or_before(df_5m, alerted_ms, timecol="close_time")
+        if idx_5m < 2:
+            continue
+
+        open_5m_ms  = int(df_5m["open_time"].iloc[idx_5m])
+        prev_close  = float(df_5m["close"].iloc[idx_5m - 1])
+        vol_mean    = float(df_5m["volume"].iloc[max(0, idx_5m - 20):idx_5m].mean())
+        recent_max  = float(df_5m["high"].iloc[max(0, idx_5m - RECENT_LOOKBACK - 1):idx_5m - 1].max())
+        closed_chg  = float(a["entry_price"] / prev_close - 1) if prev_close > 0 else 0.0
+        closed_dist = float(a["entry_price"] / recent_max - 1) if recent_max > 0 else 0.0
+
+        # Serie base de closes cerrados (hasta idx_5m - 1) para recalcular BB por minuto
+        _bb_base = df_5m["close"].iloc[max(0, idx_5m - 40):idx_5m].reset_index(drop=True)
+
+        first_fire_min = None
+        per_min = {}
+        for m in scan_minutes:
+            partial = _build_partial_bar(df_1m, open_5m_ms, m)
+            if partial is None:
+                per_min[m] = {"ok": False}
+                continue
+
+            # BB con partial close incluido — mirror exacto de screener.py:683-689
+            _series_m = pd.concat([_bb_base, pd.Series([partial["close"]])], ignore_index=True)
+            _bb_t = ta.volatility.BollingerBands(_series_m, window=20, window_dev=2)
+            _hb, _lb, _ma = _bb_t.bollinger_hband(), _bb_t.bollinger_lband(), _bb_t.bollinger_mavg()
+            if (pd.notna(_ma.iloc[-1]) and pd.notna(_ma.iloc[-2])
+                    and _ma.iloc[-1] > 0 and _ma.iloc[-2] > 0):
+                _wc = (_hb.iloc[-1] - _lb.iloc[-1]) / _ma.iloc[-1]
+                _wp = (_hb.iloc[-2] - _lb.iloc[-2]) / _ma.iloc[-2]
+                wexp_m = safe_pct(_wc, _wp) if _wp else None
+            else:
+                wexp_m = None
+
+            ok, feats = _check_forming_explosion(partial, prev_close, vol_mean, recent_max, cfg,
+                                                 width_expansion_closed=wexp_m)
+            per_min[m] = {"ok": ok, **feats}
+            if ok and first_fire_min is None:
+                first_fire_min = m
+
+        # Precio al momento de first_fire_min (para calcular lateness real)
+        entry_price_forming = None
+        if first_fire_min is not None:
+            pb = _build_partial_bar(df_1m, open_5m_ms, first_fire_min)
+            if pb:
+                entry_price_forming = pb["close"]
+
+        # Calidad 24h: max_gain y drawdown desde cada entry usando df_5m forward
+        fwd_end = min(idx_5m + 289, len(df_5m))
+        df_fwd  = df_5m.iloc[idx_5m + 1 : fwd_end]
+        if len(df_fwd) > 0:
+            max_high_fwd = float(df_fwd["high"].max())
+            min_low_fwd  = float(df_fwd["low"].min())
+            ep_c = float(a["entry_price"])
+            max_gain_24h_closed  = max_high_fwd / ep_c - 1  if ep_c > 0 else None
+            drawdown_24h_closed  = (ep_c - min_low_fwd) / ep_c  if ep_c > 0 else None
+            quality_closed       = _forming_quality(max_gain_24h_closed, drawdown_24h_closed)
+            if entry_price_forming is not None and entry_price_forming > 0:
+                max_gain_24h_forming = max_high_fwd / entry_price_forming - 1
+                drawdown_24h_forming = (entry_price_forming - min_low_fwd) / entry_price_forming
+                quality_forming      = _forming_quality(max_gain_24h_forming, drawdown_24h_forming)
+            else:
+                max_gain_24h_forming = drawdown_24h_forming = None
+                quality_forming = None
+        else:
+            max_gain_24h_closed = drawdown_24h_closed = None
+            quality_closed = "unknown"
+            max_gain_24h_forming = drawdown_24h_forming = None
+            quality_forming = None
+
+        results.append({
+            "symbol":               sym,
+            "alerted_at":           a["alerted_at"],
+            "score":                a.get("score"),
+            "bucket":               a.get("bucket"),
+            "entry_price_closed":   a["entry_price"],
+            "closed_dist":          closed_dist,
+            "closed_chg":           closed_chg,
+            "first_fire_min":       first_fire_min,
+            "entry_price_forming":  entry_price_forming,
+            "forming_dist":         (entry_price_forming / recent_max - 1) if entry_price_forming and recent_max > 0 else None,
+            "per_min":              per_min,
+            "late_entry":           closed_dist > ex_late_max,
+            "max_gain_24h_closed":  max_gain_24h_closed,
+            "drawdown_24h_closed":  drawdown_24h_closed,
+            "quality_closed":       quality_closed,
+            "max_gain_24h_forming": max_gain_24h_forming,
+            "drawdown_24h_forming": drawdown_24h_forming,
+            "quality_forming":      quality_forming,
+        })
+
+    if not results:
+        print("  [forming] Sin resultados (1m data faltante para todos los símbolos).")
+        return results
+
+    _print_forming_lateness_summary(results, scan_minutes)
+    return results
+
+
+def _print_forming_lateness_summary(results, scan_minutes):
+    n = len(results)
+    print()
+    print("═" * 70)
+    print(" ANÁLISIS FORMING — lateness EXPLOSION")
+    print("═" * 70)
+    print(f"\nAlertas EXPLOSION analizadas: {n}")
+
+    # Distribución de first_fire_min
+    fired = [r for r in results if r["first_fire_min"] is not None]
+    never = n - len(fired)
+    print(f"\n  Habrían disparado en forming: {len(fired)}/{n} ({len(fired)*100//n}%)")
+    print(f"  No habrían disparado (1m insuficiente o criterios no cumplidos antes del cierre): {never}")
+
+    if fired:
+        by_min = {}
+        for r in fired:
+            m = r["first_fire_min"]
+            by_min[m] = by_min.get(m, 0) + 1
+        print("\n  Distribución first_fire_min:")
+        for m in sorted(by_min):
+            pct = by_min[m] * 100 // len(fired)
+            print(f"    min {m}: {by_min[m]:>4} ({pct}%)")
+
+        # Lateness: dist sobre recent_max en entry forming vs closed
+        dists_closed  = [r["closed_dist"]  for r in fired if r["closed_dist"]  is not None]
+        dists_forming = [r["forming_dist"] for r in fired if r["forming_dist"] is not None]
+        if dists_closed and dists_forming:
+            def pct_stats(vals, label):
+                s = sorted(vals)
+                n = len(s)
+                med = s[n // 2]
+                p90 = s[int(n * 0.9)]
+                avg = sum(s) / n
+                print(f"    {label}: mediana {med:+.2%}, p90 {p90:+.2%}, promedio {avg:+.2%}")
+            print("\n  Distancia sobre recent_max al momento de alerta:")
+            pct_stats(dists_closed,  "CLOSED  ")
+            pct_stats(dists_forming, "FORMING ")
+            saving = [c - f for c, f in zip(dists_closed, dists_forming) if c is not None and f is not None]
+            if saving:
+                s = sorted(saving)
+                print(f"\n  Ahorro de lateness (closed - forming):")
+                print(f"    mediana: {s[len(s)//2]:+.2%}, p90: {s[int(len(s)*0.9)]:+.2%}")
+
+    # Alertas tardías (ya extendidas al cierre)
+    late = sum(1 for r in results if r.get("late_entry"))
+    if late:
+        print(f"\n  Alertas que ya tenían late_entry_penalty al cierre: {late}/{n} ({late*100//n}%)")
+
+    # Calidad de entry 24h: fakeout / mid / good
+    def _quality_table(records, key_quality, key_gain, key_dd, label):
+        vals = [(r.get(key_quality), r.get(key_gain), r.get(key_dd))
+                for r in records if r.get(key_quality) is not None]
+        if not vals:
+            return
+        total = len(vals)
+        cats   = {"good": 0, "mid": 0, "fakeout": 0, "unknown": 0}
+        gains, dds = [], []
+        for q, g, d in vals:
+            cats[q] = cats.get(q, 0) + 1
+            if g is not None:
+                gains.append(g)
+            if d is not None:
+                dds.append(d)
+        print(f"\n  {label}  (n={total})")
+        for cat in ("good", "mid", "fakeout", "unknown"):
+            c = cats.get(cat, 0)
+            if c:
+                print(f"    {cat:<10}: {c:>3} ({c*100//total:>3}%)")
+        if gains:
+            gains.sort()
+            print(f"    max_gain_24h mediana: {gains[len(gains)//2]:+.2%}")
+        if dds:
+            dds.sort()
+            print(f"    drawdown_24h mediana: {dds[len(dds)//2]:+.2%}")
+
+    print()
+    print("─" * 70)
+    print(" CALIDAD DE ENTRY 24h")
+    print("─" * 70)
+    _quality_table(results, "quality_closed",  "max_gain_24h_closed",  "drawdown_24h_closed",  "CLOSED  (todas las alertas EXPLOSION)")
+    forming_with_data = [r for r in results if r.get("quality_forming") is not None]
+    _quality_table(forming_with_data, "quality_forming", "max_gain_24h_forming", "drawdown_24h_forming", "FORMING (alertas que habrían disparado en forming)")
 
 
 def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivatives):
@@ -2189,7 +2534,20 @@ def main():
                         help="YYYY-MM-DD: fin del backtest (default: ahora). Útil para validación multi-ventana.")
     parser.add_argument("--quick", action="store_true",
                         help="Modo dev rápido: fuerza weeks=1 y max-pairs=100. Útil para iterar.")
+    parser.add_argument("--cache-dir", default=None,
+                        help="Directorio para caché de klines (default: .backtest_cache). "
+                             "Usar ruta nativa de WSL (ej: ~/scancrypto_cache) para mejor I/O.")
+    parser.add_argument("--forming-analysis", action="store_true",
+                        help="Post-análisis de lateness forming sobre alertas EXPLOSION: "
+                             "descarga 1m klines y mide en qué minuto habrían disparado.")
+    parser.add_argument("--forming-scan-points", default="1,2,3,4",
+                        help="Minutos dentro de la vela 5m a verificar para forming "
+                             "(default '1,2,3,4'). Usado con --forming-analysis.")
     args = parser.parse_args()
+
+    global CACHE_DIR
+    if args.cache_dir:
+        CACHE_DIR = Path(args.cache_dir).expanduser()
 
     if args.quick:
         args.weeks     = min(args.weeks, 1)
@@ -2387,6 +2745,33 @@ def main():
             print(f"  (la comparativa por consola ya está completa, no perdiste datos)")
     else:
         print(f"\n[4/4] Skipping JSON save (no se pasó --out)")
+
+    # ── Análisis forming (opcional) ────────────────────────────────────────────
+    if args.forming_analysis:
+        scan_points = [int(m.strip()) for m in args.forming_scan_points.split(",") if m.strip()]
+        # Tomamos las alertas del run principal (o del baseline en compare/variants)
+        main_alerts = (all_results.get("main")
+                       or all_results.get(args.config)
+                       or next(iter(all_results.values()), []))
+        explosion_syms = list({a["symbol"] for a in main_alerts if a.get("signal_type") == "EXPLOSION"})
+        if not explosion_syms:
+            print("\n[forming] Sin alertas EXPLOSION en el run — no hay nada que analizar.")
+        else:
+            print(f"\n[forming] Descargando 1m klines para {len(explosion_syms)} pares con EXPLOSION...")
+            klines_1m = download_1m_klines(explosion_syms, start_dt, end_dt)
+            forming_results = analyze_forming_lateness(
+                main_alerts, klines_1m, klines, cfg_main,
+                scan_minutes=tuple(scan_points),
+            )
+            if args.out and forming_results:
+                forming_path = Path(args.out).with_stem(Path(args.out).stem + "_forming")
+                try:
+                    with open(forming_path, "w", encoding="utf-8") as f:
+                        json.dump(forming_results, f, indent=2, default=str)
+                    print(f"  Formings guardados: {forming_path.absolute()}")
+                except OSError:
+                    pass
+
     print(f"\nDONE")
 
 
