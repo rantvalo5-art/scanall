@@ -18,7 +18,18 @@ from pathlib import Path
 
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
 import ta
+
+SESSION = requests.Session()
+
+adapter = HTTPAdapter(
+    pool_connections=100,
+    pool_maxsize=100,
+)
+
+SESSION.mount("https://", adapter)
+SESSION.mount("http://", adapter)
 
 # mplfinance es opcional: si no está instalado, los charts se desactivan en runtime
 try:
@@ -28,6 +39,8 @@ try:
     _HAS_MPLFINANCE = True
 except ImportError:
     _HAS_MPLFINANCE = False
+
+
 
 # ── Carga de configuración ────────────────────────────────────────────────────
 CONFIG_PATH = Path(__file__).parent / "config.json"
@@ -251,12 +264,12 @@ def insert_history(alert_rows):
     try:
         r = requests.post(f"{SUPABASE_URL}/rest/v1/screener_history", headers=_sb_headers(), json=rows, timeout=10)
         r.raise_for_status()
-        r2 = requests.delete(
+        SESSION.delete(
             f"{SUPABASE_URL}/rest/v1/screener_history",
             headers=_sb_headers(),
             params={"alerted_at": f"lt.{since}"},
             timeout=10,
-        )
+        )    
         r2.raise_for_status()
     except Exception as e:
         print(f"Supabase insert_history error: {e}")
@@ -369,7 +382,7 @@ def get_all_usdt_pairs(n=None):
 
 
 def get_klines(symbol, interval):
-    r = requests.get(
+    r = SESSION.get(
         "https://data-api.binance.vision/api/v3/klines",
         params={"symbol": symbol, "interval": interval, "limit": LIMIT},
         timeout=10,
@@ -478,11 +491,11 @@ def in_cooldown(symbol, history_tf, last_seen):
 
 
 def send_telegram(text):
-    requests.post(
+    SESSION.post(
         f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-        json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown", "disable_web_page_preview": True},
+        json={"chat_id": TELEGRAM_CHAT_ID, "text": text},
         timeout=10,
-    ).raise_for_status()
+    )
 
 
 # TF del screener → intervalo de TradingView
