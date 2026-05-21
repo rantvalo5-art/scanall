@@ -1,0 +1,59 @@
+[
+  {
+    "symbol": "RONINUSDT",
+    "alerted_at": "2026-05-18T18:15:00+00:00",
+    "score": 9,
+    "bucket": "WATCH",
+    "entry_price_closed": 0.136,
+    "closed_dist": 0.3492063492063493,
+    "closed_chg": 0.48796498905908114,
+    "first_fire_min": 3,
+    "entry_price_forming": 0.0999,
+    "forming_dist": -0.008928571428571397,
+    "per_min": {
+      "1": {
+        "ok": false,
+        "vol_pace": 0.2836042516669878,
+        "body": 0.0,
+        "chg": 0.0,
+        "bkdist": -0.09325396825396826,
+        "elapsed_frac": 0.2,
+        "width_expansion_proxy": 0.0001520021320564613
+      },
+      "2": {
+        "ok": false,
+        "vol_pace": 4.579038611923508,
+        "body": 0.7142857142857181,
+        "chg": 0.01641137855579866,
+        "bkdist": -0.07837301587301593,
+        "elapsed_frac": 0.4,
+        "width_expansion_proxy": 0.0558241547934788
+      },
+      "3": {
+        "ok": "True",
+        "vol_pace": 5.886584272332864,
+        "body": 0.9770114942528745,
+        "chg": 0.09299781181619271,
+        "bkdist": -0.008928571428571397,
+        "elapsed_frac": 0.6,
+        "width_expansion_proxy": 0.5432835622353929
+      },
+      "4": {
+        "ok": false,
+        "vol_pace": 11.629195088798312,
+        "body": 0.8123393316195375,
+        "chg": 0.34573304157549245,
+        "bkdist": 0.22023809523809512,
+        "elapsed_frac": 0.8,
+        "width_expansion_proxy": 2.850898583523666
+      }
+    },
+    "late_entry": true,
+    "max_gain_24h_closed": 0.10294117647058809,
+    "drawdown_24h_closed": 0.20294117647058832,
+    "quality_closed": "good",
+    "max_gain_24h_forming": 0.5015015015015014,
+    "drawdown_24h_forming": -0.08508508508508501,
+    "quality_forming": "good"
+  }
+]

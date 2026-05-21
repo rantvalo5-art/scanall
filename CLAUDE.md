@@ -66,3 +66,9 @@ Python 3.11, `pandas==2.2.3`, `ta`, `requests`, `mplfinance` (optional, for char
 - This is a Python crypto screener / backtesting project (backtest.py is central)
 - Common tasks: bug fixes in backtest.py, config variant experiments, indicator precomputation, performance tuning
 - Prefer vectorized pandas/numpy operations and disk caching for expensive computations
+
+## Run Python/backtest commands natively in Windows
+- Use `python` (Windows-native) for backtests — ~16% faster than WSL on CPU-bound work.
+- Set UTF-8 encoding before runs to avoid cp1252 errors on output:
+  `$env:PYTHONIOENCODING = "utf-8"`
+- The kline cache lives at `.backtest_cache/` in the project root.

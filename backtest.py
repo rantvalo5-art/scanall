@@ -1827,7 +1827,7 @@ def _check_forming_explosion(partial, prev_close, vol_mean, recent_max, cfg,
         "elapsed_frac":          elapsed_frac,
         "width_expansion_proxy": width_expansion_closed,
     }
-    ok = vol_pace >= ex_min_vol and body >= ex_min_body and chg >= ex_min_chg and bb_ok
+    ok = bool(vol_pace >= ex_min_vol and body >= ex_min_body and chg >= ex_min_chg and bb_ok)
     return ok, features
 
 
