@@ -28,6 +28,6 @@ jobs:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-        run:
-          # source ~/scanall/venv/bin/activate
+        run: |
+          source ~/scanall/venv/bin/activate
           python screener.py
