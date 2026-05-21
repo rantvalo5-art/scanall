@@ -29,5 +29,5 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
-          source ~/scanall/venv/bin/activate
+        #  source ~/scanall/venv/bin/activate
           python screener.py
