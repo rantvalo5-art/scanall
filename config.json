@@ -224,7 +224,7 @@
     "VOL_DEAD_BONUS": 1
   },
   "scoring_explosion": {
-    "BASE_SCORE": 12,
+    "BASE_SCORE": 11,
     "MIN_VOL_RATIO": 5.0,
     "MIN_BODY_PCT": 0.85,
     "MIN_CLOSE_CHANGE": 0.020,
