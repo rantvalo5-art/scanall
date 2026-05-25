@@ -159,6 +159,8 @@ FADING_PULLBACK_HARD = _cfg("fading", "FADING_PULLBACK_HARD", default=0.03)
 
 BEST_MIN_SCORE      = _cfg("scoring", "BEST_MIN_SCORE")
 STRONG_MIN_SCORE    = _cfg("scoring", "STRONG_MIN_SCORE")
+BEST_MIN_SCORE_PER_SIGNAL   = _cfg("scoring", "BEST_MIN_SCORE_PER_SIGNAL",   default={})
+STRONG_MIN_SCORE_PER_SIGNAL = _cfg("scoring", "STRONG_MIN_SCORE_PER_SIGNAL", default={})
 IMMEDIATE_MIN_SCORE = _cfg("scoring", "IMMEDIATE_MIN_SCORE")
 FORMING_CANDLE_PENALTY = _cfg("scoring", "FORMING_CANDLE_PENALTY")
 SCORE_CAP           = _cfg("scoring", "SCORE_CAP")
@@ -602,11 +604,30 @@ def send_telegram_photo(image_buf, caption):
             pass
 
 
-def final_bucket(score):
-    if score >= BEST_MIN_SCORE:
-        return "BEST"
-    if score >= STRONG_MIN_SCORE:
-        return "STRONG"
+def final_bucket(score, signal_type=""):
+    mode = _CAL_CFG.get("bucket_mode", "absolute")
+    if mode == "absolute":
+        best_thr   = BEST_MIN_SCORE_PER_SIGNAL.get(signal_type, BEST_MIN_SCORE)
+        strong_thr = STRONG_MIN_SCORE_PER_SIGNAL.get(signal_type, STRONG_MIN_SCORE)
+        if score >= best_thr:   return "BEST"
+        if score >= strong_thr: return "STRONG"
+        return "WATCH"
+    pct = _normalize_score(score, signal_type)
+    if mode == "percentile_global":
+        if pct >= _CAL_CFG.get("BEST_PCT", 0.85):   return "BEST"
+        if pct >= _CAL_CFG.get("STRONG_PCT", 0.50): return "STRONG"
+        return "WATCH"
+    if mode == "percentile_per_signal":
+        thr = _CAL_CFG.get("thresholds", {}).get(signal_type, {"BEST": 0.85, "STRONG": 0.50})
+        if pct >= thr["BEST"]:   return "BEST"
+        if pct >= thr["STRONG"]: return "STRONG"
+        return "WATCH"
+    if mode == "hybrid":
+        if score >= _CAL_CFG.get("BEST_MIN_RAW", 10) and pct >= _CAL_CFG.get("BEST_PCT", 0.80):   return "BEST"
+        if score >= _CAL_CFG.get("STRONG_MIN_RAW", 8) and pct >= _CAL_CFG.get("STRONG_PCT", 0.45): return "STRONG"
+        return "WATCH"
+    if score >= BEST_MIN_SCORE:   return "BEST"   # fallback safe
+    if score >= STRONG_MIN_SCORE: return "STRONG"
     return "WATCH"
 
 
@@ -1049,6 +1070,17 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 f"close 5m +{tf5['close_change_curr']:.2%}",
                 f"BB expansion +{tf5['width_expansion']:.0%}",
             ]
+            # OBV tiers sobre 15m context (igual que BREAKOUT)
+            _ex_obv = tf15.get("obv_slope", 0) or 0
+            _ex_obv_expl_b = _cfg("scoring_explosion", "OBV_EXPLOSIVE_BONUS", default=0)
+            _ex_obv_str_b  = _cfg("scoring_explosion", "OBV_STRONG_BONUS",    default=0)
+            _ex_obv_ris_b  = _cfg("scoring_explosion", "OBV_RISING_BONUS",    default=0)
+            if _ex_obv >= _cfg("scoring_breakout", "OBV_TIER_EXPLOSIVE_MIN", default=0.5) and _ex_obv_expl_b:
+                score += _ex_obv_expl_b; reasons.append(f"OBV explosive {_ex_obv:.2f}")
+            elif _ex_obv >= _cfg("scoring_breakout", "OBV_TIER_STRONG_MIN", default=0.2) and _ex_obv_str_b:
+                score += _ex_obv_str_b; reasons.append(f"OBV strong {_ex_obv:.2f}")
+            elif _ex_obv >= _cfg("scoring_breakout", "OBV_TIER_RISING_MIN", default=0.08) and _ex_obv_ris_b:
+                score += _ex_obv_ris_b; reasons.append(f"OBV rising {_ex_obv:.2f}")
             if tf5.get("breakout_distance", 0) > ex_late_max:
                 score += ex_late_pen
                 reasons.append(f"⚠ ya extendido {tf5['breakout_distance']:.2%} sobre máximo")
@@ -1059,7 +1091,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "history_tf": "EXPLOSION",
                 "score": score,
                 "priority": 5,
-                "bucket": final_bucket(score),
+                "bucket": final_bucket(score, "EXPLOSION"),
                 "reasons": reasons,
                 "late": False,
                 "timeframe": "5m",
@@ -1234,7 +1266,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "history_tf": "PREBREAK",
                 "score": score,
                 "priority": 1,
-                "bucket": final_bucket(score),
+                "bucket": final_bucket(score, "PREBREAK"),
                 "reasons": reasons,
                 "late": prev >= LATE_REPEAT_COUNT,
                 "timeframe": "5m",
@@ -1414,7 +1446,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "history_tf": "BREAKOUT",
                 "score": score,
                 "priority": 2,
-                "bucket": final_bucket(score),
+                "bucket": final_bucket(score, "BREAKOUT"),
                 "reasons": reasons,
                 "late": prev >= LATE_REPEAT_COUNT,
                 "timeframe": "15m",
@@ -1530,6 +1562,12 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                     elif fr >= _cfg_score(sr, "FUNDING_HOT_MIN", 0.0008):
                         score += _cfg_score(sr, "FUNDING_HOT_PENALTY", -1)
                         reasons.append("⚠ funding caliente — long crowded")
+            # Bonus por frescura: RIDING en las primeras N barras desde el break
+            _fresh_max = _cfg_score(sr, "FRESH_MAX_BARS", 0)
+            _fresh_b   = _cfg_score(sr, "FRESH_BONUS", 0)
+            if _fresh_b and _fresh_max and tf15.get("riding_bars_since") is not None and tf15["riding_bars_since"] <= _fresh_max:
+                score += _fresh_b
+                reasons.append(f"RIDING fresco ({tf15['riding_bars_since']} barra/s desde break)")
             late_repeat_pen = _cfg_score(sr, "LATE_REPEAT_PENALTY", 0)
             if prev > 0 and late_repeat_pen < 0:
                 score += late_repeat_pen
@@ -1541,7 +1579,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "history_tf": "RIDING",
                 "score": score,
                 "priority": 2,
-                "bucket": final_bucket(score),
+                "bucket": final_bucket(score, "RIDING"),
                 "reasons": reasons,
                 "late": False,
                 "timeframe": "15m",
@@ -1687,7 +1725,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "history_tf": "HOLD",
                 "score": score,
                 "priority": 3,
-                "bucket": final_bucket(score),
+                "bucket": final_bucket(score, "HOLD"),
                 "reasons": reasons,
                 "late": prev >= LATE_REPEAT_COUNT,
                 "timeframe": "15m",
@@ -1727,7 +1765,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             if c.get("history_tf") == "EXPLOSION":
                 continue
             c["score"] = max(0, c["score"] + _ema_pen)
-            c["bucket"] = final_bucket(c["score"])
+            c["bucket"] = final_bucket(c["score"], c["history_tf"])
 
     # Cap superior: scores de 20+, 30+, 40+ en BREAKOUT son outliers que NO predicen mejor
     # rendimiento (datos empíricos). Capeamos para que la escala 0-15 sea legible y
@@ -1735,7 +1773,7 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     for c in candidates:
         if c["score"] > SCORE_CAP:
             c["score"] = SCORE_CAP
-            c["bucket"] = final_bucket(c["score"])
+            c["bucket"] = final_bucket(c["score"], c["history_tf"])
 
     candidates.sort(
         key=lambda x: (_normalize_score(x["score"], x["history_tf"]), x["priority"], x["score"]),

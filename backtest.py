@@ -50,7 +50,7 @@ BINANCE_DATA_URL = "https://data-api.binance.vision/api/v3"
 BINANCE_FALLBACK_URL = "https://api.binance.com/api/v3"
 BINANCE_FAPI_URL = "https://fapi.binance.com"
 
-CACHE_DIR = Path(".backtest_cache")
+CACHE_DIR = Path(r"G:\.backtest_cache")
 _NO_CACHE = False  # override con --no-cache en CLI
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ecgdswroygkfckkaguxp.supabase.co")
@@ -1201,11 +1201,34 @@ def analyze_at_index(df, end_idx, params):
 # CLASIFICACIÓN — refactorizada con lectura de scoring desde config.json
 # ════════════════════════════════════════════════════════════════════════════
 
-def final_bucket(score, cfg):
-    if score >= cfg.g("scoring", "BEST_MIN_SCORE"):
-        return "BEST"
-    if score >= cfg.g("scoring", "STRONG_MIN_SCORE"):
-        return "STRONG"
+def final_bucket(score, signal_type, cfg):
+    cal_cfg = cfg.raw.get("scoring_calibration") or {}
+    mode = cal_cfg.get("bucket_mode", "absolute")
+    if mode == "absolute":
+        per_best   = cfg.raw.get("scoring", {}).get("BEST_MIN_SCORE_PER_SIGNAL", {})
+        per_strong = cfg.raw.get("scoring", {}).get("STRONG_MIN_SCORE_PER_SIGNAL", {})
+        best_thr   = per_best.get(signal_type, cfg.g("scoring", "BEST_MIN_SCORE"))
+        strong_thr = per_strong.get(signal_type, cfg.g("scoring", "STRONG_MIN_SCORE"))
+        if score >= best_thr:   return "BEST"
+        if score >= strong_thr: return "STRONG"
+        return "WATCH"
+    score_cap = cfg.g("scoring", "SCORE_CAP")
+    pct = _normalize_score(score, signal_type, cal_cfg, score_cap)
+    if mode == "percentile_global":
+        if pct >= cal_cfg.get("BEST_PCT", 0.85):   return "BEST"
+        if pct >= cal_cfg.get("STRONG_PCT", 0.50): return "STRONG"
+        return "WATCH"
+    if mode == "percentile_per_signal":
+        thr = cal_cfg.get("thresholds", {}).get(signal_type, {"BEST": 0.85, "STRONG": 0.50})
+        if pct >= thr["BEST"]:   return "BEST"
+        if pct >= thr["STRONG"]: return "STRONG"
+        return "WATCH"
+    if mode == "hybrid":
+        if score >= cal_cfg.get("BEST_MIN_RAW", 10) and pct >= cal_cfg.get("BEST_PCT", 0.80):   return "BEST"
+        if score >= cal_cfg.get("STRONG_MIN_RAW", 8) and pct >= cal_cfg.get("STRONG_PCT", 0.45): return "STRONG"
+        return "WATCH"
+    if score >= cfg.g("scoring", "BEST_MIN_SCORE"):   return "BEST"   # fallback safe
+    if score >= cfg.g("scoring", "STRONG_MIN_SCORE"): return "STRONG"
     return "WATCH"
 
 
@@ -1282,17 +1305,31 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             ex_late_max = cfg.g("scoring_explosion", "LATE_ENTRY_MAX_DIST", default=0.03)
             ex_late_pen = cfg.g("scoring_explosion", "LATE_ENTRY_PENALTY", default=-3)
             score = ex_base
+            bd = {"BASE": ex_base}
+            # OBV tiers sobre 15m context (igual que BREAKOUT — diferencia explosiones reales de fakes)
+            _ex_obv = tf15.get("obv_slope", 0) or 0
+            _ex_obv_expl_b = cfg.g("scoring_explosion", "OBV_EXPLOSIVE_BONUS", default=0)
+            _ex_obv_str_b  = cfg.g("scoring_explosion", "OBV_STRONG_BONUS",    default=0)
+            _ex_obv_ris_b  = cfg.g("scoring_explosion", "OBV_RISING_BONUS",    default=0)
+            if _ex_obv >= cfg.g("scoring_breakout", "OBV_TIER_EXPLOSIVE_MIN", default=0.5) and _ex_obv_expl_b:
+                score += _ex_obv_expl_b; bd["OBV_EXPLOSIVE"] = _ex_obv_expl_b
+            elif _ex_obv >= cfg.g("scoring_breakout", "OBV_TIER_STRONG_MIN", default=0.2) and _ex_obv_str_b:
+                score += _ex_obv_str_b; bd["OBV_STRONG"] = _ex_obv_str_b
+            elif _ex_obv >= cfg.g("scoring_breakout", "OBV_TIER_RISING_MIN", default=0.08) and _ex_obv_ris_b:
+                score += _ex_obv_ris_b; bd["OBV_RISING"] = _ex_obv_ris_b
             if tf5.get("breakout_distance", 0) > ex_late_max:
                 score += ex_late_pen
+                bd["LATE_ENTRY"] = ex_late_pen
             score = min(max(score, 0), SCORE_CAP)
             candidates.append({
                 "label": "EXPLOSION", "history_tf": "EXPLOSION", "score": score,
-                "priority": 5, "bucket": final_bucket(score, cfg),
+                "priority": 5, "bucket": final_bucket(score, "EXPLOSION", cfg),
                 "timeframe": "5m", "price": tf5["price"],
                 "ref_price": tf5.get("recent_max", tf5["price"]),
                 "obv_slope": tf15.get("obv_slope"),
                 "cvd_ratio": tf15.get("cvd_ratio"),
                 "recent_long_ok": tf15.get("recent_long_ok"),
+                "breakdown": bd,
             })
 
     # Gates para signals tradicionales (PREBREAK/BREAKOUT/RIDING/HOLD/FADING).
@@ -1359,31 +1396,38 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             growth_factor = min(tf5["vol_growth"] / grow_div, grow_cap)
             bb_factor = max(1.0 - (tf5["width_curr"] / bb_div), bb_floor)
             score = round(base_offset + vol_factor * growth_factor * bb_factor * base_mult)
+            bd = {"BASE_FORMULA": score}
 
             if tf5.get("strong_close"):
                 score += close_bonus
+                bd["STRONG_CLOSE"] = close_bonus
             if tf15.get("obv_rising"):
                 score += obv_up_bonus
+                bd["OBV_RISING"] = obv_up_bonus
             elif tf15.get("obv_slope", 0) < -cfg.g("indicators", "OBV_RISING_MIN", default=0.05):
                 score += obv_dn_pen
+                bd["OBV_FALLING"] = obv_dn_pen
             if not tf15.get("recent_long_ok", True):
                 score += struct_pen
+                bd["STRUCT"] = struct_pen
 
             # LATE_REPEAT_PENALTY (mismo comportamiento que screener.py)
             late_repeat_pen = cfg.g("scoring_prebreak", "LATE_REPEAT_PENALTY", default=-1)
             prev_pb = counts_history.get((symbol, "PREBREAK"), 0)
             if prev_pb >= LATE_REPEAT_COUNT:
                 score += late_repeat_pen
+                bd["LATE_REPEAT"] = late_repeat_pen
 
             score = min(score, SCORE_CAP)
             candidates.append({
                 "label": "PRE-BREAK", "history_tf": "PREBREAK", "score": score,
-                "priority": 1, "bucket": final_bucket(score, cfg),
+                "priority": 1, "bucket": final_bucket(score, "PREBREAK", cfg),
                 "timeframe": "5m", "price": tf5["price"],
                 "ref_price": tf5["recent_max"],
                 "obv_slope": tf15.get("obv_slope"),
                 "cvd_ratio": tf15.get("cvd_ratio"),
                 "recent_long_ok": tf15.get("recent_long_ok"),
+                "breakdown": bd,
             })
 
     # ── BREAKOUT ──────────────────────────────────────────────────────────
@@ -1428,28 +1472,29 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             struct_pen        = cfg.g("scoring_breakout", "STRUCT_PENALTY", default=-1)
 
             score = base_score
+            bd = {"BASE": base_score}
             obv_v = tf15.get("obv_slope", 0)
             cvd_v = tf15.get("cvd_ratio", 0)
 
             if obv_v >= obv_explosive_min:
-                score += obv_explosive_b
+                score += obv_explosive_b; bd["OBV_EXPLOSIVE"] = obv_explosive_b
             elif obv_v >= obv_strong_min:
-                score += obv_strong_b
+                score += obv_strong_b;   bd["OBV_STRONG"]    = obv_strong_b
             elif obv_v >= obv_rising_min:
-                score += obv_rising_b
+                score += obv_rising_b;   bd["OBV_RISING"]    = obv_rising_b
             elif obv_v >= obv_neutral_min:
-                score += obv_neutral_b
+                score += obv_neutral_b;  bd["OBV_NEUTRAL"]   = obv_neutral_b
             else:
-                score += obv_falling_pen
+                score += obv_falling_pen; bd["OBV_FALLING"]  = obv_falling_pen
 
             if cvd_v >= cvd_vbull_min:
-                score += cvd_vbull_b
+                score += cvd_vbull_b;  bd["CVD_VERY_BULLISH"] = cvd_vbull_b
             elif cvd_v >= cvd_bull_min:
-                score += cvd_bull_b
+                score += cvd_bull_b;   bd["CVD_BULLISH"]      = cvd_bull_b
             elif cvd_v >= cvd_neutral_min:
-                score += cvd_neutral_b
+                score += cvd_neutral_b; bd["CVD_NEUTRAL"]     = cvd_neutral_b
             else:
-                score += cvd_bear_pen
+                score += cvd_bear_pen; bd["CVD_BEARISH"]      = cvd_bear_pen
 
             climax_signals = 0
             if tf15.get("vol_ratio", 0) >= climax_vol_min:
@@ -1461,20 +1506,25 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             _climax_late_only = cfg.g("indicators", "CLIMAX_REQUIRES_LATE_ENTRY", default=False)
             if climax_signals >= climax_thresh and (not _climax_late_only or tf15["breakout_distance"] >= late_min):
                 score += climax_pen
+                bd["CLIMAX"] = climax_pen
 
             if tf15["breakout_distance"] <= early_max:
                 score += early_bonus
+                bd["EARLY_ENTRY"] = early_bonus
             elif tf15["breakout_distance"] >= late_min:
                 score += late_pen_entry
+                bd["LATE_ENTRY"] = late_pen_entry
 
             if not tf15.get("recent_long_ok", True):
                 score += struct_pen
+                bd["STRUCT"] = struct_pen
 
             # LATE_REPEAT_PENALTY (mismo comportamiento que screener.py)
             late_repeat_pen = cfg.g("scoring_breakout", "LATE_REPEAT_PENALTY", default=-1)
             prev_bo = counts_history.get((symbol, "BREAKOUT"), 0)
             if prev_bo >= LATE_REPEAT_COUNT:
                 score += late_repeat_pen
+                bd["LATE_REPEAT"] = late_repeat_pen
 
             # Derivatives: OI delta + funding rate (mismo bloque que screener.py)
             if cfg.g("derivatives", "ENABLED", default=False):
@@ -1494,12 +1544,13 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             score = min(score, SCORE_CAP)
             candidates.append({
                 "label": "BREAKOUT", "history_tf": "BREAKOUT", "score": score,
-                "priority": 2, "bucket": final_bucket(score, cfg),
+                "priority": 2, "bucket": final_bucket(score, "BREAKOUT", cfg),
                 "timeframe": "15m", "price": tf15["price"],
                 "ref_price": tf15["recent_max"],
                 "obv_slope": tf15.get("obv_slope"),
                 "cvd_ratio": tf15.get("cvd_ratio"),
                 "recent_long_ok": tf15.get("recent_long_ok"),
+                "breakdown": bd,
             })
 
     # ── RIDING ────────────────────────────────────────────────────────────
@@ -1535,35 +1586,36 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             strong_gain_min = cfg.g("scoring_riding", "STRONG_GAIN_MIN", default=0.08)
 
             score = base_score
+            bd = {"BASE": base_score}
             if rg >= gain_strong_min:
-                score += gain_strong_b
+                score += gain_strong_b; bd["GAIN_STRONG"] = gain_strong_b
             elif rg >= gain_solid_min:
-                score += gain_solid_b
+                score += gain_solid_b;  bd["GAIN_SOLID"]  = gain_solid_b
             else:
-                score += gain_initial_b
+                score += gain_initial_b; bd["GAIN_INITIAL"] = gain_initial_b
             # Bonus adicional para gains excepcionales
-            if rg >= strong_gain_min:
-                score += strong_gain_b
+            if rg >= strong_gain_min and strong_gain_b:
+                score += strong_gain_b; bd["STRONG_GAIN_BONUS"] = strong_gain_b
             if tf15.get("riding_vol_ok"):
-                score += vol_ok_b
+                score += vol_ok_b; bd["VOL_OK"] = vol_ok_b
             if tf15.get("strong_close"):
-                score += close_b
+                score += close_b; bd["STRONG_CLOSE"] = close_b
             _ema_up_effective = tf1h.get("ema_trend_up") or (
                 _ema_bypassed_by_explosion and cfg.g("indicators", "EMA_BYPASS_GRANTS_TREND_BONUS", default=False))
             if _ema_up_effective:
-                score += ema_b
+                score += ema_b; bd["EMA_TREND"] = ema_b
             if tf1h.get("dist_to_res", 0) > dist_high_min:
-                score += dist_high_b
+                score += dist_high_b; bd["DIST_HIGH"] = dist_high_b
             else:
-                score += dist_low_b
+                score += dist_low_b; bd["DIST_LOW"] = dist_low_b
             if tf15.get("obv_rising"):
-                score += obv_up_b
+                score += obv_up_b; bd["OBV_RISING"] = obv_up_b
             elif tf15.get("obv_slope", 0) < 0:
-                score += obv_dn_pen
+                score += obv_dn_pen; bd["OBV_FALLING"] = obv_dn_pen
             if tf15.get("cvd_bullish"):
-                score += cvd_up_b
+                score += cvd_up_b; bd["CVD_BULLISH"] = cvd_up_b
             elif tf15.get("cvd_ratio", 0) < -cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05):
-                score += cvd_dn_pen
+                score += cvd_dn_pen; bd["CVD_BEARISH"] = cvd_dn_pen
 
             # Derivatives: OI delta + funding rate (mismo bloque que screener.py)
             if cfg.g("derivatives", "ENABLED", default=False):
@@ -1580,21 +1632,30 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                     elif fr >= cfg.g("scoring_riding", "FUNDING_HOT_MIN", default=0.0008):
                         score += cfg.g("scoring_riding", "FUNDING_HOT_PENALTY", default=-1)
 
+            # Bonus por frescura: RIDING detectado en las primeras N barras desde el break
+            _fresh_max = cfg.g("scoring_riding", "FRESH_MAX_BARS", default=0)
+            _fresh_b   = cfg.g("scoring_riding", "FRESH_BONUS", default=0)
+            _bars_since = tf15.get("riding_bars_since")
+            if _fresh_b and _fresh_max and _bars_since is not None and _bars_since <= _fresh_max:
+                score += _fresh_b; bd["FRESH"] = _fresh_b
+
             # LATE_REPEAT_PENALTY (mismo comportamiento que screener.py)
             prev_riding = counts_history.get((symbol, "RIDING"), 0)
             late_repeat_pen = cfg.g("scoring_riding", "LATE_REPEAT_PENALTY", default=0)
             if prev_riding >= LATE_REPEAT_COUNT and late_repeat_pen < 0:
                 score += late_repeat_pen
+                bd["LATE_REPEAT"] = late_repeat_pen
 
             score = min(score, SCORE_CAP)
             candidates.append({
                 "label": "RIDING", "history_tf": "RIDING", "score": score,
-                "priority": 2, "bucket": final_bucket(score, cfg),
+                "priority": 2, "bucket": final_bucket(score, "RIDING", cfg),
                 "timeframe": "15m", "price": tf15["price"],
                 "ref_price": tf15.get("riding_break_close"),
                 "obv_slope": tf15.get("obv_slope"),
                 "cvd_ratio": tf15.get("cvd_ratio"),
                 "recent_long_ok": tf15.get("recent_long_ok"),
+                "breakdown": bd,
             })
 
     # ── HOLD ──────────────────────────────────────────────────────────────
@@ -1627,41 +1688,46 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             momentum_dist = cfg.g("scoring_hold", "STRONG_MOMENTUM_DIST_MIN", default=0.05)
 
             score = base + above_b + pullback_b + close_b
+            bd = {"BASE": base, "ABOVE_RESIST": above_b, "PULLBACK": pullback_b, "STRONG_CLOSE": close_b}
             if tf1h.get("dist_to_res", 0) > dist_high_min:
-                score += dist_high_b
+                score += dist_high_b; bd["DIST_HIGH"] = dist_high_b
             else:
-                score += dist_low_b
+                score += dist_low_b;  bd["DIST_LOW"]  = dist_low_b
             if tf15.get("obv_rising"):
-                score += obv_up_b
+                score += obv_up_b; bd["OBV_RISING"] = obv_up_b
             elif tf15.get("obv_slope", 0) < -cfg.g("indicators", "OBV_RISING_MIN", default=0.05):
-                score += obv_dn_pen
+                score += obv_dn_pen; bd["OBV_FALLING"] = obv_dn_pen
             if tf15.get("cvd_bullish"):
-                score += cvd_up_b
+                score += cvd_up_b; bd["CVD_BULLISH"] = cvd_up_b
             elif tf15.get("cvd_ratio", 0) < -cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05):
-                score += cvd_dn_pen
+                score += cvd_dn_pen; bd["CVD_BEARISH"] = cvd_dn_pen
             if not tf15.get("recent_long_ok", True):
-                score += struct_pen
+                score += struct_pen; bd["STRUCT"] = struct_pen
             # Bonus por momentum extremo: OBV explosivo + CVD bullish + lejos de resistencia 1h
             if (tf15.get("obv_slope", 0) >= momentum_obv
                 and tf15.get("cvd_bullish")
                 and tf1h.get("dist_to_res", 0) >= momentum_dist):
                 score += momentum_b
+                if momentum_b:
+                    bd["MOMENTUM"] = momentum_b
 
             # LATE_REPEAT_PENALTY (mismo comportamiento que screener.py)
             late_repeat_pen = cfg.g("scoring_hold", "LATE_REPEAT_PENALTY", default=-1)
             prev_hold = counts_history.get((symbol, "HOLD"), 0)
             if prev_hold >= LATE_REPEAT_COUNT:
                 score += late_repeat_pen
+                bd["LATE_REPEAT"] = late_repeat_pen
 
             score = min(score, SCORE_CAP)
             candidates.append({
                 "label": "HOLD", "history_tf": "HOLD", "score": score,
-                "priority": 3, "bucket": final_bucket(score, cfg),
+                "priority": 3, "bucket": final_bucket(score, "HOLD", cfg),
                 "timeframe": "15m", "price": tf15["price"],
                 "ref_price": tf15.get("riding_break_ref") or tf15["recent_max"],
                 "obv_slope": tf15.get("obv_slope"),
                 "cvd_ratio": tf15.get("cvd_ratio"),
                 "recent_long_ok": tf15.get("recent_long_ok"),
+                "breakdown": bd,
             })
 
     if not candidates:
@@ -1703,14 +1769,19 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             if c.get("history_tf") == "EXPLOSION":
                 continue
             c["score"] = max(0, c["score"] + _ema_pen)
-            c["bucket"] = final_bucket(c["score"], cfg)
+            c["bucket"] = final_bucket(c["score"], c["history_tf"], cfg)
+            if "breakdown" in c:
+                c["breakdown"]["EMA_SOFT"] = _ema_pen
 
     # Final cap loop (mismo screener.py). Redundante porque cada bloque ya
     # aplicó min(score, SCORE_CAP), pero se mantiene para que la simulación sea espejo.
     for c in candidates:
         if c["score"] > SCORE_CAP:
+            orig = c["score"]
             c["score"] = SCORE_CAP
-            c["bucket"] = final_bucket(c["score"], cfg)
+            c["bucket"] = final_bucket(c["score"], c["history_tf"], cfg)
+            if "breakdown" in c:
+                c["breakdown"]["SCORE_CAP_TRUNC"] = SCORE_CAP - orig
 
     candidates.sort(
         key=lambda x: (_normalize_score(x["score"], x["history_tf"], _cal_cfg, SCORE_CAP), x["priority"], x["score"]),
@@ -2159,7 +2230,7 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
 
 
 def _classify_pass(candidates, cfg, cooldown_min_by_state, history_window_ms,
-                   klines, outcomes_cache):
+                   klines, outcomes_cache, audit_mode=False):
     """Segundo pase del scan: classify + cooldowns + outcomes sobre candidatos pre-extraídos.
     outcomes_cache[(sym, idx_15m)] permite reutilizar outcomes entre variantes."""
     last_alert_ts = {}
@@ -2214,13 +2285,15 @@ def _classify_pass(candidates, cfg, cooldown_min_by_state, history_window_ms,
             "candle_status": alert.get("candle_status"),
             **outcomes,
         }
+        if audit_mode and alert.get("breakdown"):
+            alert_record["breakdown"] = alert["breakdown"]
         alerts.append(alert_record)
     return alerts
 
 
 def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None,
              scan_interval_min=SCAN_INTERVAL_MIN, derivatives=None, prepared=None,
-             analyze_cache=None, outcomes_cache=None):
+             analyze_cache=None, outcomes_cache=None, audit_mode=False):
     print(f"\n  Simulando {(end_dt - start_dt).total_seconds() / 3600:.0f}h con scans cada {scan_interval_min}min...")
 
     cooldown_min_by_state = cfg.g("cooldowns_minutes")
@@ -2245,7 +2318,7 @@ def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None,
             analyze_cache[akey] = candidates
 
     alerts = _classify_pass(candidates, cfg, cooldown_min_by_state, history_window_ms,
-                            klines, outcomes_cache)
+                            klines, outcomes_cache, audit_mode=audit_mode)
     print(f"    Total alertas simuladas: {len(alerts)}")
     return alerts
 
@@ -2481,7 +2554,8 @@ def compare_runs(alerts_a, label_a, alerts_b, label_b, period_days=7):
 
 def run_backtest(cfg, weeks, klines, start_dt, end_dt, snapshot_pairs=None,
                  label="run", scan_interval_min=SCAN_INTERVAL_MIN, derivatives=None,
-                 prepared_cache=None, analyze_cache=None, outcomes_cache=None):
+                 prepared_cache=None, analyze_cache=None, outcomes_cache=None,
+                 audit_mode=False):
     print(f"\n  >>> Corriendo backtest: {label}")
     key = _indicator_key(cfg)
     if prepared_cache is not None and key in prepared_cache:
@@ -2504,7 +2578,7 @@ def run_backtest(cfg, weeks, klines, start_dt, end_dt, snapshot_pairs=None,
     alerts = simulate(cfg, klines, start_dt, end_dt, snapshot_pairs,
                       scan_interval_min=scan_interval_min, derivatives=derivatives,
                       prepared=prepared, analyze_cache=analyze_cache,
-                      outcomes_cache=outcomes_cache)
+                      outcomes_cache=outcomes_cache, audit_mode=audit_mode)
     summarize(alerts, label=label)
     return alerts
 
@@ -2543,7 +2617,11 @@ def main():
     parser.add_argument("--forming-scan-points", default="1,2,3,4",
                         help="Minutos dentro de la vela 5m a verificar para forming "
                              "(default '1,2,3,4'). Usado con --forming-analysis.")
+    parser.add_argument("--audit-scoring", action="store_true",
+                        help="Incluye breakdown de scoring por alerta en el JSON de salida. "
+                             "Necesario para audit_scoring.py.")
     args = parser.parse_args()
+    _audit = getattr(args, "audit_scoring", False)
 
     global CACHE_DIR
     if args.cache_dir:
@@ -2639,7 +2717,8 @@ def main():
                                    snapshot_pairs, label=f"BASE ({Path(base_path).stem})",
                                    scan_interval_min=args.scan_interval_min,
                                    derivatives=derivatives, prepared_cache=prepared_cache,
-                                   analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
+                                   analyze_cache=analyze_cache, outcomes_cache=outcomes_cache,
+                                   audit_mode=_audit)
         all_results[Path(base_path).stem] = alerts_base
         n_variants = len(variant_paths)
         for vi, vp in enumerate(variant_paths, 1):
@@ -2662,7 +2741,8 @@ def main():
                                     snapshot_pairs, label=f"VARIANT ({cfg_stem})",
                                     scan_interval_min=args.scan_interval_min,
                                     derivatives=derivatives, prepared_cache=prepared_cache,
-                                    analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
+                                    analyze_cache=analyze_cache, outcomes_cache=outcomes_cache,
+                                    audit_mode=_audit)
             elapsed  = time.perf_counter() - t_cfg
             prep_st  = "miss" if len(prepared_cache) > prev_prep else "hit"
             ana_st   = "miss" if len(analyze_cache)  > prev_ana  else "hit"
@@ -2687,12 +2767,14 @@ def main():
                                   snapshot_pairs, label=f"OLD ({args.compare[0]})",
                                   scan_interval_min=args.scan_interval_min,
                                   derivatives=derivatives, prepared_cache=prepared_cache,
-                                  analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
+                                  analyze_cache=analyze_cache, outcomes_cache=outcomes_cache,
+                                  audit_mode=_audit)
         alerts_new = run_backtest(cfg_new, args.weeks, klines, start_dt, end_dt,
                                   snapshot_pairs, label=f"NEW ({args.compare[1]})",
                                   scan_interval_min=args.scan_interval_min,
                                   derivatives=derivatives, prepared_cache=prepared_cache,
-                                  analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
+                                  analyze_cache=analyze_cache, outcomes_cache=outcomes_cache,
+                                  audit_mode=_audit)
         compare_runs(alerts_old, args.compare[0], alerts_new, args.compare[1],
                      period_days=period_days)
         all_results = {"old": alerts_old, "new": alerts_new}
@@ -2718,7 +2800,8 @@ def main():
                                   snapshot_pairs, label=name,
                                   scan_interval_min=args.scan_interval_min,
                                   derivatives=derivatives, prepared_cache=prepared_cache,
-                                  analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
+                                  analyze_cache=analyze_cache, outcomes_cache=outcomes_cache,
+                                  audit_mode=_audit)
             all_results[name] = alerts
         if "full (todo activo)" in all_results:
             for name, alerts in all_results.items():
@@ -2730,7 +2813,8 @@ def main():
                               snapshot_pairs, label=f"config: {args.config}",
                               scan_interval_min=args.scan_interval_min,
                               derivatives=derivatives, prepared_cache=prepared_cache,
-                              analyze_cache=analyze_cache, outcomes_cache=outcomes_cache)
+                              analyze_cache=analyze_cache, outcomes_cache=outcomes_cache,
+                              audit_mode=_audit)
         all_results = {"main": alerts}
 
     if args.out:

@@ -1,0 +1,235 @@
+
+================================================================
+AUDIT SCORING — audit_run_G5.json (652 alertas con breakdown + outcome)
+================================================================
+
+----------------------------------------------------------------
+CORRELACIÓN COMPONENTE → MAX_24H GAIN
+Componente                    Señal       n_con   avg_con   avg_sin   diff      flag
+----------------------------------------------------------------
+
+  [BREAKOUT]
+  OBV_STRONG                    n=  31  con= +22.9%  sin= +14.9%  diff= +8.0%  
+  OBV_NEUTRAL                   n=  62  con= +11.6%  sin= +19.1%  diff= -7.5%  
+  LATE_ENTRY                    n=  60  con= +21.1%  sin= +13.7%  diff= +7.4%  
+  CLIMAX                        n=  61  con= +12.1%  sin= +18.8%  diff= -6.7%  
+  OBV_EXPLOSIVE                 n=  20  con= +19.2%  sin= +16.0%  diff= +3.2%  
+
+  [RIDING]
+  OBV_FALLING                   n=  11  con= +15.2%  sin= +12.0%  diff= +3.2%  ⚠ PENALTY INNECESARIA
+  CVD_BEARISH                   n=  22  con= +14.9%  sin= +11.8%  diff= +3.1%  
+
+  [EXPLOSION]
+  LATE_ENTRY                    n=  23  con=  +8.3%  sin= +10.7%  diff= -2.4%  
+
+  [RIDING]
+  GAIN_INITIAL                  n= 125  con= +11.6%  sin= +13.9%  diff= -2.3%  
+  CVD_BULLISH                   n= 100  con= +11.3%  sin= +13.5%  diff= -2.2%  
+
+  [BREAKOUT]
+  CVD_VERY_BULLISH              n=  58  con= +15.0%  sin= +17.1%  diff= -2.1%  ⚠ BONUS CONTRAPRODUCENTE
+  LATE_REPEAT                   n=  29  con= +18.1%  sin= +16.0%  diff= +2.1%  ⚠ PENALTY INNECESARIA
+  CVD_BULLISH                   n=  39  con= +17.6%  sin= +16.0%  diff= +1.6%  
+
+  [RIDING]
+  DIST_HIGH                     n=  32  con= +10.9%  sin= +12.5%  diff= -1.6%  
+  DIST_LOW                      n= 137  con= +12.5%  sin= +10.9%  diff= +1.6%  
+  GAIN_SOLID                    n=  41  con= +13.3%  sin= +11.9%  diff= +1.4%  
+
+  [HOLD]
+  STRUCT                        n=  38  con= +13.6%  sin= +14.6%  diff= -1.0%  
+
+  [RIDING]
+  STRONG_CLOSE                  n=  73  con= +11.6%  sin= +12.6%  diff= -1.0%  
+
+  [BREAKOUT]
+  OBV_RISING                    n=  55  con= +16.9%  sin= +16.1%  diff= +0.8%  
+  CVD_NEUTRAL                   n=  62  con= +16.8%  sin= +16.1%  diff= +0.7%  
+
+  [HOLD]
+  MOMENTUM                      n=  18  con= +15.1%  sin= +14.4%  diff= +0.7%  
+
+  [BREAKOUT]
+  EARLY_ENTRY                   n=  59  con= +16.0%  sin= +16.5%  diff= -0.5%  
+
+  [HOLD]
+  LATE_REPEAT                   n=  95  con= +14.1%  sin= +14.6%  diff= -0.5%  
+  DIST_HIGH                     n=  63  con= +14.6%  sin= +14.4%  diff= +0.2%  
+  DIST_LOW                      n= 203  con= +14.4%  sin= +14.6%  diff= -0.2%  
+
+  [RIDING]
+  OBV_RISING                    n= 143  con= +12.2%  sin= +12.1%  diff= +0.1%  
+
+----------------------------------------------------------------
+RANKING GLOBAL DE COMPONENTES (todas las señales, |diff| descendente)
+----------------------------------------------------------------
+  BASE                          n= 650  con= +14.0%  sin=  +2.6%  diff=+11.4%  
+  OBV_STRONG                    n=  31  con= +22.9%  sin= +13.5%  diff= +9.4%  
+  OBV_EXPLOSIVE                 n=  20  con= +19.2%  sin= +13.8%  diff= +5.4%  
+  LATE_ENTRY                    n=  83  con= +17.6%  sin= +13.4%  diff= +4.2%  
+  CVD_NEUTRAL                   n=  62  con= +16.8%  sin= +13.7%  diff= +3.1%  
+  GAIN_INITIAL                  n= 125  con= +11.6%  sin= +14.5%  diff= -2.9%  
+  OBV_NEUTRAL                   n=  62  con= +11.6%  sin= +14.2%  diff= -2.6%  
+  EMA_TREND                     n= 169  con= +12.2%  sin= +14.6%  diff= -2.4%  
+  VOL_OK                        n= 169  con= +12.2%  sin= +14.6%  diff= -2.4%  
+  EARLY_ENTRY                   n=  59  con= +16.0%  sin= +13.8%  diff= +2.2%  
+  CLIMAX                        n=  61  con= +12.1%  sin= +14.2%  diff= -2.1%  
+  CVD_BEARISH                   n=  31  con= +15.4%  sin= +13.9%  diff= +1.5%  
+  LATE_REPEAT                   n= 124  con= +15.1%  sin= +13.7%  diff= +1.4%  
+  OBV_FALLING                   n=  11  con= +15.2%  sin= +13.9%  diff= +1.3%  
+  MOMENTUM                      n=  18  con= +15.1%  sin= +13.9%  diff= +1.2%  
+  CVD_VERY_BULLISH              n=  58  con= +15.0%  sin= +13.9%  diff= +1.1%  
+  ABOVE_RESIST                  n= 266  con= +14.5%  sin= +13.6%  diff= +0.9%  
+  PULLBACK                      n= 266  con= +14.5%  sin= +13.6%  diff= +0.9%  
+  DIST_HIGH                     n=  95  con= +13.4%  sin= +14.1%  diff= -0.7%  
+  DIST_LOW                      n= 340  con= +13.6%  sin= +14.3%  diff= -0.7%  
+  GAIN_SOLID                    n=  41  con= +13.3%  sin= +14.0%  diff= -0.7%  
+  STRUCT                        n=  48  con= +13.6%  sin= +14.0%  diff= -0.4%  
+  STRONG_CLOSE                  n= 339  con= +13.8%  sin= +14.1%  diff= -0.3%  
+  OBV_RISING                    n= 465  con= +14.0%  sin= +13.8%  diff= +0.2%  
+  CVD_BULLISH                   n= 405  con= +14.0%  sin= +13.9%  diff= +0.1%  
+
+----------------------------------------------------------------
+POST-MORTEM — TOP 30 MOVERS (breakdown de cada alerta)
+----------------------------------------------------------------
+  # 1 OSMOUSDT       BREAKOUT  sc=11 STRONG gain=+130.1%  | BASE:+8  OBV_STRONG:+3
+  # 2 TSTUSDT        BREAKOUT  sc=14 BEST   gain=+109.3%  | BASE:+8  EARLY_ENTRY:+3  OBV_STRONG:+3
+  # 3 NILUSDT        BREAKOUT  sc=14 BEST   gain=+109.2%  | BASE:+8  CVD_BULLISH:+1  OBV_EXPLOSIVE:+5
+  # 4 SAGAUSDT       HOLD      sc=12 BEST   gain=+106.7%  | ABOVE_RESIST:+2  BASE:+5  CVD_BULLISH:+1  DIST_LOW:+1  OBV_RISING:+1  PULLBACK:+1  STRONG_CLOSE:+1
+  # 5 SAGAUSDT       RIDING    sc= 8 BEST   gain=+101.7%  | BASE:+6  DIST_HIGH:+1  OBV_RISING:+1
+  # 6 TSTUSDT        BREAKOUT  sc=13 BEST   gain= +95.2%  | BASE:+8  CVD_BULLISH:+1  EARLY_ENTRY:+3  LATE_REPEAT:-1  OBV_RISING:+2
+  # 7 OSMOUSDT       RIDING    sc= 6 WATCH  gain= +93.4%  | BASE:+6  DIST_LOW:+1  OBV_FALLING:-1
+  # 8 DUSDT          HOLD      sc=12 BEST   gain= +78.2%  | ABOVE_RESIST:+2  BASE:+5  CVD_BULLISH:+1  DIST_LOW:+1  OBV_RISING:+1  PULLBACK:+1  STRONG_CLOSE:+1
+  # 9 EDENUSDT       RIDING    sc= 8 BEST   gain= +72.4%  | BASE:+6  DIST_LOW:+1  OBV_RISING:+1
+  #10 EDENUSDT       HOLD      sc=13 BEST   gain= +69.6%  | ABOVE_RESIST:+2  BASE:+5  CVD_BULLISH:+1  DIST_HIGH:+2  OBV_RISING:+1  PULLBACK:+1  STRONG_CLOSE:+1
+  #11 DOGSUSDT       HOLD      sc=12 BEST   gain= +67.2%  | ABOVE_RESIST:+2  BASE:+5  CVD_BULLISH:+1  DIST_LOW:+1  OBV_RISING:+1  PULLBACK:+1  STRONG_CLOSE:+1
+  #12 VICUSDT        BREAKOUT  sc=11 STRONG gain= +67.0%  | BASE:+8  CLIMAX:-1  CVD_VERY_BULLISH:+2  OBV_RISING:+2
+  #13 BABYUSDT       BREAKOUT  sc=15 BEST   gain= +66.8%  | BASE:+8  CVD_VERY_BULLISH:+2  EARLY_ENTRY:+3  OBV_EXPLOSIVE:+5
+  #14 NILUSDT        BREAKOUT  sc=10 STRONG gain= +66.6%  | BASE:+8  CVD_BEARISH:-1  OBV_STRONG:+3
+  #15 FIDAUSDT       RIDING    sc= 8 BEST   gain= +65.8%  | BASE:+6  DIST_LOW:+1  OBV_RISING:+1
+  #16 BABYUSDT       RIDING    sc= 8 BEST   gain= +65.7%  | BASE:+6  DIST_LOW:+1  OBV_RISING:+1
+  #17 EDENUSDT       BREAKOUT  sc=10 STRONG gain= +63.7%  | BASE:+8  OBV_RISING:+2
+  #18 TSTUSDT        EXPLOSION sc=11 BEST   gain= +63.5%  | BASE:+11
+  #19 COSUSDT        BREAKOUT  sc=14 BEST   gain= +63.2%  | BASE:+8  CLIMAX:-1  CVD_VERY_BULLISH:+2  OBV_EXPLOSIVE:+5
+  #20 EDENUSDT       BREAKOUT  sc=10 STRONG gain= +59.9%  | BASE:+8  OBV_RISING:+2
+  #21 EDENUSDT       BREAKOUT  sc=12 BEST   gain= +57.3%  | BASE:+8  CLIMAX:-1  CVD_VERY_BULLISH:+2  OBV_STRONG:+3
+  #22 SAGAUSDT       HOLD      sc=12 BEST   gain= +56.7%  | ABOVE_RESIST:+2  BASE:+5  CVD_BULLISH:+1  DIST_LOW:+1  OBV_RISING:+1  PULLBACK:+1  STRONG_CLOSE:+1
+  #23 BABYUSDT       HOLD      sc=12 BEST   gain= +56.3%  | ABOVE_RESIST:+2  BASE:+5  CVD_BULLISH:+1  DIST_LOW:+1  OBV_RISING:+1  PULLBACK:+1  STRONG_CLOSE:+1
+  #24 TSTUSDT        BREAKOUT  sc=15 BEST   gain= +55.8%  | BASE:+8  CLIMAX:-1  CVD_VERY_BULLISH:+2  EARLY_ENTRY:+3  OBV_STRONG:+3
+  #25 BIOUSDT        BREAKOUT  sc= 7 WATCH  gain= +54.6%  | BASE:+8  CLIMAX:-1  CVD_BULLISH:+1  OBV_NEUTRAL:-1
+  #26 EDENUSDT       HOLD      sc=12 BEST   gain= +53.8%  | ABOVE_RESIST:+2  BASE:+5  CVD_BULLISH:+1  DIST_LOW:+1  OBV_RISING:+1  PULLBACK:+1  STRONG_CLOSE:+1
+  #27 TSTUSDT        EXPLOSION sc=11 BEST   gain= +53.5%  | BASE:+11
+  #28 FIDAUSDT       BREAKOUT  sc=13 BEST   gain= +53.0%  | BASE:+8  EARLY_ENTRY:+3  OBV_RISING:+2
+  #29 EDENUSDT       BREAKOUT  sc= 9 WATCH  gain= +52.7%  | BASE:+8  LATE_REPEAT:-1  OBV_RISING:+2
+  #30 FIDAUSDT       RIDING    sc= 8 BEST   gain= +52.3%  | BASE:+6  DIST_LOW:+1  OBV_RISING:+1
+
+----------------------------------------------------------------
+DISTRIBUCIÓN GAIN POR BUCKET (sanity check)
+----------------------------------------------------------------
+  BEST    n= 441  avg= +13.9%  median=  +6.6%
+  STRONG  n= 128  avg= +15.4%  median=  +9.8%
+  WATCH   n=  83  avg= +12.3%  median=  +7.5%
+
+----------------------------------------------------------------
+BUCKET DISTRIBUTION POR SIGNAL_TYPE (avg / median / win-rate >5%)
+----------------------------------------------------------------
+
+  [BREAKOUT]
+  Bucket       n      avg   median   wr>5%
+  BEST        69   +18.6%    +7.0%     65%
+  STRONG      44   +17.4%    +7.4%     61%
+  WATCH       55   +12.7%    +7.9%     60%  <<< WATCH > BEST
+
+  [EXPLOSION]
+  Bucket       n      avg   median   wr>5%
+  BEST        47    +9.6%    +5.3%     53%
+
+  [HOLD]
+  Bucket       n      avg   median   wr>5%
+  BEST       182   +14.5%    +8.7%     66%
+  STRONG      84   +14.3%   +11.0%     71%
+
+  [PREBREAK]
+  Bucket       n      avg   median   wr>5%
+  WATCH        2    +2.6%    +3.6%      0%  <<< WATCH > BEST
+
+  [RIDING]
+  Bucket       n      avg   median   wr>5%
+  BEST       143   +12.2%    +5.6%     59%
+  WATCH       26   +12.1%    +8.1%     65%  <<< WATCH > BEST
+
+----------------------------------------------------------------
+SCORE → GAIN POR SIGNAL_TYPE (avg gain por bin de score)
+----------------------------------------------------------------
+
+  [BREAKOUT]
+    sc      n      avg   median   wr>5%  bucket_ref
+     5      1    +9.4%    +9.4%    100%  WATCH
+     6      8    +5.9%    +5.6%     50%  WATCH
+     7     11   +21.6%   +17.9%     91%  WATCH
+     8     18   +13.2%    +7.5%     56%  WATCH
+     9     17    +9.9%    +3.7%     47%  WATCH
+    10     21   +19.9%   +12.9%     62%  WATCH
+    11     23   +15.1%    +6.2%     61%  STRONG
+    12     20   +11.7%    +6.8%     75%  STRONG
+    13     21   +17.3%    +5.5%     57%  BEST
+    14     16   +27.4%   +15.0%     69%  BEST
+    15     12   +20.5%   +21.9%     58%  BEST
+
+  [EXPLOSION]
+    sc      n      avg   median   wr>5%  bucket_ref
+    11     47    +9.6%    +5.3%     53%  STRONG
+
+  [HOLD]
+    sc      n      avg   median   wr>5%  bucket_ref
+    11     84   +14.3%   +11.0%     71%  STRONG
+    12    126   +14.2%    +8.4%     66%  STRONG
+    13     38   +15.3%   +10.2%     66%  BEST
+    14      4   +18.7%   +16.5%     75%  BEST
+    15     14   +14.1%    +6.6%     64%  BEST
+
+  [PREBREAK]
+    sc      n      avg   median   wr>5%  bucket_ref
+     6      1    +3.6%    +3.6%      0%  WATCH
+     8      1    +1.7%    +1.7%      0%  WATCH
+
+  [RIDING]
+    sc      n      avg   median   wr>5%  bucket_ref
+     6     11   +15.2%    +9.5%     64%  WATCH
+     7     15    +9.9%    +5.4%     67%  WATCH
+     8    143   +12.2%    +5.6%     59%  WATCH
+
+----------------------------------------------------------------
+LEVERAGE DE COMPONENTES (Σ|delta| total, n alertas afectadas)
+Componente                    n_afect  Σ|delta|    avg|delta|  avg_outcome_diff
+----------------------------------------------------------------
+  BASE                              650      4205.0        6.47  +11.4%
+  ABOVE_RESIST                      266       532.0        2.00  +0.9%
+  OBV_RISING                        465       521.0        1.12  +0.2%
+  DIST_LOW                          340       340.0        1.00  -0.7%
+  CVD_BULLISH                       405       305.0        0.75  +0.1%
+  PULLBACK                          266       266.0        1.00  +0.9%
+  STRONG_CLOSE                      339       266.0        0.78  -0.3%
+  EARLY_ENTRY                        59       177.0        3.00  +2.2%
+  DIST_HIGH                          95       158.0        1.66  -0.7%
+  LATE_REPEAT                       124       124.0        1.00  +1.4%
+  CVD_VERY_BULLISH                   58       116.0        2.00  +1.1%
+  OBV_EXPLOSIVE                      20       100.0        5.00  +5.4%
+  OBV_STRONG                         31        93.0        3.00  +9.4%
+  OBV_NEUTRAL                        62        62.0        1.00  -2.6%
+  CLIMAX                             61        61.0        1.00  -2.1%
+  MOMENTUM                           18        36.0        2.00  +1.2%
+  OBV_FALLING                        11        11.0        1.00  +1.3%
+  CVD_BEARISH                        31         9.0        0.29  +1.5%
+  CVD_NEUTRAL                        62         0.0        0.00  +3.1%
+  EMA_TREND                         169         0.0        0.00  -2.4%
+  GAIN_INITIAL                      125         0.0        0.00  -2.9%
+  GAIN_SOLID                         41         0.0        0.00  -0.7%
+  LATE_ENTRY                         83         0.0        0.00  +4.2%
+  STRUCT                             48         0.0        0.00  -0.4%
+  VOL_OK                            169         0.0        0.00  -2.4%
+
+================================================================
+FIN
+================================================================
+
