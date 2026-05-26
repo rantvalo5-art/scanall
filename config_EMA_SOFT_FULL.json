@@ -112,7 +112,7 @@
     "RIDING_MAX_GAIN": 0.15,
     "RIDING_ZONE_BUFFER": 0.012,
     "RIDING_MIN_VOL_RATIO": 1.2,
-    "RIDING_EMA_MUST_TREND": true,
+    "RIDING_EMA_MUST_TREND": false,
     "RIDING_MAX_FADE_FROM_HIGH": 0.025
   },
   "fading": {
@@ -311,6 +311,10 @@
     "ENABLED": true,
     "MODE": "hard",
     "PENALTY": 2,
-    "SIGNALS": ["BREAKOUT", "HOLD", "RIDING"]
+    "SIGNALS": [
+      "BREAKOUT",
+      "HOLD",
+      "RIDING"
+    ]
   }
 }

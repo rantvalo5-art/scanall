@@ -311,6 +311,10 @@
     "ENABLED": true,
     "MODE": "hard",
     "PENALTY": 2,
-    "SIGNALS": ["BREAKOUT", "HOLD", "RIDING"]
+    "SIGNALS": [
+      "BREAKOUT",
+      "HOLD",
+      "RIDING"
+    ]
   }
 }
