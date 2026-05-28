@@ -1082,8 +1082,15 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             and tf_4h.get("hold_recent_break", False)
             and _bsb is not None and _bsb <= _soft_max
         )
+        _struct_gate_hard = cfg.g("hold", "MAJOR_STRUCT_GATE_HARD", default=True)
         if not (_bypass_brk or _bypass_pre or _bypass_vol or _bypass_age or _bypass_soft):
-            return None
+            if _struct_gate_hard:
+                return None
+            _struct_soft_pen = True
+        else:
+            _struct_soft_pen = False
+    else:
+        _struct_soft_pen = False
 
     candidates = []
     SCORE_CAP = cfg.g("scoring", "SCORE_CAP")
@@ -1466,6 +1473,15 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             c["bucket"] = final_bucket(c["score"], c["history_tf"], cfg)
             if "breakdown" in c:
                 c["breakdown"]["EMA_SOFT"] = _ema_pen
+
+    # Penalización suave por major_struct fallido (solo cuando MAJOR_STRUCT_GATE_HARD=false).
+    if _struct_soft_pen:
+        _struct_pen = int(cfg.g("hold", "MAJOR_STRUCT_SOFT_PENALTY", default=-2))
+        for c in candidates:
+            c["score"] = max(0, c["score"] + _struct_pen)
+            c["bucket"] = final_bucket(c["score"], c["history_tf"], cfg)
+            if "breakdown" in c:
+                c["breakdown"]["STRUCT_SOFT"] = _struct_pen
 
     # Final cap loop (mismo screener.py). Redundante porque cada bloque ya
     # aplicó min(score, SCORE_CAP), pero se mantiene para que la simulación sea espejo.
