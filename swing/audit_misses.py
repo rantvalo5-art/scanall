@@ -57,8 +57,9 @@ PRE_PUMP_WINDOW = 42
 # ── Diagnóstico de señales ────────────────────────────────────────────────────
 
 def _get_signal_fail_reason(tf_1h, tf_4h, tf_1d, cfg):
-    """Devuelve la primera razón de fallo entre los signals cuando los pre-gates pasaron.
-    Elige el signal que más checks superó y devuelve '<prefijo>:<primera_gate_fallida>'."""
+    """Devuelve (razón, n_checks_pasados) del signal que más cerca estuvo de disparar.
+    Elige el signal que más checks superó y devuelve ('<prefijo>:<primera_gate_fallida>', passes).
+    Si algún signal pasa TODOS sus checks devuelve ('<prefijo>:cooldown_or_active', len(checks))."""
     require_obv = cfg.g("breakout", "BREAKOUT_REQUIRE_OBV_NON_NEGATIVE", default=True)
     min_g = cfg.g("riding", "RIDING_MIN_GAIN", default=0.015)
     max_g = cfg.g("riding", "RIDING_MAX_GAIN", default=0.30)
@@ -108,23 +109,28 @@ def _get_signal_fail_reason(tf_1h, tf_4h, tf_1d, cfg):
         passes = sum(v for _, v in checks)
         first_fail = next((k for k, v in checks if not v), None)
         if first_fail is None:
-            return f"{prefix}:cooldown_or_active"
+            return f"{prefix}:cooldown_or_active", len(checks)
         if passes > best_passes:
             best_passes = passes
             best_prefix = prefix
             best_fail   = first_fail
 
-    return f"{best_prefix}:{best_fail}"
+    return f"{best_prefix}:{best_fail}", best_passes
 
 
 def classify_explain(symbol, tf_data, cfg):
     """Llama classify() y si devuelve None explica la primera causa.
-    Devuelve (alert_o_None, razon_str_o_None)."""
+    Devuelve (alert_o_None, razon_str_o_None, proximity).
+
+    proximity = "qué tan cerca estuvo de disparar" (mayor = más cerca):
+      -1 data_missing · 0 pre_resist · 1 pre_major_struct · 2 pre_ema_trend
+      · 3 pre_atr · 10+passes señales (pasó todos los pre-gates 1d).
+    Cuando alert is not None, proximity=100 (no se consume)."""
     tf_1h = tf_data.get("1h") or {}
     tf_4h = tf_data.get("4h") or {}
     tf_1d = tf_data.get("1d") or {}
     if not tf_1h or not tf_4h or not tf_1d:
-        return None, "data_missing"
+        return None, "data_missing", -1
 
     # classify() re-deriva obv_rising/cvd_bullish sobre tf_4h
     obv_min = cfg.g("indicators", "OBV_RISING_MIN", default=0.05)
@@ -143,7 +149,7 @@ def classify_explain(symbol, tf_data, cfg):
             and (tf_4h.get("bars_since_break") or 999) <= cfg.g("hold", "RESIST_BYPASS_MAX_BARS_SINCE_BREAK", default=0)
         )
         if not _bypass_resist:
-            return None, "pre_resist"
+            return None, "pre_resist", 0
 
     # Gate: major_struct (en tf_1d)
     if not tf_1d.get("major_struct_ok", True):
@@ -163,24 +169,28 @@ def classify_explain(symbol, tf_data, cfg):
             and tf_4h.get("hold_recent_break", False)
             and _bsb is not None and _bsb <= _soft_max
         )
+        _struct_gate_hard = cfg.g("hold", "MAJOR_STRUCT_GATE_HARD", default=True)
         if not (_bypass_brk or _bypass_pre or _bypass_vol or _bypass_age or _bypass_soft):
-            return None, "pre_major_struct"
+            if _struct_gate_hard:
+                return None, "pre_major_struct", 1
+            # soft-mode: continúa; classify() aplicará la penalidad
 
     result = classify(symbol, tf_data, cfg)
     if result is not None:
-        return result, None
+        return result, None, 100
 
     # Identify the blocking gate (EMA o ATR)
     ema_gate_hard = cfg.g("indicators", "EMA_GATE_HARD", default=True)
     if ema_gate_hard and not tf_1d.get("ema_trend_up"):
-        return None, "pre_ema_trend"
+        return None, "pre_ema_trend", 2
 
     _atr_pct_v        = tf_1d.get("atr_pct", 0)
     _atr_threshold_v  = tf_1d.get("atr_threshold", cfg.g("indicators", "ATR_MIN_PCT"))
     if _atr_pct_v < _atr_threshold_v:
-        return None, "pre_atr"
+        return None, "pre_atr", 3
 
-    return None, _get_signal_fail_reason(tf_1h, tf_4h, tf_1d, cfg)
+    reason, passes = _get_signal_fail_reason(tf_1h, tf_4h, tf_1d, cfg)
+    return None, reason, 10 + passes
 
 
 # ── Detección de pump-starts en barras 4h ─────────────────────────────────────
@@ -314,7 +324,8 @@ def cmd_catch_rate(args, cfg):
         events = mover_events[label]
         caught = []
         missed_list = []
-        reasons = Counter()
+        reasons = Counter()              # gate vinculante por mover (1 voto/mover)
+        window_reason_hist = Counter()   # toda razón en cada barra de la ventana (agregado)
         caught_by_signal = Counter()
         lateness_by_signal = defaultdict(Counter)
 
@@ -328,8 +339,12 @@ def cmd_catch_rate(args, cfg):
 
             caught_this  = False
             caught_signal = None
-            last_reason  = "data_missing"
-            bar = pump_t  # fallback for enrichment
+            # Atribución por máxima proximidad: el gate vinculante es el de la barra
+            # donde MÁS cerca estuvo de disparar (no la barra del pump = offset 0).
+            best_prox    = -99
+            best_reason  = "data_missing"
+            best_offset  = 0
+            reason_first_offset = {}  # razón → offset más temprano donde apareció
 
             for offset in range(-pre_pump_window, 1):
                 bar = pump_t + offset
@@ -337,19 +352,25 @@ def cmd_catch_rate(args, cfg):
                     continue
                 cache_key = (sym, bar)
                 if cache_key in classify_cache:
-                    alert, reason = classify_cache[cache_key]
+                    alert, reason, prox = classify_cache[cache_key]
                 else:
                     tf_data = get_tf_data_at(sym_prep, bar, cfg)
                     if tf_data is None:
-                        alert, reason = None, "data_missing"
+                        alert, reason, prox = None, "data_missing", -1
                     else:
-                        alert, reason = classify_explain(sym, tf_data, cfg)
-                    classify_cache[cache_key] = (alert, reason)
+                        alert, reason, prox = classify_explain(sym, tf_data, cfg)
+                    classify_cache[cache_key] = (alert, reason, prox)
                 if alert is not None:
                     caught_this   = True
                     caught_signal = alert.get("history_tf") or "unknown"
                     break
-                last_reason = reason or "unknown"
+                reason = reason or "unknown"
+                window_reason_hist[reason] += 1
+                reason_first_offset.setdefault(reason, offset)
+                if prox > best_prox:
+                    best_prox   = prox
+                    best_reason = reason
+                    best_offset = offset
 
             df_4h = sym_prep["4h"]
             ts_ms_pump = int(df_4h["close_time"].iat[pump_t])
@@ -360,6 +381,13 @@ def cmd_catch_rate(args, cfg):
                 caught_by_signal[caught_signal] += 1
                 lateness_by_signal[caught_signal][offset] += 1
             else:
+                # Gate vinculante = el de la barra más cercana a disparar (no offset 0).
+                last_reason = best_reason
+                bar = pump_t + best_offset
+                # relax_offset: barra más temprana donde apareció ese gate vinculante
+                # (proxy de "lateness mínima alcanzable si se relaja ese gate").
+                relax_offset = reason_first_offset.get(best_reason, best_offset)
+
                 # Enriquece "pre_ema_trend"
                 if last_reason == "pre_ema_trend":
                     df_1d = sym_prep.get("1d")
@@ -389,6 +417,38 @@ def cmd_catch_rate(args, cfg):
                             else:
                                 last_reason = "pre_ema:both_fail"
 
+                # Enriquece "pre_major_struct" — subdiv por qué bypass lo habría salvado
+                if last_reason == "pre_major_struct":
+                    _tf_data_bar_full = get_tf_data_at(sym_prep, bar, cfg) if sym_prep else None
+                    _tf1d_b = (_tf_data_bar_full or {}).get("1d") or {}
+                    _tf4h_b = (_tf_data_bar_full or {}).get("4h") or {}
+
+                    _bsm    = _tf1d_b.get("bars_since_major_max")
+                    _msd    = _tf1d_b.get("major_struct_dist")
+                    _vol_1d = _tf1d_b.get("vol_ratio", 0.0)
+                    # obv_rising/cvd_bullish se re-derivan igual que en classify_explain
+                    _obv_r  = float(_tf4h_b.get("obv_slope", 0)) >= cfg.g("indicators", "OBV_RISING_MIN", default=0.05)
+                    _cvd_b  = float(_tf4h_b.get("cvd_ratio", 0)) >= cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05)
+                    _hrb    = bool(_tf4h_b.get("hold_recent_break", False))
+                    _bsb    = _tf4h_b.get("bars_since_break")
+
+                    _pass_age  = (_bsm is not None and _bsm >= 20)
+                    _pass_vol  = (_vol_1d >= 3.0)
+                    _pass_pre  = (_cvd_b and _obv_r)
+                    _pass_soft = (_msd is not None and _msd <= 0.25 and _hrb
+                                  and _bsb is not None and _bsb <= 5)
+
+                    if _pass_age:
+                        last_reason = "pre_major_struct:would_pass_age"
+                    elif _pass_vol:
+                        last_reason = "pre_major_struct:would_pass_vol"
+                    elif _pass_pre:
+                        last_reason = "pre_major_struct:would_pass_strong_pre"
+                    elif _pass_soft:
+                        last_reason = "pre_major_struct:would_pass_softzone"
+                    else:
+                        last_reason = "pre_major_struct:would_pass_none"
+
                 # Enriquece "pre_atr"
                 if last_reason == "pre_atr":
                     df_1d = sym_prep.get("1d")
@@ -404,7 +464,12 @@ def cmd_catch_rate(args, cfg):
 
                 reasons[last_reason] += 1
                 missed_list.append({"symbol": sym, "ts": ts_iso,
-                                    "gain_pct": round(gain_pct, 2), "reason": last_reason})
+                                    "gain_pct": round(gain_pct, 2), "reason": last_reason,
+                                    "closest_offset": int(best_offset),
+                                    "relax_offset": int(relax_offset),
+                                    # relax en el borde de la ventana → la relajación real
+                                    # podría ser más antigua (valor censurado).
+                                    "relax_censored": bool(relax_offset == -pre_pump_window)})
 
         total      = len(events)
         catch_rate = len(caught) * 100 / total if total else 0.0
@@ -415,10 +480,11 @@ def cmd_catch_rate(args, cfg):
             "caught":           len(caught),
             "missed":           len(missed_list),
             "catch_rate":       round(catch_rate, 1),
-            "miss_reasons":     dict(reasons),
-            "caught_by_signal": dict(caught_by_signal),
-            "lateness_bars":    {sig: dict(ctr) for sig, ctr in lateness_by_signal.items()},
-            "top_misses":       missed_list[:20],
+            "miss_reasons":       dict(reasons),
+            "window_reason_hist": dict(window_reason_hist),
+            "caught_by_signal":   dict(caught_by_signal),
+            "lateness_bars":      {sig: dict(ctr) for sig, ctr in lateness_by_signal.items()},
+            "top_misses":         missed_list[:20],
         }
 
     # ── Reporte ──────────────────────────────────────────────────────────────
@@ -444,17 +510,25 @@ def cmd_catch_rate(args, cfg):
         print(f"    Perdidos      : {r['missed']}")
         if r["miss_reasons"]:
             total_miss = sum(r["miss_reasons"].values())
-            print(f"    Causas de miss:")
+            print(f"    Gate vinculante (1 voto/mover, barra más cercana a disparar):")
             for reason, n in sorted(r["miss_reasons"].items(), key=lambda x: -x[1]):
                 pct = n * 100 / total_miss if total_miss else 0
                 print(f"      {reason:<32} {n:>4}  ({pct:.0f}%)")
+        if r.get("window_reason_hist"):
+            total_win = sum(r["window_reason_hist"].values())
+            print(f"    Histograma de gates en toda la ventana (todas las barras, agregado):")
+            for reason, n in sorted(r["window_reason_hist"].items(), key=lambda x: -x[1]):
+                pct = n * 100 / total_win if total_win else 0
+                print(f"      {reason:<32} {n:>5}  ({pct:.0f}%)")
         if r["top_misses"]:
-            print(f"\n    Top 10 misses más grandes:")
-            print(f"      {'#':>3} {'Symbol':<14} {'Gain':>8}  {'Razón':<30} Timestamp")
+            print(f"\n    Top 10 misses más grandes  (relax@ = offset 4h más temprano del gate vinculante):")
+            print(f"      {'#':>3} {'Symbol':<14} {'Gain':>8}  {'Razón':<30} {'relax@':>7} Timestamp")
             for i, m in enumerate(r["top_misses"][:10], 1):
                 ts = m.get("ts", "")[:16]
+                rel = m.get("relax_offset")
+                rel_s = f"{rel:+d}" if isinstance(rel, int) else "—"
                 print(f"      {i:>3} {m['symbol']:<14} {m['gain_pct']:>+7.1f}%  "
-                      f"{m['reason']:<30} {ts}")
+                      f"{m['reason']:<30} {rel_s:>7} {ts}")
 
     ts_str   = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
     out_path = AUDIT_RESULTS / f"catch_rate_swing_{ts_str}.json"
@@ -528,10 +602,16 @@ def cmd_distributions(args, cfg):
     cvd_lookback = cfg.g("indicators", "CVD_LOOKBACK", default=10)
 
     # Colecciones: todas las barras vs barras-de-mover
-    all_atr, pump_atr = [], []
-    all_vol, pump_vol = [], []
-    all_obv, pump_obv = [], []
-    all_cvd, pump_cvd = [], []
+    all_atr,  pump_atr  = [], []
+    all_vol,  pump_vol  = [], []
+    all_obv,  pump_obv  = [], []
+    all_cvd,  pump_cvd  = [], []
+    all_msd,  pump_msd  = [], []   # major_struct_dist (dist al máximo mayor 1d)
+    all_bbw,  pump_bbw  = [], []   # bb_width 4h
+    all_ema,  pump_ema  = [], []   # ema_trend_up 1d (0/1)
+    all_giw,  pump_giw  = [], []   # gain_in_window (retorno fwd de PRE_PUMP_WINDOW barras)
+
+    major_struct_max_dist = cfg.g("hold", "MAJOR_STRUCT_MAX_DIST", default=0.12)
 
     for sym, sym_prep in prepared.items():
         df_4h = sym_prep["4h"]
@@ -547,38 +627,84 @@ def cmd_distributions(args, cfg):
         obv_slope_s = (df_4h["_obv"].diff(obv_lookback) / vm_4h / obv_lookback).fillna(0.0)
 
         # CVD ratio vectorizado
-        cvd_slope_s  = df_4h["_cvd"].diff(cvd_lookback)
+        cvd_slope_s   = df_4h["_cvd"].diff(cvd_lookback)
         cvd_vol_sum_s = df_4h["_cvd_vol_sum"].replace(0, np.nan)
-        cvd_ratio_s  = (cvd_slope_s / cvd_vol_sum_s).fillna(0.0)
+        cvd_ratio_s   = (cvd_slope_s / cvd_vol_sum_s).fillna(0.0)
 
-        # ATR desde 1d: mapeamos cada barra 4h → 1d más cercana
-        cts_1d = df_1d["close_time"].values.astype(np.int64)
-        atr_1d = df_1d["_atr_pct"].values.astype(float)
+        # ATR y major_max desde 1d: mapeamos cada barra 4h → 1d más cercana
+        cts_1d      = df_1d["close_time"].values.astype(np.int64)
+        atr_1d      = df_1d["_atr_pct"].values.astype(float)
+        close_1d    = df_1d["close"].values.astype(float)
+        major_max_1d = df_1d["_major_max"].values.astype(float) if "_major_max" in df_1d.columns else None
+
+        # ema_trend_up vectorizado sobre 1d: precio > EMA lento y EMA lento sube
+        ema_slow_1d   = df_1d["_ema_slow"].values.astype(float)
+        ema_trend_arr = (
+            (close_1d > ema_slow_1d)
+            & (ema_slow_1d > np.concatenate([[np.nan] * 3, ema_slow_1d[:-3]]))
+        ).astype(float)  # 1.0 / 0.0 / nan al inicio
+
+        # gain_in_window: retorno forward de PRE_PUMP_WINDOW barras sobre 4h
+        close_4h = df_4h["close"].values.astype(float)
+        high_4h  = df_4h["high"].values.astype(float)
+        n4 = len(close_4h)
+        h_ser = pd.Series(high_4h)
+        fwd_max_4h = (
+            h_ser[::-1]
+            .rolling(window=PRE_PUMP_WINDOW, min_periods=PRE_PUMP_WINDOW)
+            .max()[::-1]
+            .shift(-1)
+            .values
+        )
 
         for idx in idxs_4h:
             if idx < 40:
                 continue
             ts_bar = int(cts_4h[idx])
 
-            # vol_ratio
-            vr = float(df_4h["_vol_ratio"].iat[idx])
-            # obv slope
+            # vol_ratio, bb_width, gain_in_window (4h)
+            vr    = float(df_4h["_vol_ratio"].iat[idx])
+            bbw_v = float(df_4h["_bb_width"].iat[idx])
+            c4    = float(close_4h[idx])
+            fw    = float(fwd_max_4h[idx]) if idx + PRE_PUMP_WINDOW < n4 else float("nan")
+            giw_v = (fw / c4 - 1.0) if (c4 > 0 and not np.isnan(fw)) else float("nan")
+
+            # obv slope, cvd ratio (4h)
             obv_v = float(obv_slope_s.iat[idx])
-            # cvd ratio
             cvd_v = float(cvd_ratio_s.iat[idx])
-            # atr (from 1d)
+
+            # features desde 1d (mapeo 4h → 1d)
             idx_1d = np.searchsorted(cts_1d, ts_bar, side="right") - 1
             if idx_1d < 0 or idx_1d >= len(atr_1d):
                 continue
             atr_v = float(atr_1d[idx_1d])
 
+            # major_struct_dist: (major_max − precio) / precio  (>0 = por debajo del máx)
+            msd_v = float("nan")
+            if major_max_1d is not None and idx_1d < len(major_max_1d):
+                mm = float(major_max_1d[idx_1d])
+                c1 = float(close_1d[idx_1d])
+                if c1 > 0 and not np.isnan(mm):
+                    msd_v = (mm - c1) / c1
+
+            # ema_trend_up 1d (0/1)
+            ema_v = float(ema_trend_arr[idx_1d]) if idx_1d < len(ema_trend_arr) else float("nan")
+
             is_pump = (sym, idx) in pump_bars
 
             all_atr.append(atr_v);  all_vol.append(vr)
             all_obv.append(obv_v);  all_cvd.append(cvd_v)
+            all_bbw.append(bbw_v)
+            if not np.isnan(msd_v): all_msd.append(msd_v)
+            if not np.isnan(ema_v): all_ema.append(ema_v)
+            if not np.isnan(giw_v): all_giw.append(giw_v)
             if is_pump:
                 pump_atr.append(atr_v); pump_vol.append(vr)
                 pump_obv.append(obv_v); pump_cvd.append(cvd_v)
+                pump_bbw.append(bbw_v)
+                if not np.isnan(msd_v): pump_msd.append(msd_v)
+                if not np.isnan(ema_v): pump_ema.append(ema_v)
+                if not np.isnan(giw_v): pump_giw.append(giw_v)
 
     # ── Reporte ──────────────────────────────────────────────────────────────
     print()
@@ -600,26 +726,58 @@ def cmd_distributions(args, cfg):
                   f"  p75={d2['p75']:>7.4f}  p90={d2['p90']:>7.4f}  p95={d2['p95']:>7.4f}")
         return {"all": _percentiles(all_v), "pump": _percentiles(pump_v)}
 
+    def show_rate(label, all_v, pump_v):
+        """Para features binarias (0/1): reportar fracción de 1s."""
+        r_all  = sum(all_v)  / len(all_v)  if all_v  else float("nan")
+        r_pump = sum(pump_v) / len(pump_v) if pump_v else float("nan")
+        print(f"\n  [{label}]")
+        print(f"    Todas las barras  (n={len(all_v):>7}): tasa = {r_all:.3f}")
+        print(f"    Barras de pump    (n={len(pump_v):>7}): tasa = {r_pump:.3f}")
+        return {"all_rate": round(r_all, 4), "pump_rate": round(r_pump, 4)}
+
     dist_data = {}
+    print("\n── Prioridad 1: gate pre_major_struct ──")
+    dist_data["major_struct_dist"] = show_dist(
+        f"major_struct_dist 1d  (gate ≤{major_struct_max_dist:.2f}; +grande = más lejos del máx, más bloqueado)",
+        all_msd, pump_msd)
+    # fracción de barras que PASARÍAN el gate
+    n_all_pass  = sum(1 for v in all_msd  if v <= major_struct_max_dist)
+    n_pump_pass = sum(1 for v in pump_msd if v <= major_struct_max_dist)
+    r_all_pass  = n_all_pass  / len(all_msd)  if all_msd  else float("nan")
+    r_pump_pass = n_pump_pass / len(pump_msd) if pump_msd else float("nan")
+    print(f"    Fracción que pasa el gate (dist≤{major_struct_max_dist:.2f}):  "
+          f"población={r_all_pass:.2%}  movers={r_pump_pass:.2%}")
+    dist_data["major_struct_dist"]["pct_pass_gate"] = {
+        "all": round(r_all_pass, 4), "pump": round(r_pump_pass, 4)}
+
+    print("\n── Prioridad 2: tendencia y compresión ──")
+    dist_data["ema_trend_up_1d"]  = show_rate(
+        "ema_trend_up 1d  (fracción barras con EMA alcista)", all_ema, pump_ema)
+    dist_data["bb_width_4h"]      = show_dist(
+        "bb_width 4h  (compresión previa; menor = más comprimido)", all_bbw, pump_bbw)
+
+    print("\n── Prioridad 3: señales clásicas ──")
     dist_data["atr_pct_1d"]   = show_dist("atr_pct_1d    (umbral ATR_MIN_PCT, gate duro)", all_atr, pump_atr)
     dist_data["vol_ratio_4h"] = show_dist("vol_ratio_4h  (BREAKOUT_MIN_VOL_RATIO, PREBREAK_MIN_VOL_RATIO)", all_vol, pump_vol)
     dist_data["obv_slope_4h"] = show_dist("obv_slope_4h  (OBV_RISING_MIN)", all_obv, pump_obv)
     dist_data["cvd_ratio_4h"] = show_dist("cvd_ratio_4h  (CVD_BULLISH_MIN)", all_cvd, pump_cvd)
 
+    print("\n── Prioridad 4: lateness ──")
+    dist_data["gain_in_window"] = show_dist(
+        f"gain_in_window 4h  (retorno fwd {PRE_PUMP_WINDOW} barras; +alto = barra temprana)",
+        all_giw, pump_giw)
+
     # Sugerencia de umbrales derivada de la distribución
     print("\n─── Sugerencia de umbrales (p30 de barras-de-pump) ─────────────")
-    for key, label_cfg in [
-        ("atr_pct_1d",   "ATR_MIN_PCT"),
-        ("vol_ratio_4h", "BREAKOUT_MIN_VOL_RATIO"),
-        ("obv_slope_4h", "OBV_RISING_MIN"),
-        ("cvd_ratio_4h", "CVD_BULLISH_MIN"),
+    for key, label_cfg, pump_v in [
+        ("major_struct_dist", "MAJOR_STRUCT_MAX_DIST",    pump_msd),
+        ("atr_pct_1d",        "ATR_MIN_PCT",              pump_atr),
+        ("vol_ratio_4h",      "BREAKOUT_MIN_VOL_RATIO",   pump_vol),
+        ("obv_slope_4h",      "OBV_RISING_MIN",           pump_obv),
+        ("cvd_ratio_4h",      "CVD_BULLISH_MIN",          pump_cvd),
     ]:
-        pump_v = (pump_atr if key == "atr_pct_1d"
-                  else pump_vol if key == "vol_ratio_4h"
-                  else pump_obv if key == "obv_slope_4h"
-                  else pump_cvd)
         if pump_v:
-            a = sorted(pump_v)
+            a   = sorted(pump_v)
             p30 = a[max(0, int(len(a) * 0.30))]
             print(f"    {label_cfg:<30} p30 de pumps = {p30:.4f}")
         else:
@@ -696,6 +854,7 @@ def cmd_post_mortem(args, cfg):
         "recent_max", "near_recent_max", "breakout", "breakout_distance",
         "recent_long_ok", "obv_slope", "obv_rising", "cvd_ratio", "cvd_bullish",
         "not_near_resistance", "dist_to_res", "major_struct_ok", "major_struct_dist",
+        "bars_since_major_max",
         "hold_recent_break", "hold_kept_zone", "hold_pullback_ok", "hold_strong",
         "bars_since_break", "riding_gain", "riding_above_zone", "riding_vol_ok",
         "riding_bars_since", "fading_reversal",
@@ -731,7 +890,7 @@ def cmd_post_mortem(args, cfg):
 
     # ── Clasificación ─────────────────────────────────────────────────────────
     print("\n─── CLASIFICACIÓN ───────────────────────────────────────────────")
-    alert, reason = classify_explain(symbol, tf_data, cfg)
+    alert, reason, _prox = classify_explain(symbol, tf_data, cfg)
     if alert is not None:
         print(f"  ✓ SEÑAL: {alert['label']}  score={alert['score']}  bucket={alert['bucket']}")
         for r in alert.get("reasons", []):
