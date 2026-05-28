@@ -101,6 +101,18 @@ def _get_signal_fail_reason(tf_1h, tf_4h, tf_1d, cfg):
         ],
     }
 
+    if cfg.g("active_signals", "COILING", default=False):
+        _coil_max_dist = cfg.g("coiling", "COILING_MAX_DIST", default=0.04)
+        _bd_co = tf_4h.get("breakout_distance", -999)
+        signals["co"] = [
+            ("no_breakout", not bool(tf_4h.get("breakout"))),
+            ("dist_range",  -_coil_max_dist <= _bd_co < 0),
+            ("obv_rising",  tf_4h.get("obv_slope", 0) >= cfg.g("indicators", "OBV_RISING_MIN", default=0.05)),
+            ("cvd_bullish", tf_4h.get("cvd_ratio", 0) >= cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05)),
+            ("vol_ratio",   tf_4h.get("vol_ratio", 0) >= cfg.g("coiling", "COILING_MIN_VOL_RATIO", default=1.0)),
+            ("bb_width",    tf_4h.get("width_curr", 9) <= cfg.g("coiling", "COILING_BB_WIDTH_MAX", default=9.0)),
+        ]
+
     best_prefix = "all"
     best_fail   = "signals"
     best_passes = -1
@@ -328,6 +340,7 @@ def cmd_catch_rate(args, cfg):
         window_reason_hist = Counter()   # toda razón en cada barra de la ventana (agregado)
         caught_by_signal = Counter()
         lateness_by_signal = defaultdict(Counter)
+        bo_breakout_feat_rows = []   # features 4h de cada miss bo:breakout (Step 0)
 
         for sym, pump_t, gain_pct in events:
             sym_prep = prepared.get(sym)
@@ -462,6 +475,21 @@ def cmd_catch_rate(args, cfg):
                             sub = "pre_atr:near" if ratio >= 0.80 else ("pre_atr:mid" if ratio >= 0.50 else "pre_atr:far")
                             last_reason = sub
 
+                # Step 0: capturar features 4h cuando el gate vinculante es bo:breakout
+                if last_reason == "bo:breakout":
+                    _td_bo  = get_tf_data_at(sym_prep, bar, cfg) if sym_prep else None
+                    _tf4_bo = (_td_bo or {}).get("4h") or {}
+                    if _tf4_bo:
+                        bo_breakout_feat_rows.append({
+                            "breakout_distance": _tf4_bo.get("breakout_distance"),
+                            "vol_ratio":         _tf4_bo.get("vol_ratio"),
+                            "obv_slope":         _tf4_bo.get("obv_slope"),
+                            "cvd_ratio":         _tf4_bo.get("cvd_ratio"),
+                            "width_curr":        _tf4_bo.get("width_curr"),
+                            "strong_close":      int(bool(_tf4_bo.get("strong_close"))),
+                            "candle_body_pct":   _tf4_bo.get("candle_body_pct"),
+                        })
+
                 reasons[last_reason] += 1
                 missed_list.append({"symbol": sym, "ts": ts_iso,
                                     "gain_pct": round(gain_pct, 2), "reason": last_reason,
@@ -475,6 +503,17 @@ def cmd_catch_rate(args, cfg):
         catch_rate = len(caught) * 100 / total if total else 0.0
         missed_list.sort(key=lambda x: x["gain_pct"], reverse=True)
 
+        # Step 0: distribución de features para los misses bo:breakout
+        bo_feat_dist = {}
+        if bo_breakout_feat_rows:
+            _feat_keys = ["breakout_distance", "vol_ratio", "obv_slope", "cvd_ratio",
+                          "width_curr", "candle_body_pct"]
+            for fk in _feat_keys:
+                vals = [r[fk] for r in bo_breakout_feat_rows if r.get(fk) is not None]
+                bo_feat_dist[fk] = _percentiles(vals)
+            _sc = sum(r["strong_close"] for r in bo_breakout_feat_rows)
+            bo_feat_dist["strong_close_rate"] = round(_sc / len(bo_breakout_feat_rows), 3)
+
         results[label] = {
             "total_movers":     total,
             "caught":           len(caught),
@@ -485,6 +524,10 @@ def cmd_catch_rate(args, cfg):
             "caught_by_signal":   dict(caught_by_signal),
             "lateness_bars":      {sig: dict(ctr) for sig, ctr in lateness_by_signal.items()},
             "top_misses":         missed_list[:20],
+            "bo_breakout_features": {
+                "count": len(bo_breakout_feat_rows),
+                "distributions": bo_feat_dist,
+            } if bo_feat_dist else None,
         }
 
     # ── Reporte ──────────────────────────────────────────────────────────────
@@ -529,6 +572,22 @@ def cmd_catch_rate(args, cfg):
                 rel_s = f"{rel:+d}" if isinstance(rel, int) else "—"
                 print(f"      {i:>3} {m['symbol']:<14} {m['gain_pct']:>+7.1f}%  "
                       f"{m['reason']:<30} {rel_s:>7} {ts}")
+        bo_f = r.get("bo_breakout_features")
+        if bo_f and bo_f.get("distributions"):
+            print(f"\n    [Step 0] Features 4h de los {bo_f['count']} misses bo:breakout")
+            print(f"      {'feature':<20}  {'p10':>7} {'p25':>7} {'p50':>7} {'p75':>7} {'p90':>7}")
+            _fkeys = ["breakout_distance", "vol_ratio", "obv_slope", "cvd_ratio",
+                      "width_curr", "candle_body_pct"]
+            for fk in _fkeys:
+                dist = bo_f["distributions"].get(fk, {})
+                print(f"      {fk:<20}  "
+                      f"{dist.get('p10', float('nan')):>7.3f} "
+                      f"{dist.get('p25', float('nan')):>7.3f} "
+                      f"{dist.get('p50', float('nan')):>7.3f} "
+                      f"{dist.get('p75', float('nan')):>7.3f} "
+                      f"{dist.get('p90', float('nan')):>7.3f}")
+            sc_rate = bo_f["distributions"].get("strong_close_rate", 0)
+            print(f"      {'strong_close_rate':<20}  {sc_rate:.1%}")
 
     ts_str   = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M")
     out_path = AUDIT_RESULTS / f"catch_rate_swing_{ts_str}.json"

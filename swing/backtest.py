@@ -1457,6 +1457,80 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                     "breakdown": bd,
                 })
 
+    # ── COILING ───────────────────────────────────────────────────────────
+    if _trad_signals_eligible and cfg.g("active_signals", "COILING", default=False):
+        _coil_max_dist = cfg.g("coiling", "COILING_MAX_DIST", default=0.04)
+        _coil_min_vol  = cfg.g("coiling", "COILING_MIN_VOL_RATIO", default=1.0)
+        _coil_bb_max   = cfg.g("coiling", "COILING_BB_WIDTH_MAX", default=9.0)
+        _bd = tf_4h.get("breakout_distance", -999)
+        if (not tf_4h.get("breakout", False)
+            and -_coil_max_dist <= _bd < 0
+            and tf_4h.get("obv_rising", False)
+            and tf_4h.get("cvd_bullish", False)
+            and tf_4h.get("vol_ratio", 0) >= _coil_min_vol
+            and tf_4h.get("width_curr", 9) <= _coil_bb_max):
+
+            base_score     = cfg.g("scoring_coiling", "BASE_SCORE",               default=3)
+            obv_exp_min    = cfg.g("scoring_coiling", "OBV_TIER_EXPLOSIVE_MIN",    default=0.3)
+            obv_exp_b      = cfg.g("scoring_coiling", "OBV_TIER_EXPLOSIVE_BONUS",  default=3)
+            obv_strong_min = cfg.g("scoring_coiling", "OBV_TIER_STRONG_MIN",       default=0.1)
+            obv_strong_b   = cfg.g("scoring_coiling", "OBV_TIER_STRONG_BONUS",     default=2)
+            obv_rising_b   = cfg.g("scoring_coiling", "OBV_TIER_RISING_BONUS",     default=1)
+            cvd_vbull_min  = cfg.g("scoring_coiling", "CVD_TIER_VERY_BULLISH_MIN", default=0.1)
+            cvd_vbull_b    = cfg.g("scoring_coiling", "CVD_TIER_VERY_BULLISH_BONUS", default=2)
+            cvd_bull_b     = cfg.g("scoring_coiling", "CVD_TIER_BULLISH_BONUS",    default=1)
+            close_b        = cfg.g("scoring_coiling", "STRONG_CLOSE_BONUS",        default=1)
+            dist_tight_max = cfg.g("scoring_coiling", "DIST_TIGHT_MAX",            default=0.01)
+            dist_tight_b   = cfg.g("scoring_coiling", "DIST_TIGHT_BONUS",          default=2)
+            dist_wide_min  = cfg.g("scoring_coiling", "DIST_WIDE_MIN",             default=0.03)
+            dist_wide_pen  = cfg.g("scoring_coiling", "DIST_WIDE_PENALTY",         default=-1)
+            late_repeat_pen = cfg.g("scoring_coiling", "LATE_REPEAT_PENALTY",      default=-1)
+
+            score = base_score
+            bd_obj = {"BASE": base_score}
+
+            obv_v = tf_4h.get("obv_slope", 0)
+            if obv_v >= obv_exp_min:
+                score += obv_exp_b;    bd_obj["OBV_EXPLOSIVE"] = obv_exp_b
+            elif obv_v >= obv_strong_min:
+                score += obv_strong_b; bd_obj["OBV_STRONG"]    = obv_strong_b
+            else:
+                score += obv_rising_b; bd_obj["OBV_RISING"]    = obv_rising_b
+
+            cvd_v = tf_4h.get("cvd_ratio", 0)
+            if cvd_v >= cvd_vbull_min:
+                score += cvd_vbull_b;  bd_obj["CVD_VERY_BULLISH"] = cvd_vbull_b
+            else:
+                score += cvd_bull_b;   bd_obj["CVD_BULLISH"]      = cvd_bull_b
+
+            if tf_4h.get("strong_close"):
+                score += close_b;      bd_obj["STRONG_CLOSE"] = close_b
+
+            # Bonus por coiling muy tight (< 1%), penalidad por alejado (> 3%)
+            if abs(_bd) <= dist_tight_max:
+                score += dist_tight_b; bd_obj["DIST_TIGHT"] = dist_tight_b
+            elif abs(_bd) >= dist_wide_min:
+                score += dist_wide_pen; bd_obj["DIST_WIDE"] = dist_wide_pen
+
+            prev_coil = counts_history.get((symbol, "COILING"), 0)
+            if prev_coil >= LATE_REPEAT_COUNT:
+                score += late_repeat_pen
+                bd_obj["LATE_REPEAT"] = late_repeat_pen
+
+            score = min(score, SCORE_CAP)
+            candidates.append({
+                "label": "COILING", "history_tf": "COILING", "score": score,
+                "priority": 0, "bucket": final_bucket(score, "COILING", cfg),
+                "timeframe": "4h", "price": tf_4h["price"],
+                "ref_price": tf_4h["recent_max"],
+                "obv_slope": tf_4h.get("obv_slope"),
+                "cvd_ratio": tf_4h.get("cvd_ratio"),
+                "recent_long_ok": tf_4h.get("recent_long_ok"),
+                "htf_1d_up": bool(tf_1d.get("ema_trend_up")),
+                "htf_1w_up": bool(tf_1w.get("ema_trend_up")),
+                "breakdown": bd_obj,
+            })
+
     if not candidates:
         return None
 
