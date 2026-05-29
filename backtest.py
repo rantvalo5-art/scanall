@@ -243,14 +243,15 @@ def get_klines_range(symbol, interval, start_ms, end_ms):
 
 
 def download_all_klines(symbols, start_dt, end_dt):
-    buffer_days = 3
+    intervals = ["5m", "15m", "1h", "4h"]
+    buffer_days = 15 if "4h" in intervals else 3  # 4h necesita ≥80 barras (~13d)
     fetch_start = start_dt - timedelta(days=buffer_days)
     fetch_end = end_dt
     start_ms = int(fetch_start.timestamp() * 1000)
     end_ms = int(fetch_end.timestamp() * 1000)
-    intervals = ["5m", "15m", "1h"]
     data = {}
-    print(f"\n  Descargando {len(symbols)} pares × 3 timeframes = {len(symbols)*3} requests")
+    n_tfs = len(intervals)
+    print(f"\n  Descargando {len(symbols)} pares × {n_tfs} timeframes = {len(symbols)*n_tfs} requests")
     print(f"  Rango: {fetch_start.date()} a {fetch_end.date()} ({buffer_days}d buffer + período)")
     completed = 0
 
@@ -273,9 +274,9 @@ def download_all_klines(symbols, start_dt, end_dt):
             data.setdefault(sym, {})[tf] = df
             completed += 1
             if completed % 50 == 0:
-                print(f"    {completed}/{len(symbols)*3} descargados...")
-    valid = {s: tfs for s, tfs in data.items() if len(tfs) == 3}
-    print(f"  {len(valid)}/{len(symbols)} pares con data completa en los 3 TF")
+                print(f"    {completed}/{len(symbols)*n_tfs} descargados...")
+    valid = {s: tfs for s, tfs in data.items() if all(t in tfs for t in ("5m","15m","1h"))}
+    print(f"  {len(valid)}/{len(symbols)} pares con data completa (5m/15m/1h requeridos)")
     return valid
 
 
@@ -1244,6 +1245,12 @@ def classify(symbol, tf_data, cfg, counts_history=None):
     tf1h = tf_data.get("1h") or {}
     if not tf5 or not tf15 or not tf1h:
         return None
+    tf4h = tf_data.get("4h") or {}
+    _tf4_up = tf4h.get("ema_trend_up", True)  # fail-safe: 4h ausente => no bloquear
+    _tf4_enabled = cfg.g("trend_filter_4h", "ENABLED", default=False)
+    _tf4_mode    = cfg.g("trend_filter_4h", "MODE",    default="soft")
+    _tf4_penalty = cfg.g("trend_filter_4h", "PENALTY", default=2)
+    _tf4_signals = set(cfg.g("trend_filter_4h", "SIGNALS", default=["BREAKOUT","HOLD","RIDING"]))
 
     # Los thresholds OBV/CVD varían entre variantes: se re-derivan aquí para que
     # _build_candidates() pueda compartirse entre todas las variantes (una sola entrada en analyze_cache).
@@ -1329,6 +1336,8 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 "obv_slope": tf15.get("obv_slope"),
                 "cvd_ratio": tf15.get("cvd_ratio"),
                 "recent_long_ok": tf15.get("recent_long_ok"),
+                "htf_1h_up": bool(tf1h.get("ema_trend_up")),
+                "htf_4h_up": bool(tf4h.get("ema_trend_up")),
                 "breakdown": bd,
             })
 
@@ -1427,6 +1436,8 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 "obv_slope": tf15.get("obv_slope"),
                 "cvd_ratio": tf15.get("cvd_ratio"),
                 "recent_long_ok": tf15.get("recent_long_ok"),
+                "htf_1h_up": bool(tf1h.get("ema_trend_up")),
+                "htf_4h_up": bool(tf4h.get("ema_trend_up")),
                 "breakdown": bd,
             })
 
@@ -1541,17 +1552,22 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                     elif fr >= cfg.g("scoring_breakout", "FUNDING_HOT_MIN", default=0.0008):
                         score += cfg.g("scoring_breakout", "FUNDING_HOT_PENALTY", default=-2)
 
+            if _tf4_enabled and "BREAKOUT" in _tf4_signals and not _tf4_up and _tf4_mode == "soft":
+                score -= _tf4_penalty; bd["NO_4H_TREND"] = -_tf4_penalty
             score = min(score, SCORE_CAP)
-            candidates.append({
-                "label": "BREAKOUT", "history_tf": "BREAKOUT", "score": score,
-                "priority": 2, "bucket": final_bucket(score, "BREAKOUT", cfg),
-                "timeframe": "15m", "price": tf15["price"],
-                "ref_price": tf15["recent_max"],
-                "obv_slope": tf15.get("obv_slope"),
-                "cvd_ratio": tf15.get("cvd_ratio"),
-                "recent_long_ok": tf15.get("recent_long_ok"),
-                "breakdown": bd,
-            })
+            if not (_tf4_enabled and _tf4_mode == "hard" and "BREAKOUT" in _tf4_signals and not _tf4_up):
+                candidates.append({
+                    "label": "BREAKOUT", "history_tf": "BREAKOUT", "score": score,
+                    "priority": 2, "bucket": final_bucket(score, "BREAKOUT", cfg),
+                    "timeframe": "15m", "price": tf15["price"],
+                    "ref_price": tf15["recent_max"],
+                    "obv_slope": tf15.get("obv_slope"),
+                    "cvd_ratio": tf15.get("cvd_ratio"),
+                    "recent_long_ok": tf15.get("recent_long_ok"),
+                    "htf_1h_up": bool(tf1h.get("ema_trend_up")),
+                    "htf_4h_up": bool(tf4h.get("ema_trend_up")),
+                    "breakdown": bd,
+                })
 
     # ── RIDING ────────────────────────────────────────────────────────────
     if _trad_signals_eligible and cfg.g("active_signals", "RIDING"):
@@ -1646,17 +1662,22 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 score += late_repeat_pen
                 bd["LATE_REPEAT"] = late_repeat_pen
 
+            if _tf4_enabled and "RIDING" in _tf4_signals and not _tf4_up and _tf4_mode == "soft":
+                score -= _tf4_penalty; bd["NO_4H_TREND"] = -_tf4_penalty
             score = min(score, SCORE_CAP)
-            candidates.append({
-                "label": "RIDING", "history_tf": "RIDING", "score": score,
-                "priority": 2, "bucket": final_bucket(score, "RIDING", cfg),
-                "timeframe": "15m", "price": tf15["price"],
-                "ref_price": tf15.get("riding_break_close"),
-                "obv_slope": tf15.get("obv_slope"),
-                "cvd_ratio": tf15.get("cvd_ratio"),
-                "recent_long_ok": tf15.get("recent_long_ok"),
-                "breakdown": bd,
-            })
+            if not (_tf4_enabled and _tf4_mode == "hard" and "RIDING" in _tf4_signals and not _tf4_up):
+                candidates.append({
+                    "label": "RIDING", "history_tf": "RIDING", "score": score,
+                    "priority": 2, "bucket": final_bucket(score, "RIDING", cfg),
+                    "timeframe": "15m", "price": tf15["price"],
+                    "ref_price": tf15.get("riding_break_close"),
+                    "obv_slope": tf15.get("obv_slope"),
+                    "cvd_ratio": tf15.get("cvd_ratio"),
+                    "recent_long_ok": tf15.get("recent_long_ok"),
+                    "htf_1h_up": bool(tf1h.get("ema_trend_up")),
+                    "htf_4h_up": bool(tf4h.get("ema_trend_up")),
+                    "breakdown": bd,
+                })
 
     # ── HOLD ──────────────────────────────────────────────────────────────
     if _trad_signals_eligible and cfg.g("active_signals", "HOLD"):
@@ -1718,17 +1739,22 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 score += late_repeat_pen
                 bd["LATE_REPEAT"] = late_repeat_pen
 
+            if _tf4_enabled and "HOLD" in _tf4_signals and not _tf4_up and _tf4_mode == "soft":
+                score -= _tf4_penalty; bd["NO_4H_TREND"] = -_tf4_penalty
             score = min(score, SCORE_CAP)
-            candidates.append({
-                "label": "HOLD", "history_tf": "HOLD", "score": score,
-                "priority": 3, "bucket": final_bucket(score, "HOLD", cfg),
-                "timeframe": "15m", "price": tf15["price"],
-                "ref_price": tf15.get("riding_break_ref") or tf15["recent_max"],
-                "obv_slope": tf15.get("obv_slope"),
-                "cvd_ratio": tf15.get("cvd_ratio"),
-                "recent_long_ok": tf15.get("recent_long_ok"),
-                "breakdown": bd,
-            })
+            if not (_tf4_enabled and _tf4_mode == "hard" and "HOLD" in _tf4_signals and not _tf4_up):
+                candidates.append({
+                    "label": "HOLD", "history_tf": "HOLD", "score": score,
+                    "priority": 3, "bucket": final_bucket(score, "HOLD", cfg),
+                    "timeframe": "15m", "price": tf15["price"],
+                    "ref_price": tf15.get("riding_break_ref") or tf15["recent_max"],
+                    "obv_slope": tf15.get("obv_slope"),
+                    "cvd_ratio": tf15.get("cvd_ratio"),
+                    "recent_long_ok": tf15.get("recent_long_ok"),
+                    "htf_1h_up": bool(tf1h.get("ema_trend_up")),
+                    "htf_4h_up": bool(tf4h.get("ema_trend_up")),
+                    "breakdown": bd,
+                })
 
     if not candidates:
         return None
@@ -2144,7 +2170,7 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
     bar_idx_cache = {}
     for sym, tfs in klines.items():
         by_tf = {}
-        for tf in ("5m", "15m", "1h"):
+        for tf in ("5m", "15m", "1h", "4h"):
             sym_prep = (prepared.get(sym) or {}) if prepared else {}
             df = sym_prep.get(tf)
             if df is None:
@@ -2199,6 +2225,16 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
             tf_data[tf] = result
         if not valid:
             return None
+        # 4h opcional para filtro de tendencia (fail-safe si falta o índice insuficiente)
+        _idxs_4h = by_tf.get("4h")
+        if _idxs_4h is not None:
+            _idx4 = int(_idxs_4h[i])
+            if _idx4 >= 80:
+                _df4 = klines.get(sym, {}).get("4h")
+                if _df4 is not None:
+                    _r4 = analyze_at_time(_df4, _idx4, cfg)
+                    if _r4 is not None:
+                        tf_data["4h"] = _r4
         if deriv_enabled:
             oi_delta, funding_rate = lookup_derivatives_at(
                 derivatives.get(sym), ts_ms, oi_lookback_min=deriv_lookback)
@@ -2282,6 +2318,8 @@ def _classify_pass(candidates, cfg, cooldown_min_by_state, history_window_ms,
             "obv_slope": alert.get("obv_slope"),
             "cvd_ratio": alert.get("cvd_ratio"),
             "recent_long_ok": alert.get("recent_long_ok"),
+            "htf_1h_up": alert.get("htf_1h_up"),
+            "htf_4h_up": alert.get("htf_4h_up"),
             "candle_status": alert.get("candle_status"),
             **outcomes,
         }
@@ -2567,7 +2605,7 @@ def run_backtest(cfg, weeks, klines, start_dt, end_dt, snapshot_pairs=None,
         futures_prep = {}
         with ThreadPoolExecutor(max_workers=n_workers) as ex:
             for sym, tfs in klines.items():
-                for tf in ("5m", "15m", "1h"):
+                for tf in ("5m", "15m", "1h", "4h"):
                     if tf in tfs:
                         futures_prep[(sym, tf)] = ex.submit(precompute_indicators, tfs[tf], cfg)
         prepared = {}
@@ -2609,8 +2647,8 @@ def main():
     parser.add_argument("--quick", action="store_true",
                         help="Modo dev rápido: fuerza weeks=1 y max-pairs=100. Útil para iterar.")
     parser.add_argument("--cache-dir", default=None,
-                        help="Directorio para caché de klines (default: .backtest_cache). "
-                             "Usar ruta nativa de WSL (ej: ~/scancrypto_cache) para mejor I/O.")
+                        help="Directorio para caché de klines (default: I:\\.backtest_cache). "
+                             "Pasar ruta alternativa si se quiere otro disco/ubicación.")
     parser.add_argument("--forming-analysis", action="store_true",
                         help="Post-análisis de lateness forming sobre alertas EXPLOSION: "
                              "descarga 1m klines y mide en qué minuto habrían disparado.")

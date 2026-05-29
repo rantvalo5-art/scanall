@@ -103,6 +103,11 @@ ACTIVE_SIGNALS_HOLD      = _cfg("active_signals", "HOLD")
 ACTIVE_SIGNALS_EXPLOSION         = _cfg("active_signals", "EXPLOSION", default=False)
 ACTIVE_SIGNALS_EXPLOSION_FORMING = _cfg("active_signals", "EXPLOSION_FORMING", default=False)
 
+TF4_ENABLED  = _cfg("trend_filter_4h", "ENABLED",  default=False)
+TF4_MODE     = _cfg("trend_filter_4h", "MODE",     default="soft")
+TF4_PENALTY  = _cfg_score("trend_filter_4h", "PENALTY", 2)
+TF4_SIGNALS  = set(_cfg("trend_filter_4h", "SIGNALS", default=["BREAKOUT", "HOLD", "RIDING"]))
+
 EMA_SLOW        = _cfg("indicators", "EMA_SLOW")
 RECENT_LOOKBACK = _cfg("indicators", "RECENT_LOOKBACK")
 ATR_MIN_PCT     = _cfg("indicators", "ATR_MIN_PCT")
@@ -1009,6 +1014,8 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
     tf1h = tf_map.get("1h") or {}
     if not tf5 or not tf15 or not tf1h:
         return None
+    tf4h = tf_map.get("4h") or {}
+    _tf4_up = tf4h.get("ema_trend_up", True)  # fail-safe: 4h ausente => no bloquear
 
     # Gates universales (aplican a TODOS los signals incl. EXPLOSION).
     if not tf1h.get("not_near_resistance"):
@@ -1418,6 +1425,8 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                     elif fr >= _cfg_score(sb, "FUNDING_HOT_MIN", 0.0008):
                         score += _cfg_score(sb, "FUNDING_HOT_PENALTY", -2)
 
+            if TF4_ENABLED and "BREAKOUT" in TF4_SIGNALS and not _tf4_up and TF4_MODE == "soft":
+                score -= TF4_PENALTY
             # Cap final
             score = min(score, SCORE_CAP)
 
@@ -1440,7 +1449,10 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 reasons.append(deriv_note)
             if tf1h.get("dist_to_res", 0) > 0.04:
                 reasons.append(f"1h con espacio ({tf1h['dist_to_res']:.2%})")
-            candidates.append({
+            if TF4_ENABLED and "BREAKOUT" in TF4_SIGNALS and not _tf4_up:
+                reasons.append("⚠ tendencia 4h bajista")
+            if not (TF4_ENABLED and TF4_MODE == "hard" and "BREAKOUT" in TF4_SIGNALS and not _tf4_up):
+              candidates.append({
                 "symbol": symbol,
                 "label": "BREAKOUT",
                 "history_tf": "BREAKOUT",
@@ -1572,8 +1584,13 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             if prev > 0 and late_repeat_pen < 0:
                 score += late_repeat_pen
                 reasons.append("repeticion tardia")
+            if TF4_ENABLED and "RIDING" in TF4_SIGNALS and not _tf4_up:
+                if TF4_MODE == "soft":
+                    score -= TF4_PENALTY
+                reasons.append("⚠ tendencia 4h bajista")
             score = min(score, SCORE_CAP)
-            candidates.append({
+            if not (TF4_ENABLED and TF4_MODE == "hard" and "RIDING" in TF4_SIGNALS and not _tf4_up):
+              candidates.append({
                 "symbol": symbol,
                 "label": "RIDING",
                 "history_tf": "RIDING",
@@ -1718,8 +1735,13 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 reasons.append(f"🚀 momentum extremo (OBV {tf15['obv_slope']:+.1%} + CVD bullish + dist {tf1h['dist_to_res']:.2%})")
             if prev >= LATE_REPEAT_COUNT:
                 score += late_pen
+            if TF4_ENABLED and "HOLD" in TF4_SIGNALS and not _tf4_up:
+                if TF4_MODE == "soft":
+                    score -= TF4_PENALTY
+                reasons.append("⚠ tendencia 4h bajista")
             score = min(score, SCORE_CAP)
-            candidates.append({
+            if not (TF4_ENABLED and TF4_MODE == "hard" and "HOLD" in TF4_SIGNALS and not _tf4_up):
+              candidates.append({
                 "symbol": symbol,
                 "label": "HOLD",
                 "history_tf": "HOLD",
