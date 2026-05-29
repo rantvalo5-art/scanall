@@ -102,6 +102,7 @@ ACTIVE_SIGNALS_FADING    = _cfg("active_signals", "FADING")
 ACTIVE_SIGNALS_HOLD      = _cfg("active_signals", "HOLD")
 ACTIVE_SIGNALS_EXPLOSION         = _cfg("active_signals", "EXPLOSION", default=False)
 ACTIVE_SIGNALS_EXPLOSION_FORMING = _cfg("active_signals", "EXPLOSION_FORMING", default=False)
+ACTIVE_SIGNALS_COILING           = _cfg("active_signals", "COILING", default=False)
 
 TF4_ENABLED  = _cfg("trend_filter_4h", "ENABLED",  default=False)
 TF4_MODE     = _cfg("trend_filter_4h", "MODE",     default="soft")
@@ -1759,6 +1760,87 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
                 "recent_long_ok": tf15.get("recent_long_ok"),
             })
 
+    # ── COILING ────────────────────────────────────────────────────────────────
+    # Pre-ruptura en 4h: precio comprimiendo justo debajo del máximo reciente,
+    # OBV y CVD alcistas, BB estrecho. Max score ~10 < BEST_MIN_SCORE → solo WATCH/STRONG.
+    if _trad_signals_eligible and ACTIVE_SIGNALS_COILING:
+        _coil_max_dist = _cfg("coiling", "COILING_MAX_DIST", default=0.04)
+        _coil_min_vol  = _cfg("coiling", "COILING_MIN_VOL_RATIO", default=1.0)
+        _coil_bb_max   = _cfg("coiling", "COILING_BB_WIDTH_MAX", default=9.0)
+        _bd = tf4h.get("breakout_distance", -999)
+        if (not tf4h.get("breakout", False)
+                and -_coil_max_dist <= _bd < 0
+                and tf4h.get("obv_rising", False)
+                and tf4h.get("cvd_bullish", False)
+                and tf4h.get("vol_ratio", 0) >= _coil_min_vol
+                and tf4h.get("width_curr", 9) <= _coil_bb_max):
+            if not in_cooldown(symbol, "COILING", last_seen):
+                prev = counts_history.get((symbol, "COILING"), 0) if counts_history else 0
+
+                sc = "scoring_coiling"
+                base_score      = _cfg_score(sc, "BASE_SCORE",               3)
+                obv_exp_min     = _cfg_score(sc, "OBV_TIER_EXPLOSIVE_MIN",    0.3)
+                obv_exp_b       = _cfg_score(sc, "OBV_TIER_EXPLOSIVE_BONUS",  3)
+                obv_strong_min  = _cfg_score(sc, "OBV_TIER_STRONG_MIN",       0.1)
+                obv_strong_b    = _cfg_score(sc, "OBV_TIER_STRONG_BONUS",     2)
+                obv_rising_b    = _cfg_score(sc, "OBV_TIER_RISING_BONUS",     1)
+                cvd_vbull_min   = _cfg_score(sc, "CVD_TIER_VERY_BULLISH_MIN", 0.1)
+                cvd_vbull_b     = _cfg_score(sc, "CVD_TIER_VERY_BULLISH_BONUS", 2)
+                cvd_bull_b      = _cfg_score(sc, "CVD_TIER_BULLISH_BONUS",    1)
+                close_b         = _cfg_score(sc, "STRONG_CLOSE_BONUS",        1)
+                dist_tight_max  = _cfg_score(sc, "DIST_TIGHT_MAX",            0.01)
+                dist_tight_b    = _cfg_score(sc, "DIST_TIGHT_BONUS",          2)
+                dist_wide_min   = _cfg_score(sc, "DIST_WIDE_MIN",             0.03)
+                dist_wide_pen   = _cfg_score(sc, "DIST_WIDE_PENALTY",         -1)
+                late_repeat_pen = _cfg_score(sc, "LATE_REPEAT_PENALTY",       -1)
+
+                score = base_score
+                reasons = [f"4h a {abs(_bd):.2%} del máximo — compresión pre-ruptura"]
+
+                obv_v = tf4h.get("obv_slope", 0)
+                if obv_v >= obv_exp_min:
+                    score += obv_exp_b;    reasons.append(f"OBV 4h explosivo ({obv_v:+.2f})")
+                elif obv_v >= obv_strong_min:
+                    score += obv_strong_b; reasons.append(f"OBV 4h fuerte ({obv_v:+.2f})")
+                else:
+                    score += obv_rising_b; reasons.append(f"OBV 4h subiendo ({obv_v:+.2f})")
+
+                cvd_v = tf4h.get("cvd_ratio", 0)
+                if cvd_v >= cvd_vbull_min:
+                    score += cvd_vbull_b;  reasons.append(f"CVD 4h muy alcista ({cvd_v:+.2f})")
+                else:
+                    score += cvd_bull_b;   reasons.append(f"CVD 4h alcista ({cvd_v:+.2f})")
+
+                if tf4h.get("strong_close"):
+                    score += close_b;      reasons.append("vela 4h cerró fuerte")
+
+                if abs(_bd) <= dist_tight_max:
+                    score += dist_tight_b; reasons.append(f"compresión muy tight ({abs(_bd):.2%})")
+                elif abs(_bd) >= dist_wide_min:
+                    score += dist_wide_pen; reasons.append(f"⚠ algo alejado del máx ({abs(_bd):.2%})")
+
+                if prev >= LATE_REPEAT_COUNT:
+                    score += late_repeat_pen
+
+                score = min(score, SCORE_CAP)
+                candidates.append({
+                    "symbol": symbol,
+                    "label": "COILING",
+                    "history_tf": "COILING",
+                    "score": score,
+                    "priority": 0,
+                    "bucket": final_bucket(score, "COILING"),
+                    "reasons": reasons,
+                    "late": prev >= LATE_REPEAT_COUNT,
+                    "timeframe": "4h",
+                    "immediate": False,
+                    "price": tf4h["price"],
+                    "ref_price": tf4h.get("recent_max", tf4h["price"]),
+                    "obv_slope": tf4h.get("obv_slope"),
+                    "cvd_ratio": tf4h.get("cvd_ratio"),
+                    "recent_long_ok": tf4h.get("recent_long_ok"),
+                })
+
     if not candidates:
         return None
 
@@ -1824,6 +1906,7 @@ def format_alert(alert, counts_history, with_reasons=True):
         "BREAKOUT": "💥",
         "PRE-BREAK": "👀",
         "HOLD": "🤝",
+        "COILING": "🌀",
     }.get(alert["label"], "")
 
     header = (
@@ -1918,6 +2001,7 @@ def main():
     if ACTIVE_SIGNALS_HOLD:      active_names.append("HOLD")
     if ACTIVE_SIGNALS_EXPLOSION: active_names.append("EXPLOSION")
     if ACTIVE_SIGNALS_EXPLOSION_FORMING: active_names.append("EXPLOSION-FORMING")
+    if ACTIVE_SIGNALS_COILING: active_names.append("COILING")
 
     print(f"[{now}] Escaneando {len(pairs)} pares USDT ({' + '.join(INTERVALS)}) con {MAX_WORKERS} workers...")
     print(f"Señales activas: {', '.join(active_names) if active_names else 'NINGUNA'}")
