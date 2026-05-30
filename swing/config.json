@@ -125,7 +125,9 @@
     "OBV_RISING_BONUS": 2,
     "OBV_FALLING_PENALTY": -1,
     "STRUCT_PENALTY": 0,
-    "LATE_REPEAT_PENALTY": -1
+    "LATE_REPEAT_PENALTY": -1,
+    "ATR1D_GATE_MIN": 5.0,
+    "ATR1D_GATE_MIN_SCORE": 5
   },
   "scoring_breakout": {
     "BASE_SCORE": 8,
