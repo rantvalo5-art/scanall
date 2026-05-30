@@ -9,3 +9,37 @@ __pycache__/
 .sweep_results3_coarse/
 .audit_results/
 .sweep_results3_refined/
+
+# --- Local / editor / OS ---
+.claude/settings.local.json
+.~lock.*#
+*Copy*
+.DS_Store
+
+# --- Artefactos de corridas / experimentos (no trackear) ---
+*.log
+*.prof
+*_log.txt
+compare_*.json
+config_*.json
+audit_*.json
+audit_findings*.txt
+smoke_*.json
+forming_*.json
+sweep*.json
+diag_*.json
+ablation_*.json
+bests_*.json
+catch_rate_*.json
+lateness_*.json
+log_*.txt
+outcomes_5d.json
+baseline.json
+optimized.json
+try.json
+2026-*.txt
+error.txt
+tests.txt
+results/
+CLAUDECONFIGCFG0020.json
+CLAUDEconfig - activande derivatives.json
