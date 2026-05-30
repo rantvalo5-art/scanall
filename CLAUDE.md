@@ -72,3 +72,4 @@ Python 3.11, `pandas==2.2.3`, `ta`, `requests`, `mplfinance` (optional, for char
 - Set UTF-8 encoding before runs to avoid cp1252 errors on output:
   `$env:PYTHONIOENCODING = "utf-8"`
 - The kline cache lives at `.backtest_cache/` in the project root.
+- if there are multiple heavy backtest to run(for example: 4 weeks or 400 pairs). run then sequentially not all at the same time (one by one)

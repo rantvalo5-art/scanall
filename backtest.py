@@ -50,7 +50,7 @@ BINANCE_DATA_URL = "https://data-api.binance.vision/api/v3"
 BINANCE_FALLBACK_URL = "https://api.binance.com/api/v3"
 BINANCE_FAPI_URL = "https://fapi.binance.com"
 
-CACHE_DIR = Path(r"G:\.backtest_cache")
+CACHE_DIR = Path(r"I:\.backtest_cache")
 _NO_CACHE = False  # override con --no-cache en CLI
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ecgdswroygkfckkaguxp.supabase.co")

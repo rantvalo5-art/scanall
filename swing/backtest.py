@@ -1171,6 +1171,18 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 "htf_1d_up": bool(tf_1d.get("ema_trend_up")),
                 "htf_1w_up": bool(tf_1w.get("ema_trend_up")),
                 "breakdown": bd,
+                # features extendidas para diagnóstico
+                "vol_ratio": tf_1h.get("vol_ratio"),
+                "bb_width": tf_1h.get("width_curr"),
+                "vol_growth": tf_1h.get("vol_growth"),
+                "dist_to_res": tf_4h.get("dist_to_res"),
+                # features candidatas (Fase A separabilidad) — ya disponibles, cero precómputo
+                "width_expansion": tf_1h.get("width_expansion"),
+                "atr_pct": tf_1h.get("atr_pct"),
+                "atr_pct_1d": tf_1d.get("atr_pct"),
+                "close_change_curr": tf_1h.get("close_change_curr"),
+                "breakout_distance": tf_1h.get("breakout_distance"),
+                "bars_since_major_max": tf_1h.get("bars_since_major_max"),
             })
 
     # ── BREAKOUT ──────────────────────────────────────────────────────────
@@ -1284,6 +1296,11 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                     "htf_1d_up": bool(tf_1d.get("ema_trend_up")),
                     "htf_1w_up": bool(tf_1w.get("ema_trend_up")),
                     "breakdown": bd,
+                    # features extendidas para diagnóstico
+                    "vol_ratio": tf_4h.get("vol_ratio"),
+                    "bb_width": tf_4h.get("width_curr"),
+                    "breakout_distance": tf_4h.get("breakout_distance"),
+                    "dist_to_res": tf_1d.get("dist_to_res"),
                 })
 
     # ── RIDING ────────────────────────────────────────────────────────────
@@ -1378,6 +1395,10 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                     "htf_1d_up": bool(tf_1d.get("ema_trend_up")),
                     "htf_1w_up": bool(tf_1w.get("ema_trend_up")),
                     "breakdown": bd,
+                    # features extendidas para diagnóstico
+                    "vol_ratio": tf_4h.get("vol_ratio"),
+                    "riding_gain": tf_4h.get("riding_gain"),
+                    "bars_since_break": tf_4h.get("bars_since_break"),
                 })
 
     # ── HOLD ──────────────────────────────────────────────────────────────
@@ -1455,6 +1476,10 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                     "htf_1d_up": bool(tf_1d.get("ema_trend_up")),
                     "htf_1w_up": bool(tf_1w.get("ema_trend_up")),
                     "breakdown": bd,
+                    # features extendidas para diagnóstico
+                    "vol_ratio": tf_4h.get("vol_ratio"),
+                    "dist_to_res": tf_1d.get("dist_to_res"),
+                    "bars_since_break": tf_4h.get("bars_since_break"),
                 })
 
     # ── COILING ───────────────────────────────────────────────────────────
@@ -1566,6 +1591,24 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             c["bucket"] = final_bucket(c["score"], c["history_tf"], cfg)
             if "breakdown" in c:
                 c["breakdown"]["SCORE_CAP_TRUNC"] = SCORE_CAP - orig
+
+    # ── Gate atr_pct_1d → BEST (Fase B, config-driven, default OFF) ──────────
+    # El bonus aditivo está muerto (gap score→12 es +3..+8 variable); el mecanismo
+    # es un OVERRIDE de bucket. atr_pct_1d (ATR% diario HTF) es el único separador
+    # robusto h1/h2 (AUC ~0.66/0.67). DEBE ir DESPUÉS de las penalizaciones soft
+    # (EMA/struct/cap recomputan bucket vía final_bucket y lo pisarían si fuera
+    # antes). Usa el score FINAL (post-penalización), que es la barra medida en
+    # Fase A (banda 5–8). MIN_SCORE floor evita promover fuera de esa banda.
+    atr1d_gate_min   = cfg.g("scoring_prebreak", "ATR1D_GATE_MIN", default=999.0)
+    atr1d_gate_floor = cfg.g("scoring_prebreak", "ATR1D_GATE_MIN_SCORE", default=99)
+    _atr1d_v = tf_1d.get("atr_pct", 0) or 0
+    if _atr1d_v > atr1d_gate_min:
+        for c in candidates:
+            if (c["history_tf"] == "PREBREAK" and c["score"] >= atr1d_gate_floor
+                    and c["bucket"] != "BEST"):
+                c["bucket"] = "BEST"
+                if "breakdown" in c:
+                    c["breakdown"]["ATR1D_GATE"] = f">{atr1d_gate_min}@{_atr1d_v:.2f}"
 
     candidates.sort(
         key=lambda x: (_normalize_score(x["score"], x["history_tf"], _cal_cfg, SCORE_CAP), x["priority"], x["score"]),
@@ -1788,6 +1831,20 @@ def _classify_pass(candidates, cfg, cooldown_min_by_state, history_window_ms,
             "htf_1d_up": alert.get("htf_1d_up"),
             "htf_1w_up": alert.get("htf_1w_up"),
             "candle_status": alert.get("candle_status"),
+            # features extendidas (diagnóstico de scoring gap)
+            "vol_ratio": alert.get("vol_ratio"),
+            "bb_width": alert.get("bb_width"),
+            "vol_growth": alert.get("vol_growth"),
+            "dist_to_res": alert.get("dist_to_res"),
+            "breakout_distance": alert.get("breakout_distance"),
+            "bars_since_break": alert.get("bars_since_break"),
+            "riding_gain": alert.get("riding_gain"),
+            # features candidatas Fase A (separabilidad PREBREAK banda baja)
+            "width_expansion": alert.get("width_expansion"),
+            "atr_pct": alert.get("atr_pct"),
+            "atr_pct_1d": alert.get("atr_pct_1d"),
+            "close_change_curr": alert.get("close_change_curr"),
+            "bars_since_major_max": alert.get("bars_since_major_max"),
             **outcomes,
         }
         if audit_mode and alert.get("breakdown"):

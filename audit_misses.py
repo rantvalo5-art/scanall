@@ -421,6 +421,38 @@ def cmd_catch_rate(args, cfg):
                             else:
                                 sub = "pre_atr:far"
                             last_reason = sub + ("+vol15m" if vr_15m >= 2.0 else "")
+                if last_reason == "bo:breakout":
+                    _tf_bo = get_tf_data_at(sym_prep, bar, cfg)
+                    if _tf_bo is not None:
+                        _tf15_bo = _tf_bo.get("15m") or {}
+                        _tf5_bo  = _tf_bo.get("5m")  or {}
+                        _d = _tf15_bo.get("breakout_distance", -999)
+                        if _d >= -0.005:
+                            _band = "near"
+                        elif _d >= -0.02:
+                            _band = "mid"
+                        else:
+                            _band = "far"
+                        _req_obv = cfg.g("breakout", "BREAKOUT_REQUIRE_OBV_NON_NEGATIVE", default=True)
+                        _rest_checks = sum([
+                            _tf15_bo.get("vol_ratio",         0) >= cfg.g("breakout", "BREAKOUT_MIN_VOL_RATIO"),
+                            _tf15_bo.get("breakout_distance", 9) <= cfg.g("breakout", "BREAKOUT_MAX_EXTENDED"),
+                            _tf15_bo.get("width_expansion",  -9) >= cfg.g("breakout", "BREAKOUT_BB_EXPANSION_MIN"),
+                            bool(_tf15_bo.get("strong_close")),
+                            _tf15_bo.get("candle_body_pct",   0) >= cfg.g("breakout", "BREAKOUT_MIN_BODY_PCT"),
+                            _tf5_bo.get("vol_ratio",          0) >= cfg.g("breakout", "BREAKOUT_5M_MIN_VOL_RATIO"),
+                            bool(_tf5_bo.get("strong_close")),
+                            (not _req_obv) or _tf15_bo.get("obv_slope", 0) >= 0,
+                        ])
+                        if _rest_checks >= 8:
+                            _rest_bin = "rest8"
+                        elif _rest_checks >= 6:
+                            _rest_bin = "rest67"
+                        else:
+                            _rest_bin = "rest_low"
+                        _vr_15m = _tf15_bo.get("vol_ratio", 0)
+                        last_reason = (f"bo:breakout:{_band}:{_rest_bin}"
+                                       + ("+vol15m" if _vr_15m >= 2.0 else ""))
                 reasons[last_reason] += 1
                 missed_list.append({"symbol": sym, "ts": ts_iso,
                                     "gain_pct": round(gain_pct, 2), "reason": last_reason})
