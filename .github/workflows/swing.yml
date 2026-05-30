@@ -1,0 +1,27 @@
+name: Swing Screener
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [run-swing]
+  # Sin schedule por ahora: solo se ejecuta manualmente (workflow_dispatch) o por
+  # repository_dispatch [run-swing]. Swing opera en 1h/4h/1d/1w → cadencia horaria
+  # cuando se quiera automatizar.
+jobs:
+  scan:
+    runs-on: self-hosted
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run swing screener
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          PYTHONIOENCODING: "utf-8"
+        run: |
+          source ~/scanall/venv/bin/activate
+          # joblib lo importa backtest.py (motor compartido) a nivel módulo; el venv del
+          # daytrader puede no tenerlo. Install idempotente (no-op si ya está).
+          pip install --quiet joblib
+          python -u swing/screener.py

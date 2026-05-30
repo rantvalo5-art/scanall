@@ -107,9 +107,9 @@
     "HOLD_OBV_BARS": 1
   },
   "scoring": {
-    "BEST_MIN_SCORE": 12,
+    "BEST_MIN_SCORE": 11,
     "STRONG_MIN_SCORE": 10,
-    "IMMEDIATE_MIN_SCORE": 12,
+    "IMMEDIATE_MIN_SCORE": 11,
     "SCORE_CAP": 15
   },
   "scoring_prebreak": {

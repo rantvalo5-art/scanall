@@ -1,0 +1,561 @@
+"""
+Screener SWING en vivo — espejo del backtest de swing.
+
+A diferencia del daytrader (screener.py en la raíz), swing opera en timeframes
+altos (1h/4h/1d/1w) y con sus propias señales: PRE-BREAK, BREAKOUT, RIDING, HOLD
+y COILING (sin EXPLOSION ni derivatives).
+
+Arquitectura: la lógica de detección/scoring NO se duplica aquí. Se importa
+directamente del motor del backtest (backtest.py) — `analyze_at_time()` calcula los
+features de una vela cerrada y `classify()` decide la señal. Así screener y backtest
+NO pueden desincronizarse: corren exactamente el mismo código. Este archivo solo
+aporta el andamiaje de I/O en vivo (Binance, Telegram, Supabase, anti-spam),
+copiado/adaptado del screener.py raíz.
+
+Mismo chat de Telegram y mismas tablas de Supabase que el daytrader (sin aislamiento).
+
+Variables de entorno requeridas: TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, SUPABASE_KEY.
+Configuración en swing/config.json.
+"""
+
+import os
+from datetime import datetime, timezone, timedelta
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from io import BytesIO
+from pathlib import Path
+
+import pandas as pd
+import requests
+from requests.adapters import HTTPAdapter
+import ta
+
+# Motor de detección/scoring compartido con el backtest de swing. Importarlo es seguro:
+# argparse vive dentro de main() (guardado por __main__) y a nivel módulo solo hay
+# constantes. classify() referencia internamente final_bucket/_normalize_score/etc.,
+# que resuelven dentro del módulo backtest — no hay que tocarlos.
+from backtest import Config, analyze_at_time, classify, _normalize_score
+
+SESSION = requests.Session()
+
+adapter = HTTPAdapter(
+    pool_connections=100,
+    pool_maxsize=100,
+)
+SESSION.mount("https://", adapter)
+SESSION.mount("http://", adapter)
+
+# mplfinance es opcional: si no está instalado, los charts se desactivan en runtime
+try:
+    import matplotlib
+    matplotlib.use("Agg")  # backend sin display, necesario en CI
+    import mplfinance as mpf
+    _HAS_MPLFINANCE = True
+except ImportError:
+    _HAS_MPLFINANCE = False
+
+
+# ── Carga de configuración ────────────────────────────────────────────────────
+CONFIG_PATH = Path(__file__).parent / "config.json"
+if not CONFIG_PATH.exists():
+    raise SystemExit(f"FATAL: config.json no encontrado en {CONFIG_PATH}")
+
+# Config es la misma clase que usa el backtest: g() con defaults y .raw con el dict crudo.
+CFG = Config(str(CONFIG_PATH))
+
+
+def _g(section, key, default=None):
+    """Atajo a CFG.g con default explícito (None aborta solo si falta sin default)."""
+    return CFG.g(section, key, default=default)
+
+
+# ── Variables de entorno ──────────────────────────────────────────────────────
+TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
+TELEGRAM_CHAT_ID = os.environ["TELEGRAM_CHAT_ID"]
+SUPABASE_KEY = os.environ["SUPABASE_KEY"]
+SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
+
+# ── Configuración derivada (solo I/O; el scoring lo lee classify vía CFG) ───────
+INTERVALS         = _g("general", "INTERVALS", default=["1h", "4h", "1d", "1w"])
+LIMIT             = _g("general", "LIMIT", default=200)
+TOP_N             = _g("general", "TOP_N", default=9999)
+MAX_WORKERS       = _g("general", "MAX_WORKERS", default=20)
+MIN_QUOTE_VOLUME  = _g("general", "MIN_QUOTE_VOLUME", default=1000000)
+TOP_ALERT_COUNT   = _g("general", "TOP_ALERT_COUNT", default=5)
+
+HISTORY_HOURS           = _g("history", "HISTORY_HOURS", default=24)
+SNAPSHOT_RETENTION_DAYS = _g("history", "SNAPSHOT_RETENTION_DAYS", default=30)
+
+MAX_IMMEDIATE_PER_RUN = _g("anti_spam", "MAX_IMMEDIATE_PER_RUN", default=5)
+
+COOLDOWN_BY_STATE = CFG.raw.get("cooldowns_minutes", {})
+
+SCORE_CAP   = _g("scoring", "SCORE_CAP", default=15)
+EMA_SLOW    = _g("indicators", "EMA_SLOW", default=21)
+
+CHART_ENABLED = _g("chart", "ENABLED", default=False)
+CHART_BARS    = _g("chart", "BARS", default=50)
+CHART_WIDTH   = _g("chart", "WIDTH", default=1000)
+CHART_HEIGHT  = _g("chart", "HEIGHT", default=600)
+CHART_STYLE   = _g("chart", "STYLE", default="nightclouds")
+
+OUTCOMES_ENABLED = _g("outcomes", "ENABLED", default=False)
+
+_CAL_CFG = CFG.raw.get("scoring_calibration") or {}
+
+
+def _norm(raw_score, signal_type):
+    """Wrapper sobre el _normalize_score del backtest (firma de 4 args)."""
+    return _normalize_score(raw_score, signal_type, _CAL_CFG, SCORE_CAP)
+
+
+# ── Supabase ───────────────────────────────────────────────────────────────────
+def _sb_headers():
+    return {
+        "apikey": SUPABASE_KEY,
+        "Authorization": f"Bearer {SUPABASE_KEY}",
+        "Content-Type": "application/json",
+        "Prefer": "return=minimal",
+    }
+
+
+def fetch_history():
+    """Lee alertas de las últimas HISTORY_HOURS de screener_history → (counts, last_seen).
+    counts[(symbol, history_tf)] = nº de alertas (para LATE_REPEAT en classify).
+    last_seen[(symbol, history_tf)] = timestamp de la última (para cooldowns)."""
+    since = (datetime.now(timezone.utc) - timedelta(hours=HISTORY_HOURS)).isoformat()
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/screener_history",
+            headers={**_sb_headers(), "Prefer": ""},
+            params={"select": "symbol,timeframe,alerted_at", "alerted_at": f"gte.{since}"},
+            timeout=10,
+        )
+        r.raise_for_status()
+        counts = {}
+        last_seen = {}
+        for row in r.json():
+            key = (row["symbol"], row["timeframe"])
+            counts[key] = counts.get(key, 0) + 1
+            ts = datetime.fromisoformat(row["alerted_at"].replace("Z", "+00:00"))
+            if key not in last_seen or ts > last_seen[key]:
+                last_seen[key] = ts
+        return counts, last_seen
+    except Exception as e:
+        print(f"Supabase fetch_history error: {e}")
+        return {}, {}
+
+
+def insert_history(alert_rows):
+    """Registra las alertas seleccionadas en screener_history (timeframe = history_tf)
+    y purga filas más viejas que HISTORY_HOURS."""
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    since = (now - timedelta(hours=HISTORY_HOURS)).isoformat()
+    rows = [{"symbol": row["symbol"], "timeframe": row["history_tf"], "alerted_at": now_iso}
+            for row in alert_rows]
+    if not rows:
+        return
+    try:
+        r = requests.post(f"{SUPABASE_URL}/rest/v1/screener_history",
+                          headers=_sb_headers(), json=rows, timeout=10)
+        r.raise_for_status()
+        resp = SESSION.delete(
+            f"{SUPABASE_URL}/rest/v1/screener_history",
+            headers=_sb_headers(),
+            params={"alerted_at": f"lt.{since}"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+    except Exception as e:
+        print(f"Supabase insert_history error: {e}")
+
+
+def insert_pairs_snapshot(pairs):
+    """Snapshot de qué pares cotizaban en este run + auto-purge de filas viejas.
+    Sirve para reconstruir el universo histórico al armar tracking de outcomes."""
+    if not pairs:
+        return
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    purge_before = (now - timedelta(days=SNAPSHOT_RETENTION_DAYS)).isoformat()
+    rows = [{"run_at": now_iso, "symbol": s} for s in pairs]
+    try:
+        BATCH = 500
+        for i in range(0, len(rows), BATCH):
+            r = requests.post(
+                f"{SUPABASE_URL}/rest/v1/screener_pairs_snapshot",
+                headers=_sb_headers(),
+                json=rows[i:i + BATCH],
+                timeout=15,
+            )
+            r.raise_for_status()
+        r2 = requests.delete(
+            f"{SUPABASE_URL}/rest/v1/screener_pairs_snapshot",
+            headers=_sb_headers(),
+            params={"run_at": f"lt.{purge_before}"},
+            timeout=15,
+        )
+        r2.raise_for_status()
+        print(f"  snapshot: {len(rows)} pares guardados (purge >{SNAPSHOT_RETENTION_DAYS}d)")
+    except Exception as e:
+        print(f"Supabase insert_pairs_snapshot error: {e}")
+
+
+def insert_outcomes(alerts):
+    """Inserta filas en screener_outcomes para tracking de cómo evolucionan las alertas.
+    Solo guarda el snapshot del momento; los precios futuros los completa update_outcomes.py.
+    No-op si outcomes.ENABLED=false (default en swing)."""
+    if not OUTCOMES_ENABLED or not alerts:
+        return
+    now_iso = datetime.now(timezone.utc).isoformat()
+    rows = []
+    for a in alerts:
+        obv = a.get("obv_slope")
+        cvd = a.get("cvd_ratio")
+        rows.append({
+            "alerted_at": now_iso,
+            "symbol": a["symbol"],
+            "signal_type": a["history_tf"],
+            "timeframe": a["timeframe"],
+            "score": int(a["score"]),
+            "bucket": a.get("bucket"),
+            "entry_price": float(a["price"]),
+            "ref_price": float(a["ref_price"]) if a.get("ref_price") else None,
+            "candle_status": a.get("candle_status", "closed"),
+            "obv_slope": float(obv) if obv is not None else None,
+            "cvd_ratio": float(cvd) if cvd is not None else None,
+            "recent_long_ok": bool(a["recent_long_ok"]) if a.get("recent_long_ok") is not None else None,
+        })
+    try:
+        r = requests.post(
+            f"{SUPABASE_URL}/rest/v1/screener_outcomes",
+            headers=_sb_headers(),
+            json=rows,
+            timeout=10,
+        )
+        r.raise_for_status()
+        print(f"  outcomes: {len(rows)} alertas trackeadas")
+    except Exception as e:
+        print(f"Supabase insert_outcomes error: {e}")
+
+
+# ── Datos Binance ──────────────────────────────────────────────────────────────
+def get_active_usdt_symbols():
+    r = requests.get("https://data-api.binance.vision/api/v3/exchangeInfo", timeout=20)
+    r.raise_for_status()
+    return {
+        s["symbol"]
+        for s in r.json()["symbols"]
+        if s["symbol"].endswith("USDT") and s["status"] == "TRADING"
+    }
+
+
+def get_all_usdt_pairs(n=None):
+    if n is None:
+        n = TOP_N
+    active_symbols = get_active_usdt_symbols()
+    r = requests.get("https://data-api.binance.vision/api/v3/ticker/24hr", timeout=15)
+    r.raise_for_status()
+    pairs = [
+        x for x in r.json()
+        if x["symbol"] in active_symbols
+        and x["symbol"].encode("ascii", errors="ignore").decode() == x["symbol"]
+        and float(x["quoteVolume"]) > MIN_QUOTE_VOLUME
+    ]
+    pairs.sort(key=lambda x: float(x["quoteVolume"]), reverse=True)
+    return [x["symbol"] for x in pairs[:n]]
+
+
+def get_klines(symbol, interval):
+    """Klines en vivo. Devuelve el df con las columnas exactas que analyze_at_time espera
+    (close_time int64, OHLCV float, taker_buy_base para el CVD)."""
+    r = SESSION.get(
+        "https://data-api.binance.vision/api/v3/klines",
+        params={"symbol": symbol, "interval": interval, "limit": LIMIT},
+        timeout=10,
+    )
+    r.raise_for_status()
+    df = pd.DataFrame(r.json(), columns=[
+        "open_time", "open", "high", "low", "close", "volume",
+        "close_time", "quote_vol", "trades", "taker_buy_base", "taker_buy_quote", "ignore"
+    ])
+    for col in ["open", "high", "low", "close", "volume", "taker_buy_base", "taker_buy_quote"]:
+        df[col] = df[col].astype(float)
+    df["close_time"] = df["close_time"].astype("int64")
+    df["open_time"] = df["open_time"].astype("int64")
+    return df
+
+
+def safe_pct(a, b):
+    return (a / b - 1) if b else 0.0
+
+
+def in_cooldown(symbol, history_tf, last_seen):
+    ts = last_seen.get((symbol, history_tf))
+    if not ts:
+        return False
+    cooldown_minutes = COOLDOWN_BY_STATE.get(history_tf, 60)
+    return datetime.now(timezone.utc) - ts < timedelta(minutes=cooldown_minutes)
+
+
+# ── Telegram ─────────────────────────────────────────────────────────────────
+def send_telegram(text):
+    SESSION.post(
+        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+        json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"},
+        timeout=10,
+    )
+
+
+# TF del screener → intervalo de TradingView
+TV_TF_MAP = {
+    "1h": "60", "2h": "120", "4h": "240", "1d": "D", "1w": "W",
+}
+
+
+def tradingview_link(symbol, timeframe="4h"):
+    tv_interval = TV_TF_MAP.get(timeframe, "240")
+    url = f"https://www.tradingview.com/chart/?symbol=BINANCE:{symbol}&interval={tv_interval}"
+    return f"[{symbol}]({url})"
+
+
+def send_telegram_photo(image_buf, caption):
+    """Envía una imagen a Telegram con caption (límite 1024 chars)."""
+    if len(caption) > 1024:
+        caption = caption[:1020] + "…"
+    try:
+        files = {"photo": ("chart.png", image_buf, "image/png")}
+        data = {"chat_id": TELEGRAM_CHAT_ID, "caption": caption, "parse_mode": "Markdown"}
+        r = requests.post(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto",
+            data=data, files=files, timeout=15,
+        )
+        r.raise_for_status()
+    except Exception as e:
+        print(f"  send_telegram_photo error: {e}")
+        try:
+            send_telegram(caption)
+        except Exception:
+            pass
+
+
+# ── Formato de alerta ──────────────────────────────────────────────────────────
+def _reasons_from_alert(alert):
+    """Construye líneas legibles a partir del breakdown de scoring + contexto OBV/CVD.
+    El classify de swing entrega 'breakdown' (dict componente→puntos), no 'reasons'."""
+    reasons = []
+    obv = alert.get("obv_slope")
+    cvd = alert.get("cvd_ratio")
+    if obv is not None:
+        reasons.append(f"OBV slope {obv:+.2%}")
+    if cvd is not None:
+        reasons.append(f"CVD ratio {cvd:+.2%}")
+    bd = alert.get("breakdown") or {}
+    items = [(k, v) for k, v in bd.items()
+             if isinstance(v, (int, float)) and not isinstance(v, bool) and k != "BASE"]
+    items.sort(key=lambda kv: abs(kv[1]), reverse=True)
+    for k, v in items:
+        # Backticks (code span) para que los '_' de los nombres de componente no rompan
+        # el parser Markdown de Telegram (un nº impar de '_' → 400 y la alerta se pierde).
+        reasons.append(f"`{k}`: {v:+g}")
+    return reasons or ["sin desglose de scoring"]
+
+
+def format_alert(alert, counts_history, with_reasons=True):
+    prev = counts_history.get((alert["symbol"], alert["history_tf"]), 0)
+
+    if alert["history_tf"] == "RIDING" and prev > 0:
+        hist_tag = f"  _(confirmo {prev}x en {HISTORY_HOURS}h)_"
+    elif prev > 0:
+        hist_tag = f"  _(+{prev} en {HISTORY_HOURS}h)_"
+    else:
+        hist_tag = ""
+
+    emoji = {
+        "RIDING": "🚀",
+        "BREAKOUT": "💥",
+        "PRE-BREAK": "👀",
+        "HOLD": "🤝",
+        "COILING": "🌀",
+    }.get(alert["label"], "")
+
+    header = (
+        f"{emoji} [{alert['bucket']}] [{alert['label']}] {alert['symbol']} "
+        f"score {alert['score']} • {alert['timeframe']} "
+        f"{tradingview_link(alert['symbol'], alert['timeframe'])}{hist_tag}"
+    )
+
+    if not with_reasons:
+        return header
+
+    price = alert.get("price", 0)
+    ref = alert.get("ref_price") or 0
+    if ref and ref > 0 and price > 0:
+        pct = (price - ref) / ref * 100
+        if alert["history_tf"] == "RIDING":
+            price_line = f"  💰 {price:.6g} USDT ({pct:+.2f}% desde breakout)"
+        else:
+            price_line = f"  💰 {price:.6g} USDT ({pct:+.2f}% desde zona de ruptura)"
+    else:
+        price_line = f"  💰 {price:.6g} USDT"
+
+    cs = alert.get("candle_status", "closed")
+    candle_line = "  ✅ vela cerrada" if cs == "closed" else "  🟡 vela en formación"
+
+    reasons = alert.get("reasons") or _reasons_from_alert(alert)
+    body = "\n".join(f"  - {r}" for r in reasons[:3])
+    return f"{header}\n{price_line}\n{candle_line}\n{body}"
+
+
+def dedupe_and_rank(alerts):
+    """Una alerta por símbolo (la de mayor score normalizado) y top TOP_ALERT_COUNT."""
+    best = {}
+    for alert in alerts:
+        cur = best.get(alert["symbol"])
+        if cur is None:
+            best[alert["symbol"]] = alert
+        elif (
+            _norm(alert["score"], alert["history_tf"]),
+            alert["priority"],
+            alert["score"],
+        ) > (
+            _norm(cur["score"], cur["history_tf"]),
+            cur["priority"],
+            cur["score"],
+        ):
+            best[alert["symbol"]] = alert
+    ranked = list(best.values())
+    ranked.sort(key=lambda x: (
+        _norm(x["score"], x["history_tf"]),
+        x["priority"],
+        x["score"],
+    ), reverse=True)
+    return ranked[:TOP_ALERT_COUNT]
+
+
+def send_immediate(alert, counts_history):
+    """Envía alerta inmediata (bucket BEST). Chart off por defecto en swing → texto plano."""
+    text = f"🔥 PRIORITY NOW\n{format_alert(alert, counts_history)}"
+    send_telegram(text)
+
+
+# ── Análisis por (símbolo, intervalo) ──────────────────────────────────────────
+def analyze(symbol, interval):
+    """Fetch klines en vivo, descarta la vela en formación y calcula los features con el
+    motor del backtest (analyze_at_time) mirando la última vela CERRADA. Devuelve
+    (symbol, interval, feature_dict | None)."""
+    try:
+        df = get_klines(symbol, interval)
+    except Exception:
+        return symbol, interval, None
+
+    # Binance incluye la vela en formación (close_time futuro). Trabajar con vela viva
+    # mete ruido (vol_ratio incompleto, breakouts intra-vela, strong_close inválido).
+    # Si la última todavía no cerró, la descartamos → iloc[-1] = última vela cerrada,
+    # espejo exacto de cómo el backtest escanea en bordes de vela.
+    if len(df):
+        last_close_time_ms = int(df["close_time"].iloc[-1])
+        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
+        if now_ms < last_close_time_ms:
+            df = df.iloc[:-1]
+
+    if len(df) < 80:
+        return symbol, interval, None
+
+    try:
+        feat = analyze_at_time(df, len(df) - 1, CFG)
+    except Exception as e:
+        print(f"  analyze error {symbol} {interval}: {e}")
+        return symbol, interval, None
+    return symbol, interval, feat
+
+
+def main():
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    pairs = get_all_usdt_pairs()
+
+    active_names = []
+    for name, label in (("PREBREAK", "PRE-BREAK"), ("BREAKOUT", "BREAKOUT"),
+                        ("RIDING", "RIDING"), ("HOLD", "HOLD"), ("COILING", "COILING")):
+        if CFG.g("active_signals", name, default=False):
+            active_names.append(label)
+
+    print(f"[{now}] SWING — escaneando {len(pairs)} pares USDT "
+          f"({' + '.join(INTERVALS)}) con {MAX_WORKERS} workers...")
+    print(f"Señales activas: {', '.join(active_names) if active_names else 'NINGUNA'}")
+
+    insert_pairs_snapshot(pairs)
+
+    counts_history, last_seen = fetch_history()
+    tasks = [(sym, tf) for sym in pairs for tf in INTERVALS]
+    per_symbol = {sym: {} for sym in pairs}
+    candidates = []
+    processed = set()
+    immediate_sent_keys = set()
+    immediate_sent_alerts = []
+    immediate_skipped = 0
+
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        futures = {executor.submit(analyze, sym, tf): (sym, tf) for sym, tf in tasks}
+
+        for future in as_completed(futures):
+            symbol, interval, data = future.result()
+            per_symbol[symbol][interval] = data or {}
+            ready = all(tf in per_symbol[symbol] for tf in INTERVALS)
+            if not ready or symbol in processed:
+                continue
+
+            # classify recibe el dict {tf: features}; requiere 1h/4h/1d (1w opcional, fail-safe).
+            alert = classify(symbol, per_symbol[symbol], CFG, counts_history)
+            processed.add(symbol)
+            if not alert:
+                continue
+
+            # classify no setea 'symbol' ni 'reasons' — los inyectamos para el I/O.
+            alert["symbol"] = symbol
+            alert["reasons"] = _reasons_from_alert(alert)
+
+            # Cooldown: el swing aplica cooldown al best candidate retornado (no por bloque),
+            # igual que _classify_pass del backtest.
+            if in_cooldown(symbol, alert["history_tf"], last_seen):
+                continue
+
+            candidates.append(alert)
+            print(f"  {alert['label']} {symbol} score={alert['score']} bucket={alert['bucket']}")
+
+            key = (alert["symbol"], alert["history_tf"])
+            if alert.get("bucket") == "BEST" and key not in immediate_sent_keys:
+                if len(immediate_sent_keys) >= MAX_IMMEDIATE_PER_RUN:
+                    immediate_skipped += 1
+                    print(f"  inmediata saltada (tope {MAX_IMMEDIATE_PER_RUN}): {symbol}")
+                    continue
+                try:
+                    send_immediate(alert, counts_history)
+                    immediate_sent_keys.add(key)
+                    immediate_sent_alerts.append(alert)
+                except Exception as e:
+                    print(f"  error envio inmediato {symbol}: {e}")
+
+    if not candidates:
+        print("Sin setups en este run.")
+        if immediate_sent_alerts:
+            insert_outcomes(immediate_sent_alerts)
+        return
+
+    selected = dedupe_and_rank(candidates)
+    insert_history(selected)
+
+    selected_keys = {(a["symbol"], a["history_tf"]) for a in selected}
+    extra_immediates = [a for a in immediate_sent_alerts
+                        if (a["symbol"], a["history_tf"]) not in selected_keys]
+    insert_outcomes(selected + extra_immediates)
+
+    riding_count = sum(1 for a in candidates if a["history_tf"] == "RIDING")
+    coiling_count = sum(1 for a in candidates if a["history_tf"] == "COILING")
+    print(f"Total candidatos: {len(candidates)} (RIDING: {riding_count}, COILING: {coiling_count})")
+    print(f"Inmediatos enviados: {len(immediate_sent_keys)} | saltados: {immediate_skipped}")
+    print(f"Top final: {len(selected)}")
+
+
+if __name__ == "__main__":
+    main()
