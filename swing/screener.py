@@ -545,6 +545,10 @@ def main():
     print(f"[{now}] SWING — escaneando {len(pairs)} pares USDT "
           f"({' + '.join(INTERVALS)}) con {MAX_WORKERS} workers...")
     print(f"Señales activas: {', '.join(active_names) if active_names else 'NINGUNA'}")
+    # Diagnóstico de charts: si mplfinance no importó (o el chart está off), los BEST salen
+    # como texto+link sin PNG. Este log confirma de un vistazo por qué no aparece el chart.
+    print(f"Charts: ENABLED={CHART_ENABLED} mplfinance={_HAS_MPLFINANCE} "
+          f"→ {'PNG vía sendPhoto' if (CHART_ENABLED and _HAS_MPLFINANCE) else 'solo texto+link'}")
 
     insert_pairs_snapshot(pairs)
 
