@@ -19,14 +19,14 @@ jobs:
           python-version: "3.11"
           cache: "pip"
       - name: Install dependencies
-        run: pip install requests pandas==2.2.3 ta mplfinance
+        run: pip install requests pandas==2.2.3 ta mplfinance joblib
       - name: Run swing screener
         env:
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           PYTHONIOENCODING: "utf-8"
-        run: 
+        run: |
           # source ~/scanall/venv/bin/activate
           # joblib lo importa backtest.py (motor compartido) a nivel módulo; mplfinance lo
           # usa screener.py para los charts de los BEST. El venv del daytrader puede no
@@ -41,6 +41,6 @@ jobs:
         env:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           PYTHONIOENCODING: "utf-8"
-        run: 
+        run: |
           #source ~/scanall/venv/bin/activate
           python -u update_outcomes.py
