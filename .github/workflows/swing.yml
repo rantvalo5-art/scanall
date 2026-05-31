@@ -33,3 +33,14 @@ jobs:
           # tenerlos. Install idempotente (no-op si ya están).
           pip install --quiet joblib mplfinance
           python -u swing/screener.py
+      # Rellena precios futuros (15m/1h/4h/24h) de las alertas guardadas y purga
+      # filas >RETENTION_DAYS. Tabla screener_outcomes compartida; agnóstico al TF.
+      # continue-on-error: un fallo del filler no debe marcar fallido el scan ya hecho.
+      - name: Fill outcomes
+        continue-on-error: true
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          PYTHONIOENCODING: "utf-8"
+        run: |
+          source ~/scanall/venv/bin/activate
+          python -u update_outcomes.py
