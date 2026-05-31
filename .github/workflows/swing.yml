@@ -27,11 +27,11 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           PYTHONIOENCODING: "utf-8"
         run: |
-          source ~/scanall/venv/bin/activate
+          # source ~/scanall/venv/bin/activate
           # joblib lo importa backtest.py (motor compartido) a nivel módulo; mplfinance lo
           # usa screener.py para los charts de los BEST. El venv del daytrader puede no
           # tenerlos. Install idempotente (no-op si ya están).
-          pip install --quiet joblib mplfinance
+          # pip install --quiet joblib mplfinance
           python -u swing/screener.py
       # Rellena precios futuros (15m/1h/4h/24h) de las alertas guardadas y purga
       # filas >RETENTION_DAYS. Tabla screener_outcomes compartida; agnóstico al TF.
@@ -41,6 +41,6 @@ jobs:
         env:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           PYTHONIOENCODING: "utf-8"
-        run: |
-          source ~/scanall/venv/bin/activate
+        run: 
+          #source ~/scanall/venv/bin/activate
           python -u update_outcomes.py
