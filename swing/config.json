@@ -232,7 +232,7 @@
     "SIGNALS": ["BREAKOUT", "HOLD", "RIDING"]
   },
   "coiling": {
-    "COILING_MAX_DIST": 0.04,
+    "COILING_MAX_DIST": 0.06,
     "COILING_MIN_VOL_RATIO": 1.0,
     "COILING_BB_WIDTH_MAX": 0.09
   },
