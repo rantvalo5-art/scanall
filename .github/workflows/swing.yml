@@ -28,7 +28,8 @@ jobs:
           PYTHONIOENCODING: "utf-8"
         run: |
           source ~/scanall/venv/bin/activate
-          # joblib lo importa backtest.py (motor compartido) a nivel módulo; el venv del
-          # daytrader puede no tenerlo. Install idempotente (no-op si ya está).
-          pip install --quiet joblib
+          # joblib lo importa backtest.py (motor compartido) a nivel módulo; mplfinance lo
+          # usa screener.py para los charts de los BEST. El venv del daytrader puede no
+          # tenerlos. Install idempotente (no-op si ya están).
+          pip install --quiet joblib mplfinance
           python -u swing/screener.py

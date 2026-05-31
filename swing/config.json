@@ -205,7 +205,7 @@
     "VOL_DEAD_BONUS": 1
   },
   "chart": {
-    "ENABLED": false,
+    "ENABLED": true,
     "BARS": 50,
     "WIDTH": 1000,
     "HEIGHT": 600,

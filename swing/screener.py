@@ -124,7 +124,7 @@ def fetch_history():
     last_seen[(symbol, history_tf)] = timestamp de la última (para cooldowns)."""
     since = (datetime.now(timezone.utc) - timedelta(hours=HISTORY_HOURS)).isoformat()
     try:
-        r = requests.get(
+        r = SESSION.get(
             f"{SUPABASE_URL}/rest/v1/screener_history",
             headers={**_sb_headers(), "Prefer": ""},
             params={"select": "symbol,timeframe,alerted_at", "alerted_at": f"gte.{since}"},
@@ -156,8 +156,8 @@ def insert_history(alert_rows):
     if not rows:
         return
     try:
-        r = requests.post(f"{SUPABASE_URL}/rest/v1/screener_history",
-                          headers=_sb_headers(), json=rows, timeout=10)
+        r = SESSION.post(f"{SUPABASE_URL}/rest/v1/screener_history",
+                         headers=_sb_headers(), json=rows, timeout=10)
         r.raise_for_status()
         resp = SESSION.delete(
             f"{SUPABASE_URL}/rest/v1/screener_history",
@@ -182,14 +182,14 @@ def insert_pairs_snapshot(pairs):
     try:
         BATCH = 500
         for i in range(0, len(rows), BATCH):
-            r = requests.post(
+            r = SESSION.post(
                 f"{SUPABASE_URL}/rest/v1/screener_pairs_snapshot",
                 headers=_sb_headers(),
                 json=rows[i:i + BATCH],
                 timeout=15,
             )
             r.raise_for_status()
-        r2 = requests.delete(
+        r2 = SESSION.delete(
             f"{SUPABASE_URL}/rest/v1/screener_pairs_snapshot",
             headers=_sb_headers(),
             params={"run_at": f"lt.{purge_before}"},
@@ -227,7 +227,7 @@ def insert_outcomes(alerts):
             "recent_long_ok": bool(a["recent_long_ok"]) if a.get("recent_long_ok") is not None else None,
         })
     try:
-        r = requests.post(
+        r = SESSION.post(
             f"{SUPABASE_URL}/rest/v1/screener_outcomes",
             headers=_sb_headers(),
             json=rows,
@@ -241,7 +241,7 @@ def insert_outcomes(alerts):
 
 # ── Datos Binance ──────────────────────────────────────────────────────────────
 def get_active_usdt_symbols():
-    r = requests.get("https://data-api.binance.vision/api/v3/exchangeInfo", timeout=20)
+    r = SESSION.get("https://data-api.binance.vision/api/v3/exchangeInfo", timeout=20)
     r.raise_for_status()
     return {
         s["symbol"]
@@ -254,7 +254,7 @@ def get_all_usdt_pairs(n=None):
     if n is None:
         n = TOP_N
     active_symbols = get_active_usdt_symbols()
-    r = requests.get("https://data-api.binance.vision/api/v3/ticker/24hr", timeout=15)
+    r = SESSION.get("https://data-api.binance.vision/api/v3/ticker/24hr", timeout=15)
     r.raise_for_status()
     pairs = [
         x for x in r.json()
@@ -319,6 +319,57 @@ def tradingview_link(symbol, timeframe="4h"):
     return f"[{symbol}]({url})"
 
 
+def generate_chart_image(df, symbol, timeframe, ref_price=None):
+    """Genera una PNG en memoria con las últimas CHART_BARS velas + BB(20,2) + EMA + volumen.
+    Si ref_price está, dibuja una línea horizontal (zona de ruptura/breakout). Devuelve
+    BytesIO o None si mplfinance no está disponible, el chart está off, o algo falla.
+    Adaptado de generate_chart_image del screener.py raíz."""
+    if not _HAS_MPLFINANCE or not CHART_ENABLED or df is None:
+        return None
+    try:
+        chart_df = df.tail(CHART_BARS).copy()
+        # mplfinance espera OHLCV capitalizado con DatetimeIndex.
+        chart_df["timestamp"] = pd.to_datetime(chart_df["open_time"], unit="ms", utc=True)
+        chart_df = chart_df.set_index("timestamp")
+        chart_df = chart_df.rename(columns={
+            "open": "Open", "high": "High", "low": "Low",
+            "close": "Close", "volume": "Volume",
+        })
+        chart_df = chart_df[["Open", "High", "Low", "Close", "Volume"]]
+
+        # BB y EMA sobre el df recortado para que coincida el largo de las series.
+        bb = ta.volatility.BollingerBands(chart_df["Close"], window=20, window_dev=2)
+        ema = ta.trend.EMAIndicator(chart_df["Close"], window=EMA_SLOW).ema_indicator()
+        addplots = [
+            mpf.make_addplot(bb.bollinger_hband(), color="#888", width=0.7),
+            mpf.make_addplot(bb.bollinger_lband(), color="#888", width=0.7),
+            mpf.make_addplot(bb.bollinger_mavg(),  color="#888", width=0.5, linestyle="--"),
+            mpf.make_addplot(ema, color="#e3b341", width=1.0),
+        ]
+
+        buf = BytesIO()
+        kwargs = dict(
+            type="candle",
+            style=CHART_STYLE,
+            addplot=addplots,
+            volume=True,
+            figsize=(CHART_WIDTH / 100, CHART_HEIGHT / 100),  # px → pulgadas a 100 dpi
+            title=f"\n{symbol} • {timeframe}",
+            tight_layout=True,
+            savefig=dict(fname=buf, format="png", dpi=100, bbox_inches="tight"),
+        )
+        if ref_price and ref_price > 0:
+            kwargs["hlines"] = dict(hlines=[float(ref_price)], colors=["#39d353"],
+                                    linestyle="--", linewidths=0.8)
+
+        mpf.plot(chart_df, **kwargs)
+        buf.seek(0)
+        return buf
+    except Exception as e:
+        print(f"  generate_chart_image error {symbol} {timeframe}: {e}")
+        return None
+
+
 def send_telegram_photo(image_buf, caption):
     """Envía una imagen a Telegram con caption (límite 1024 chars)."""
     if len(caption) > 1024:
@@ -326,7 +377,7 @@ def send_telegram_photo(image_buf, caption):
     try:
         files = {"photo": ("chart.png", image_buf, "image/png")}
         data = {"chat_id": TELEGRAM_CHAT_ID, "caption": caption, "parse_mode": "Markdown"}
-        r = requests.post(
+        r = SESSION.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendPhoto",
             data=data, files=files, timeout=15,
         )
@@ -433,9 +484,19 @@ def dedupe_and_rank(alerts):
     return ranked[:TOP_ALERT_COUNT]
 
 
-def send_immediate(alert, counts_history):
-    """Envía alerta inmediata (bucket BEST). Chart off por defecto en swing → texto plano."""
+def send_immediate(alert, counts_history, dfs=None):
+    """Envía alerta inmediata (bucket BEST). Si hay chart disponible lo manda con sendPhoto;
+    si no, fallback a texto plano. `dfs` = {(symbol, timeframe): df_cerrado} del scan."""
     text = f"🔥 PRIORITY NOW\n{format_alert(alert, counts_history)}"
+
+    if dfs is not None and CHART_ENABLED and _HAS_MPLFINANCE:
+        df = dfs.get((alert["symbol"], alert["timeframe"]))
+        img = generate_chart_image(df, alert["symbol"], alert["timeframe"],
+                                   ref_price=alert.get("ref_price"))
+        if img is not None:
+            send_telegram_photo(img, text)
+            return
+
     send_telegram(text)
 
 
@@ -443,11 +504,12 @@ def send_immediate(alert, counts_history):
 def analyze(symbol, interval):
     """Fetch klines en vivo, descarta la vela en formación y calcula los features con el
     motor del backtest (analyze_at_time) mirando la última vela CERRADA. Devuelve
-    (symbol, interval, feature_dict | None)."""
+    (symbol, interval, feature_dict | None, df_cerrado | None). El df se conserva sólo
+    para dibujar el chart de los BEST inmediatos (mismas velas que se analizaron)."""
     try:
         df = get_klines(symbol, interval)
     except Exception:
-        return symbol, interval, None
+        return symbol, interval, None, None
 
     # Binance incluye la vela en formación (close_time futuro). Trabajar con vela viva
     # mete ruido (vol_ratio incompleto, breakouts intra-vela, strong_close inválido).
@@ -460,14 +522,14 @@ def analyze(symbol, interval):
             df = df.iloc[:-1]
 
     if len(df) < 80:
-        return symbol, interval, None
+        return symbol, interval, None, None
 
     try:
         feat = analyze_at_time(df, len(df) - 1, CFG)
     except Exception as e:
         print(f"  analyze error {symbol} {interval}: {e}")
-        return symbol, interval, None
-    return symbol, interval, feat
+        return symbol, interval, None, None
+    return symbol, interval, feat, df
 
 
 def main():
@@ -489,6 +551,8 @@ def main():
     counts_history, last_seen = fetch_history()
     tasks = [(sym, tf) for sym in pairs for tf in INTERVALS]
     per_symbol = {sym: {} for sym in pairs}
+    # df de velas cerradas por (symbol, interval); sólo para dibujar charts de BEST inmediatos.
+    dfs = {} if CHART_ENABLED and _HAS_MPLFINANCE else None
     candidates = []
     processed = set()
     immediate_sent_keys = set()
@@ -499,8 +563,10 @@ def main():
         futures = {executor.submit(analyze, sym, tf): (sym, tf) for sym, tf in tasks}
 
         for future in as_completed(futures):
-            symbol, interval, data = future.result()
+            symbol, interval, data, df = future.result()
             per_symbol[symbol][interval] = data or {}
+            if dfs is not None and df is not None:
+                dfs[(symbol, interval)] = df
             ready = all(tf in per_symbol[symbol] for tf in INTERVALS)
             if not ready or symbol in processed:
                 continue
@@ -530,7 +596,7 @@ def main():
                     print(f"  inmediata saltada (tope {MAX_IMMEDIATE_PER_RUN}): {symbol}")
                     continue
                 try:
-                    send_immediate(alert, counts_history)
+                    send_immediate(alert, counts_history, dfs)
                     immediate_sent_keys.add(key)
                     immediate_sent_alerts.append(alert)
                 except Exception as e:
