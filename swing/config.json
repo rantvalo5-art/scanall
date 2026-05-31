@@ -26,14 +26,16 @@
     "BREAKOUT": 240,
     "RIDING": 360,
     "FADING": 720,
-    "HOLD": 480
+    "HOLD": 480,
+    "COILING": 240
   },
   "active_signals": {
     "PREBREAK": true,
     "BREAKOUT": true,
     "RIDING": true,
     "FADING": false,
-    "HOLD": true
+    "HOLD": true,
+    "COILING": true
   },
   "indicators": {
     "EMA_SLOW": 21,
@@ -228,5 +230,29 @@
     "MODE": "soft",
     "PENALTY": 2,
     "SIGNALS": ["BREAKOUT", "HOLD", "RIDING"]
+  },
+  "coiling": {
+    "COILING_MAX_DIST": 0.04,
+    "COILING_MIN_VOL_RATIO": 1.0,
+    "COILING_BB_WIDTH_MAX": 0.09
+  },
+  "scoring_coiling": {
+    "BASE_SCORE": 3,
+    "OBV_TIER_EXPLOSIVE_MIN": 0.3,
+    "OBV_TIER_EXPLOSIVE_BONUS": 3,
+    "OBV_TIER_STRONG_MIN": 0.1,
+    "OBV_TIER_STRONG_BONUS": 2,
+    "OBV_TIER_RISING_BONUS": 1,
+    "CVD_TIER_VERY_BULLISH_MIN": 0.1,
+    "CVD_TIER_VERY_BULLISH_BONUS": 2,
+    "CVD_TIER_BULLISH_BONUS": 1,
+    "STRONG_CLOSE_BONUS": 1,
+    "DIST_TIGHT_MAX": 0.01,
+    "DIST_TIGHT_BONUS": 2,
+    "DIST_WIDE_MIN": 0.03,
+    "DIST_WIDE_PENALTY": -1,
+    "LATE_REPEAT_PENALTY": -1,
+    "ATR1D_GATE_MIN": 5.0,
+    "ATR1D_GATE_MIN_SCORE": 0
   }
 }

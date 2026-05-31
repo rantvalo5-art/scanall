@@ -51,6 +51,10 @@ BINANCE_FALLBACK_URL = "https://api.binance.com/api/v3"
 CACHE_DIR = Path(r"I:\.backtest_cache")
 _NO_CACHE = False  # override con --no-cache en CLI
 
+# Trace de features por-barra (instrumentación PASO 1, off por default).
+_TRACE_SET = None  # None = sin trace. set(...) = sólo esos símbolos. "ALL" = todos.
+_TRACE_OUT = None  # Path del JSONL de salida.
+
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ecgdswroygkfckkaguxp.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 
@@ -1610,6 +1614,21 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 if "breakdown" in c:
                     c["breakdown"]["ATR1D_GATE"] = f">{atr1d_gate_min}@{_atr1d_v:.2f}"
 
+    # ── Gate atr_pct_1d → BEST para COILING (mismo mecanismo que PREBREAK) ───
+    # atr_pct_1d separa COILING-movers de no-movers (AUC 0.67 @ net≥10%, direccional
+    # no-volatilidad: P(+10) 9→27% vs P(-10) 5→9%). El score interno de COILING NO es
+    # predictivo, así que el floor va bajo (0 = promover todo COILING con atr>thr).
+    # Valor = entrada más temprana sobre movers que el suite agarra tarde (lateness).
+    coil_atr_gate_min   = cfg.g("scoring_coiling", "ATR1D_GATE_MIN", default=999.0)
+    coil_atr_gate_floor = cfg.g("scoring_coiling", "ATR1D_GATE_MIN_SCORE", default=99)
+    if _atr1d_v > coil_atr_gate_min:
+        for c in candidates:
+            if (c["history_tf"] == "COILING" and c["score"] >= coil_atr_gate_floor
+                    and c["bucket"] != "BEST"):
+                c["bucket"] = "BEST"
+                if "breakdown" in c:
+                    c["breakdown"]["ATR1D_GATE"] = f">{coil_atr_gate_min}@{_atr1d_v:.2f}"
+
     candidates.sort(
         key=lambda x: (_normalize_score(x["score"], x["history_tf"], _cal_cfg, SCORE_CAP), x["priority"], x["score"]),
         reverse=True,
@@ -1879,6 +1898,31 @@ def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None,
         if analyze_cache is not None:
             analyze_cache[akey] = candidates
 
+    # ── Instrumentación PASO 1: trayectorias de features por-barra (gated, aditivo) ──
+    # Tap acá (no en _build_candidates) para emitir aunque candidates venga de analyze_cache.
+    # candidates ya trae tf_data de TODO símbolo×scan con datos válidos (pre-classify/cooldown).
+    if _TRACE_OUT is not None:
+        def _flat(v):
+            # numpy.int64/bool_ NO subclasean int/bool → default=str los volvería strings y
+            # envenenaría el análisis offline. .item() devuelve nativo int/float/bool de una.
+            return v.item() if isinstance(v, np.generic) else v
+        n_trace = 0
+        with open(_TRACE_OUT, "w", encoding="utf-8") as ft:
+            for (i, ts_ms, sym, tf_data, idx_4h) in candidates:
+                if _TRACE_SET != "ALL" and sym not in _TRACE_SET:
+                    continue
+                row = {"ts_ms": ts_ms,
+                       "iso": datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat(),
+                       "sym": sym}
+                for tf, pref in (("1h", "h1"), ("4h", "h4"), ("1d", "d1"), ("1w", "w1")):
+                    d = tf_data.get(tf)
+                    if d:
+                        for k, val in d.items():
+                            row[f"{pref}_{k}"] = _flat(val)
+                ft.write(json.dumps(row, default=str) + "\n")
+                n_trace += 1
+        print(f"    [trace] {n_trace} filas escritas a {_TRACE_OUT}")
+
     alerts = _classify_pass(candidates, cfg, cooldown_min_by_state, history_window_ms,
                             klines, outcomes_cache, audit_mode=audit_mode)
     print(f"    Total alertas simuladas: {len(alerts)}")
@@ -1975,7 +2019,7 @@ def summarize(alerts, label="resultados"):
 
     ranked = [(pct_move(a["max_high_7d"], a["entry_price"]) or -999, a) for a in alerts]
     ranked.sort(key=lambda x: x[0], reverse=True)
-    print("\nTOP 30 movers detectados:")
+    print("\nTOP 30 movers detectados (alert-derived, SESGADA — rankea por fila, no por símbolo):")
     print(f"  {'#':>3} {'Symbol':<14} {'Type':<10} {'Score':>5} {'Bucket':<7} {'max24h':>8} "
           f"{'cvd':>7} {'obv':>7} {'long_ok':>7}")
     for i, (move, a) in enumerate(ranked[:30], start=1):
@@ -2011,6 +2055,41 @@ def summarize(alerts, label="resultados"):
     print(f"  Score promedio top 30: {avg_score_top30:.1f}")
     avg_move_top30 = sum(m for m, _ in ranked[:30]) / 30 if ranked else 0
     print(f"  Move promedio top 30: +{avg_move_top30:.2f}%")
+
+    # ── Vista POR SÍMBOLO (mejor bucket alcanzado) — métrica honesta de bucketing ──
+    # La tabla de arriba rankea CADA fila de alerta por su propio move realizado y no
+    # deduplica por símbolo: entradas tardías del mismo símbolo desplazan a sus filas
+    # BEST tempranas. Acá: 1 fila por símbolo, rankeado por su mejor move, contando el
+    # mejor bucket que ese símbolo alcanzó en CUALQUIER alerta.
+    _BUCKET_RANK = {"BEST": 3, "STRONG": 2, "WATCH": 1}
+    by_symbol = defaultdict(list)
+    for a in alerts:
+        by_symbol[a["symbol"]].append(a)
+    sym_rows = []
+    for sym, items in by_symbol.items():
+        moves = [pct_move(a["max_high_7d"], a["entry_price"]) for a in items]
+        moves = [m for m in moves if m is not None]
+        if not moves:
+            continue
+        best_move = max(moves)
+        best_bucket = max((it["bucket"] for it in items), key=lambda b: _BUCKET_RANK.get(b, 0))
+        # alerta que alcanzó ese bucket más temprano (para mostrar señal/score representativos)
+        best_alert = min((it for it in items if it["bucket"] == best_bucket),
+                         key=lambda it: it.get("alerted_at") or "")
+        sym_rows.append((best_move, best_bucket, best_alert, len(items)))
+    sym_rows.sort(key=lambda x: x[0], reverse=True)
+
+    print("\nTOP 30 movers POR SÍMBOLO (mejor bucket alcanzado — métrica honesta):")
+    print(f"  {'#':>3} {'Symbol':<14} {'BestBkt':<7} {'Type':<10} {'Score':>5} {'bestMove':>9} {'#alerts':>7}")
+    for i, (move, bkt, a, nalerts) in enumerate(sym_rows[:30], start=1):
+        print(f"  {i:>3} {a['symbol']:<14} {bkt:<7} {a['signal_type']:<10} {a['score']:>5} "
+              f"{move:>+8.2f}% {nalerts:>7}")
+    top30_sym = sym_rows[:30]
+    sym_bucket_counts = {"BEST": 0, "STRONG": 0, "WATCH": 0}
+    for _, bkt, _, _ in top30_sym:
+        sym_bucket_counts[bkt] += 1
+    print(f"  Buckets (por símbolo, mejor alcanzado): BEST={sym_bucket_counts['BEST']}, "
+          f"STRONG={sym_bucket_counts['STRONG']}, WATCH={sym_bucket_counts['WATCH']}")
 
 
 def compare_runs(alerts_a, label_a, alerts_b, label_b, period_days=7):
@@ -2176,6 +2255,13 @@ def main():
     parser.add_argument("--audit-scoring", action="store_true",
                         help="Incluye breakdown de scoring por alerta en el JSON de salida. "
                              "Necesario para audit_scoring.py.")
+    parser.add_argument("--trace-features", nargs="+", metavar="SYM",
+                        help="Dumpea trayectorias de features por-barra. Lista de símbolos o 'ALL'.")
+    parser.add_argument("--trace-out", default="trace_features.jsonl",
+                        help="Path del JSONL de trace (default trace_features.jsonl).")
+    parser.add_argument("--extra-symbols", nargs="+", metavar="SYM", default=None,
+                        help="Símbolos extra a forzar dentro del universo (UNION con el top-N/snapshot). "
+                             "Útil para escanear movers fuera del universo por volumen sin tocar --max-pairs.")
     args = parser.parse_args()
     _audit = getattr(args, "audit_scoring", False)
 
@@ -2192,6 +2278,13 @@ def main():
     _NO_CACHE = args.no_cache
     if _NO_CACHE:
         print("  [cache] Desactivado por --no-cache")
+
+    global _TRACE_SET, _TRACE_OUT
+    if args.trace_features:
+        _TRACE_SET = "ALL" if args.trace_features == ["ALL"] else set(args.trace_features)
+        _TRACE_OUT = Path(args.trace_out)
+        print(f"  [trace] Activado → {_TRACE_OUT} "
+              f"({'ALL' if _TRACE_SET == 'ALL' else f'{len(_TRACE_SET)} símbolos'})")
 
     results_dir = None
     if args.results_dir:
@@ -2227,6 +2320,15 @@ def main():
         print(f"  {len(symbols)} pares calificantes hoy (top {args.max_pairs} por volumen)")
     else:
         symbols = list(snap_symbols)[:args.max_pairs]
+
+    if args.extra_symbols:
+        base_set = set(symbols)
+        added = [s for s in args.extra_symbols if s not in base_set]
+        symbols = symbols + added
+        print(f"  +extra-symbols: {len(added)} agregados (UNION); universo total {len(symbols)}")
+        missing = [s for s in args.extra_symbols if s in base_set]
+        if missing:
+            print(f"  (ya estaban en el universo base: {' '.join(missing)})")
 
     print(f"\n[2/4] Descargando klines históricas...")
     klines = download_all_klines(symbols, start_dt, end_dt)
