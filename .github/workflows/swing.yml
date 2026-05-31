@@ -26,7 +26,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           PYTHONIOENCODING: "utf-8"
-        run: |
+        run: 
           # source ~/scanall/venv/bin/activate
           # joblib lo importa backtest.py (motor compartido) a nivel módulo; mplfinance lo
           # usa screener.py para los charts de los BEST. El venv del daytrader puede no
