@@ -209,8 +209,11 @@ def insert_watchlist(rows):
     now = datetime.now(timezone.utc)
     since = (now - timedelta(days=WATCHLIST_RETENTION_DAYS)).isoformat()
     try:
+        # upsert por (symbol, scan_date): merge-duplicates pisa la fila del día con el último scan.
+        up_headers = {**_sb_headers(), "Prefer": "resolution=merge-duplicates,return=minimal"}
         r = SESSION.post(f"{SUPABASE_URL}/rest/v1/swing_watchlist",
-                         headers=_sb_headers(), json=rows, timeout=10)
+                         headers=up_headers, params={"on_conflict": "symbol,scan_date"},
+                         json=rows, timeout=10)
         r.raise_for_status()
         resp = SESSION.delete(
             f"{SUPABASE_URL}/rest/v1/swing_watchlist",
@@ -762,13 +765,17 @@ def main():
     # por eso va antes del early-return de candidates. F es superset de H, así que escribimos
     # las filas con F=true y marcamos flag_h en las más fuertes. Nunca se pinguea.
     if WATCHLIST_ENABLED:
-        wl_now = datetime.now(timezone.utc).isoformat()
+        wl_dt = datetime.now(timezone.utc)
+        wl_now, wl_date = wl_dt.isoformat(), wl_dt.date().isoformat()
         wl_rows = []
         for sym, tfs in per_symbol.items():
             d1 = tfs.get("1d") or {}
             if not d1.get("watch_F"):
                 continue
+            # scan_date + upsert → 1 fila por símbolo/día (F/H es flag DIARIA: la última barra
+            # cerrada es la misma en cada run del día; sin esto se acumularían dupes por run).
             wl_rows.append({
+                "scan_date": wl_date,
                 "scanned_at": wl_now,
                 "symbol": sym,
                 "flag_f": True,

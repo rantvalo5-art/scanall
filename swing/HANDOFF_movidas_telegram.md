@@ -57,17 +57,22 @@ generan, respetando la prioridad del usuario (`lateness > precision > F-score > 
     ```sql
     create table swing_watchlist (
       id bigserial primary key,
+      scan_date date not null,
       scanned_at timestamptz not null,
       symbol text not null,
       flag_f boolean not null default true,
       flag_h boolean not null default false,
       price double precision,
       atr_pct_1d double precision,
-      pctb_1d double precision
+      pctb_1d double precision,
+      unique (symbol, scan_date)   -- upsert: 1 fila por símbolo/día (F/H es flag diaria)
     );
     create index on swing_watchlist (scanned_at);
-    create index on swing_watchlist (symbol, scanned_at desc);
+    create index on swing_watchlist (symbol, scan_date desc);
     ```
+    Lectura del watchlist (más reciente por símbolo): `select * from swing_watchlist
+    order by scan_date desc, flag_h desc, atr_pct_1d desc`. Primera aparición de X:
+    `select symbol, min(scan_date) from swing_watchlist group by symbol`.
   - **Display:** pendiente (viewer HTML mínimo o query Supabase). El sink ya persiste; el dashboard es opcional.
   - **Verificación en vivo:** correr el scan y confirmar que HOME cae en la watchlist el 11-15 may y que NO dispara
     `send_telegram`.
