@@ -96,6 +96,14 @@ ATR_BADGE_HIGH = _g("history", "ATR_BADGE_HIGH", default=8.0)
 # computa ahí. 14d cubre arcos tipo HOME (COILING→HOLD→RIDING en ~13d) sin diluir.
 STREAK_LOOKBACK_DAYS = _g("history", "STREAK_LOOKBACK_DAYS", default=14)
 
+# Watchlist momentum (Idea 3): dragnet diario F/H que NO se pinguea (recall-recovery sin
+# spam). F=precio↑3d + OBV slope≥0; H=F + %B>0.8 (banda alta). Recupera ~+30pp de movers que
+# las señales BEST se pierden, a costa de ~55 hits/día / ~90% falsos → SOLO sink (tabla
+# swing_watchlist), jamás Telegram. Def de _faseB_recall.daily_flags (validada).
+WATCHLIST_ENABLED        = _g("watchlist", "ENABLED", default=True)
+WATCHLIST_OBV_LB         = _g("watchlist", "OBV_LOOKBACK", default=10)
+WATCHLIST_RETENTION_DAYS = _g("watchlist", "RETENTION_DAYS", default=14)
+
 MAX_IMMEDIATE_PER_RUN = _g("anti_spam", "MAX_IMMEDIATE_PER_RUN", default=5)
 
 COOLDOWN_BY_STATE = CFG.raw.get("cooldowns_minutes", {})
@@ -190,6 +198,30 @@ def fetch_symbol_streak(symbol):
     except Exception as e:
         print(f"Supabase fetch_symbol_streak error: {e}")
         return None
+
+
+def insert_watchlist(rows):
+    """Escribe el watchlist momentum (Idea 3) en swing_watchlist y purga filas viejas.
+    Sink paralelo: NO toca screener_history/outcomes ni Telegram. No-op si está deshabilitado
+    o no hay hits. Si la tabla no existe en Supabase, falla en silencio (logueado)."""
+    if not WATCHLIST_ENABLED or not rows:
+        return
+    now = datetime.now(timezone.utc)
+    since = (now - timedelta(days=WATCHLIST_RETENTION_DAYS)).isoformat()
+    try:
+        r = SESSION.post(f"{SUPABASE_URL}/rest/v1/swing_watchlist",
+                         headers=_sb_headers(), json=rows, timeout=10)
+        r.raise_for_status()
+        resp = SESSION.delete(
+            f"{SUPABASE_URL}/rest/v1/swing_watchlist",
+            headers=_sb_headers(),
+            params={"scanned_at": f"lt.{since}"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        print(f"  watchlist: {len(rows)} hits F/H escritos")
+    except Exception as e:
+        print(f"Supabase insert_watchlist error: {e}")
 
 
 def insert_history(alert_rows):
@@ -589,6 +621,29 @@ def send_immediate(alert, counts_history, dfs=None):
 
 
 # ── Análisis por (símbolo, intervalo) ──────────────────────────────────────────
+def _watch_flags(df1d):
+    """Flags F/H (watchlist momentum, Idea 3) sobre la ÚLTIMA barra diaria cerrada.
+    Espejo exacto de _faseB_recall.daily_flags (definición validada):
+      F = close>close[-3] & obv_slope≥0;  H = F & %B>0.8.
+    Devuelve (F:bool, H:bool, pctb:float) o None si no hay barras suficientes."""
+    if df1d is None or len(df1d) < 25:
+        return None
+    c, v = df1d["close"], df1d["volume"]
+    bb = ta.volatility.BollingerBands(c, window=20, window_dev=2)
+    hb, lb = bb.bollinger_hband(), bb.bollinger_lband()
+    pctb = ((c - lb) / (hb - lb)).clip(-1, 2)
+    obv = ta.volume.OnBalanceVolumeIndicator(c, v).on_balance_volume()
+    obv_slope = (obv - obv.shift(WATCHLIST_OBV_LB)) / obv.abs()
+    up3 = bool(c.iloc[-1] > c.iloc[-4])
+    os_last = obv_slope.iloc[-1]
+    pb_last = pctb.iloc[-1]
+    if pd.isna(os_last) or pd.isna(pb_last):
+        return None
+    F = up3 and (os_last >= 0)
+    H = F and (pb_last > 0.8)
+    return bool(F), bool(H), float(pb_last)
+
+
 def analyze(symbol, interval):
     """Fetch klines en vivo, descarta la vela en formación y calcula los features con el
     motor del backtest (analyze_at_time) mirando la última vela CERRADA. Devuelve
@@ -617,6 +672,15 @@ def analyze(symbol, interval):
     except Exception as e:
         print(f"  analyze error {symbol} {interval}: {e}")
         return symbol, interval, None, None
+
+    # Watchlist momentum (Idea 3): F/H se computan sobre el daily crudo. Reusa el df ya
+    # fetcheado (sin red extra); se stashea en el feat 1d para que main() lo recoja sin
+    # tocar el flujo de alerts. Path separado, no afecta classify ni el push.
+    if interval == "1d" and WATCHLIST_ENABLED and feat is not None:
+        wf = _watch_flags(df)
+        if wf is not None:
+            feat["watch_F"], feat["watch_H"], feat["watch_pctb"] = wf
+
     return symbol, interval, feat, df
 
 
@@ -693,6 +757,27 @@ def main():
                     immediate_sent_alerts.append(alert)
                 except Exception as e:
                     print(f"  error envio inmediato {symbol}: {e}")
+
+    # Watchlist momentum (Idea 3): sink paralelo sobre TODO el universo (no solo alertados),
+    # por eso va antes del early-return de candidates. F es superset de H, así que escribimos
+    # las filas con F=true y marcamos flag_h en las más fuertes. Nunca se pinguea.
+    if WATCHLIST_ENABLED:
+        wl_now = datetime.now(timezone.utc).isoformat()
+        wl_rows = []
+        for sym, tfs in per_symbol.items():
+            d1 = tfs.get("1d") or {}
+            if not d1.get("watch_F"):
+                continue
+            wl_rows.append({
+                "scanned_at": wl_now,
+                "symbol": sym,
+                "flag_f": True,
+                "flag_h": bool(d1.get("watch_H")),
+                "price": float(d1["price"]) if d1.get("price") is not None else None,
+                "atr_pct_1d": float(d1["atr_pct"]) if d1.get("atr_pct") is not None else None,
+                "pctb_1d": float(d1["watch_pctb"]) if d1.get("watch_pctb") is not None else None,
+            })
+        insert_watchlist(wl_rows)
 
     if not candidates:
         print("Sin setups en este run.")

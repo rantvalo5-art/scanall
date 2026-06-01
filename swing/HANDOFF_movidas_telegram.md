@@ -43,7 +43,34 @@ generan, respetando la prioridad del usuario (`lateness > precision > F-score > 
   acotada a 1 símbolo dentro de `send_immediate` (≤5/run). Verificado con smoke test del arco HOME.
 - **Pendiente de validar en vivo:** correr un scan real (env `TELEGRAM_TOKEN`/`CHAT_ID`/`SUPABASE_KEY`) y confirmar
   que `fetch_symbol_streak` lee bien `screener_outcomes` y que el badge/racha aparecen en un BEST real. Sin commit aún.
-- **Ideas 3 y 4 — sin tocar.**
+- **Idea 4 — HECHA.** Tag `🪢 candidata a hold — correa larga (seguir 14/21d)` para RIDING/HOLD reincidentes
+  (`prev>0` o racha ≥2). Solo presentación; commit `e989c07` en rama `swing/telegram-triaje-badge-racha`.
+- **Idea 3 — HECHA (rama aparte `swing/watchlist-momentum`, stacked sobre la de Telegram).** Watchlist momentum
+  F/H que NO se pinguea. `_watch_flags(df1d)` reproduce exacto `_faseB_recall.daily_flags` (validado contra
+  referencia); se computa en `analyze()` para el 1d reusando el df ya fetcheado (sin red extra) y se stashea en el
+  feat. `main()` recolecta los hits F sobre TODO el universo (antes del early-return) y los escribe vía
+  `insert_watchlist()` a la tabla Supabase **`swing_watchlist`**. Path 100% separado: no toca
+  candidates/classify/insert_outcomes/Telegram. Knobs en sección `watchlist` (ENABLED/OBV_LOOKBACK/RETENTION_DAYS,
+  defaults en código, no requiere editar config.json).
+  - **ACCIÓN REQUERIDA antes del primer run:** crear la tabla en Supabase (si no, `insert_watchlist` falla en
+    silencio y loguea). SQL:
+    ```sql
+    create table swing_watchlist (
+      id bigserial primary key,
+      scanned_at timestamptz not null,
+      symbol text not null,
+      flag_f boolean not null default true,
+      flag_h boolean not null default false,
+      price double precision,
+      atr_pct_1d double precision,
+      pctb_1d double precision
+    );
+    create index on swing_watchlist (scanned_at);
+    create index on swing_watchlist (symbol, scanned_at desc);
+    ```
+  - **Display:** pendiente (viewer HTML mínimo o query Supabase). El sink ya persiste; el dashboard es opcional.
+  - **Verificación en vivo:** correr el scan y confirmar que HOME cae en la watchlist el 11-15 may y que NO dispara
+    `send_telegram`.
 
 ## Las 4 ideas (todas, ordenadas por relación valor/riesgo)
 
