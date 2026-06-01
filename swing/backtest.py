@@ -1567,6 +1567,10 @@ def classify(symbol, tf_data, cfg, counts_history=None):
 
     for c in candidates:
         c["candle_status"] = (tf_data.get(c["timeframe"]) or {}).get("candle_status", "closed")
+        # atr_pct_1d (ATR% diario HTF) es el único separador robusto de movers (gate a BEST
+        # en PREBREAK/COILING). Exponerlo en TODA señal alimenta el badge de convicción del
+        # mensaje de Telegram. PREBREAK ya lo trae en su dict; aquí se unifica para el resto.
+        c["atr_pct_1d"] = tf_1d.get("atr_pct")
 
     # Penalización suave por EMA 1d no alcista (solo cuando EMA_GATE_HARD=false).
     if not _ema_gate_hard and not tf_1d.get("ema_trend_up"):

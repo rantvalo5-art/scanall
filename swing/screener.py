@@ -85,6 +85,17 @@ TOP_ALERT_COUNT   = _g("general", "TOP_ALERT_COUNT", default=5)
 HISTORY_HOURS           = _g("history", "HISTORY_HOURS", default=24)
 SNAPSHOT_RETENTION_DAYS = _g("history", "SNAPSHOT_RETENTION_DAYS", default=30)
 
+# Badge de convicción: atr_pct_1d es el único separador robusto de movers (gate a BEST=5).
+# Por encima de ATR_BADGE_HIGH la alerta se marca como alta convicción (HOME estaba en ~6.5,
+# o sea gated-pero-no-🔥, que es la historia correcta).
+ATR_BADGE_HIGH = _g("history", "ATR_BADGE_HIGH", default=8.0)
+
+# Racha cross-señal (Idea 2): ventana multi-día para detectar reincidencia/convicción.
+# counts_history (24h) está acoplado a LATE_REPEAT (scoring) y no se puede ensanchar; en
+# cambio screener_outcomes retiene RETENTION_DAYS y trae signal_type, así que la racha se
+# computa ahí. 14d cubre arcos tipo HOME (COILING→HOLD→RIDING en ~13d) sin diluir.
+STREAK_LOOKBACK_DAYS = _g("history", "STREAK_LOOKBACK_DAYS", default=14)
+
 MAX_IMMEDIATE_PER_RUN = _g("anti_spam", "MAX_IMMEDIATE_PER_RUN", default=5)
 
 COOLDOWN_BY_STATE = CFG.raw.get("cooldowns_minutes", {})
@@ -143,6 +154,42 @@ def fetch_history():
     except Exception as e:
         print(f"Supabase fetch_history error: {e}")
         return {}, {}
+
+
+def fetch_symbol_streak(symbol):
+    """Racha cross-señal de un símbolo en los últimos STREAK_LOOKBACK_DAYS, leída de
+    screener_outcomes (retención larga, trae signal_type). Devuelve dict o None:
+      {seq: [tipos distintos en orden cronológico], n_types, total, span_days}
+    La repetición — sobre todo cross-tipo (COILING→HOLD→RIDING) — es la huella del mover
+    sostenido. Guardrail: elevar, NO suprimir. Query acotada a un símbolo (≤5/run)."""
+    since = (datetime.now(timezone.utc) - timedelta(days=STREAK_LOOKBACK_DAYS)).isoformat()
+    try:
+        r = SESSION.get(
+            f"{SUPABASE_URL}/rest/v1/screener_outcomes",
+            headers={**_sb_headers(), "Prefer": ""},
+            # desc+limit: si PostgREST trunca (cap ~1000), nos quedamos con lo MÁS reciente
+            # (que es el punto de la racha), no con lo más viejo. Reordenamos asc en Python.
+            params={"select": "signal_type,alerted_at", "symbol": f"eq.{symbol}",
+                    "alerted_at": f"gte.{since}", "order": "alerted_at.desc", "limit": 500},
+            timeout=10,
+        )
+        r.raise_for_status()
+        rows = r.json()
+        if not rows:
+            return None
+        rows.reverse()   # → orden cronológico (asc) para construir el arco seq
+        seq = []
+        for row in rows:
+            t = row.get("signal_type")
+            if t and (not seq or seq[-1] != t):   # colapsa repeticiones consecutivas
+                seq.append(t)
+        first = datetime.fromisoformat(rows[0]["alerted_at"].replace("Z", "+00:00"))
+        last  = datetime.fromisoformat(rows[-1]["alerted_at"].replace("Z", "+00:00"))
+        span_days = (last - first).total_seconds() / 86400.0
+        return {"seq": seq, "n_types": len(set(seq)), "total": len(rows), "span_days": span_days}
+    except Exception as e:
+        print(f"Supabase fetch_symbol_streak error: {e}")
+        return None
 
 
 def insert_history(alert_rows):
@@ -412,7 +459,19 @@ def _reasons_from_alert(alert):
     return reasons or ["sin desglose de scoring"]
 
 
-def format_alert(alert, counts_history, with_reasons=True):
+def _streak_line(streak):
+    """Línea de convicción (Idea 2): reincidencia multi-día, sobre todo cross-tipo.
+    None si no hay racha que valga la pena mostrar (≤1 alerta en la ventana)."""
+    if not streak or streak["total"] < 2:
+        return None
+    span = max(1, round(streak["span_days"]))
+    if streak["n_types"] >= 2:
+        arc = "→".join(streak["seq"])
+        return f"  🔁 convicción: {arc} ({streak['total']}× / {span}d)"
+    return f"  🔁 reincide: {streak['seq'][0]} {streak['total']}× / {span}d"
+
+
+def format_alert(alert, counts_history, with_reasons=True, streak=None):
     prev = counts_history.get((alert["symbol"], alert["history_tf"]), 0)
 
     if alert["history_tf"] == "RIDING" and prev > 0:
@@ -430,9 +489,17 @@ def format_alert(alert, counts_history, with_reasons=True):
         "COILING": "🌀",
     }.get(alert["label"], "")
 
+    # Badge de convicción por atr_pct_1d (separador robusto). Siempre muestra el valor;
+    # 🔥 sólo cuando supera ATR_BADGE_HIGH (alta convicción).
+    atr1d = alert.get("atr_pct_1d")
+    if atr1d is not None:
+        atr_badge = f" 🔥atr{atr1d:.1f}" if atr1d >= ATR_BADGE_HIGH else f" atr{atr1d:.1f}"
+    else:
+        atr_badge = ""
+
     header = (
         f"{emoji} [{alert['bucket']}] [{alert['label']}] {alert['symbol']} "
-        f"score {alert['score']} • {alert['timeframe']} "
+        f"score {alert['score']}{atr_badge} • {alert['timeframe']} "
         f"{tradingview_link(alert['symbol'], alert['timeframe'])}{hist_tag}"
     )
 
@@ -455,7 +522,12 @@ def format_alert(alert, counts_history, with_reasons=True):
 
     reasons = alert.get("reasons") or _reasons_from_alert(alert)
     body = "\n".join(f"  - {r}" for r in reasons[:3])
-    return f"{header}\n{price_line}\n{candle_line}\n{body}"
+    lines = [header, price_line, candle_line]
+    streak_line = _streak_line(streak)
+    if streak_line:
+        lines.append(streak_line)
+    lines.append(body)
+    return "\n".join(lines)
 
 
 def dedupe_and_rank(alerts):
@@ -487,7 +559,8 @@ def dedupe_and_rank(alerts):
 def send_immediate(alert, counts_history, dfs=None):
     """Envía alerta inmediata (bucket BEST). Si hay chart disponible lo manda con sendPhoto;
     si no, fallback a texto plano. `dfs` = {(symbol, timeframe): df_cerrado} del scan."""
-    text = f"🔥 PRIORITY NOW\n{format_alert(alert, counts_history)}"
+    streak = fetch_symbol_streak(alert["symbol"])
+    text = f"🔥 PRIORITY NOW\n{format_alert(alert, counts_history, streak=streak)}"
 
     if dfs is not None and CHART_ENABLED and _HAS_MPLFINANCE:
         df = dfs.get((alert["symbol"], alert["timeframe"]))
