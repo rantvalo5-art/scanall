@@ -471,6 +471,18 @@ def _streak_line(streak):
     return f"  🔁 reincide: {streak['seq'][0]} {streak['total']}× / {span}d"
 
 
+def _hold_candidate_line(alert, prev, streak):
+    """Línea de tendencia sostenida (Idea 4): RIDING/HOLD que reinciden = candidata a hold,
+    darle correa larga. El payoff madura >7d y RIDING rinde mejor a 21d (+30.8%); el valor
+    está en aguantar, no en adelantar. None si no aplica."""
+    if alert["history_tf"] not in ("RIDING", "HOLD"):
+        return None
+    repite = prev > 0 or bool(streak and streak["total"] >= 2)
+    if not repite:
+        return None
+    return "  🪢 candidata a hold — correa larga (seguir 14/21d)"
+
+
 def format_alert(alert, counts_history, with_reasons=True, streak=None):
     prev = counts_history.get((alert["symbol"], alert["history_tf"]), 0)
 
@@ -526,6 +538,9 @@ def format_alert(alert, counts_history, with_reasons=True, streak=None):
     streak_line = _streak_line(streak)
     if streak_line:
         lines.append(streak_line)
+    hold_line = _hold_candidate_line(alert, prev, streak)
+    if hold_line:
+        lines.append(hold_line)
     lines.append(body)
     return "\n".join(lines)
 
