@@ -32,7 +32,7 @@
   "active_signals": {
     "PREBREAK": true,
     "BREAKOUT": true,
-    "RIDING": true,
+    "RIDING": false,
     "FADING": false,
     "HOLD": true,
     "COILING": true
@@ -159,7 +159,8 @@
     "LATE_ENTRY_MIN": 0.06,
     "LATE_ENTRY_PENALTY": 0,
     "STRUCT_PENALTY": 0,
-    "LATE_REPEAT_PENALTY": -1
+    "LATE_REPEAT_PENALTY": -1,
+    "ATR1D_BEST_MIN": 5.0
   },
   "scoring_riding": {
     "BASE_SCORE": 6,
@@ -196,6 +197,7 @@
     "CVD_BEARISH_PENALTY": -2,
     "STRUCT_PENALTY": 0,
     "LATE_REPEAT_PENALTY": -1,
+    "ATR1D_BEST_MIN": 5.0,
     "STRONG_MOMENTUM_BONUS": 2,
     "STRONG_MOMENTUM_OBV_MIN": 0.2,
     "STRONG_MOMENTUM_DIST_MIN": 0.08
