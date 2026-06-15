@@ -382,11 +382,23 @@ def in_cooldown(symbol, history_tf, last_seen):
 
 # ── Telegram ─────────────────────────────────────────────────────────────────
 def send_telegram(text):
-    SESSION.post(
-        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-        json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"},
-        timeout=10,
-    )
+    try:
+        r = SESSION.post(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+            json={"chat_id": TELEGRAM_CHAT_ID, "text": text, "parse_mode": "Markdown"},
+            timeout=10,
+        )
+        r.raise_for_status()
+    except Exception as e:
+        print(f"  send_telegram error: {e}")
+        try:
+            SESSION.post(
+                f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+                json={"chat_id": TELEGRAM_CHAT_ID, "text": text},
+                timeout=10,
+            )
+        except Exception:
+            pass
 
 
 # TF del screener → intervalo de TradingView
@@ -714,9 +726,6 @@ def main():
     dfs = {} if CHART_ENABLED and _HAS_MPLFINANCE else None
     candidates = []
     processed = set()
-    immediate_sent_keys = set()
-    immediate_sent_alerts = []
-    immediate_skipped = 0
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {executor.submit(analyze, sym, tf): (sym, tf) for sym, tf in tasks}
@@ -748,19 +757,6 @@ def main():
             candidates.append(alert)
             print(f"  {alert['label']} {symbol} score={alert['score']} bucket={alert['bucket']}")
 
-            key = (alert["symbol"], alert["history_tf"])
-            if alert.get("bucket") == "BEST" and key not in immediate_sent_keys:
-                if len(immediate_sent_keys) >= MAX_IMMEDIATE_PER_RUN:
-                    immediate_skipped += 1
-                    print(f"  inmediata saltada (tope {MAX_IMMEDIATE_PER_RUN}): {symbol}")
-                    continue
-                try:
-                    send_immediate(alert, counts_history, dfs)
-                    immediate_sent_keys.add(key)
-                    immediate_sent_alerts.append(alert)
-                except Exception as e:
-                    print(f"  error envio inmediato {symbol}: {e}")
-
     # Watchlist momentum (Idea 3): sink paralelo sobre TODO el universo (no solo alertados),
     # por eso va antes del early-return de candidates. F es superset de H, así que escribimos
     # las filas con F=true y marcamos flag_h en las más fuertes. Nunca se pinguea.
@@ -786,24 +782,53 @@ def main():
             })
         insert_watchlist(wl_rows)
 
+    # Inmediatos (BEST → "PRIORITY NOW"): rankear por convicción y pushear top-N (D1a).
+    # Antes se enviaban en orden de finalización de thread (≈ azar) y se cortaba al llegar al
+    # tope, así que con >5 BEST se perdían los mejores. Ahora se juntan todos los BEST y se
+    # mandan los de mayor atr_pct_1d (único separador robusto; el score no separa). Diferir el
+    # envío al final del scan no agrega latencia material (el scan es el cuello de botella).
+    best_imm = {}
+    for a in candidates:
+        if a.get("bucket") != "BEST":
+            continue
+        k = (a["symbol"], a["history_tf"])
+        if k not in best_imm or a["score"] > best_imm[k]["score"]:
+            best_imm[k] = a
+    ranked_imm = sorted(
+        best_imm.values(),
+        key=lambda a: (a.get("atr_pct_1d") or 0, _norm(a["score"], a["history_tf"]), a["score"]),
+        reverse=True,
+    )
+    immediate_sent_alerts = []
+    for a in ranked_imm[:MAX_IMMEDIATE_PER_RUN]:
+        try:
+            send_immediate(a, counts_history, dfs)
+            immediate_sent_alerts.append(a)
+            print(f"  inmediata BEST {a['symbol']} (atr{(a.get('atr_pct_1d') or 0):.1f})")
+        except Exception as e:
+            print(f"  error envio inmediato {a['symbol']}: {e}")
+    immediate_skipped = max(0, len(ranked_imm) - MAX_IMMEDIATE_PER_RUN)
+    for a in ranked_imm[MAX_IMMEDIATE_PER_RUN:]:
+        print(f"  inmediata saltada (tope {MAX_IMMEDIATE_PER_RUN}): {a['symbol']}")
+
     if not candidates:
         print("Sin setups en este run.")
-        if immediate_sent_alerts:
-            insert_outcomes(immediate_sent_alerts)
         return
 
     selected = dedupe_and_rank(candidates)
-    insert_history(selected)
-
     selected_keys = {(a["symbol"], a["history_tf"]) for a in selected}
     extra_immediates = [a for a in immediate_sent_alerts
                         if (a["symbol"], a["history_tf"]) not in selected_keys]
+    # D4: grabar también los inmediatos en history (no solo el top-5 seleccionado) → marcan
+    # cooldown el próximo run y no se re-pushean a la hora (la fuga que causaba doble-push,
+    # sobre todo COILING horario). extra_immediates no se solapa con selected (filtrado por key).
+    insert_history(selected + extra_immediates)
     insert_outcomes(selected + extra_immediates)
 
     riding_count = sum(1 for a in candidates if a["history_tf"] == "RIDING")
     coiling_count = sum(1 for a in candidates if a["history_tf"] == "COILING")
     print(f"Total candidatos: {len(candidates)} (RIDING: {riding_count}, COILING: {coiling_count})")
-    print(f"Inmediatos enviados: {len(immediate_sent_keys)} | saltados: {immediate_skipped}")
+    print(f"Inmediatos enviados: {len(immediate_sent_alerts)} | saltados: {immediate_skipped}")
     print(f"Top final: {len(selected)}")
 
 

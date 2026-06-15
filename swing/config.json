@@ -241,6 +241,7 @@
     "cdf": {}
   },
   "trend_filter_1w": {
+    "_COMMENT": "INERTE: el 1w casi nunca se computa (analyze exige >=80 barras = ~80 semanas; la mayoria de pares son mas jovenes) -> el filtro casi nunca actua (falla-seguro via default True) y htf_1w_up sale ~siempre False. NO es palanca de tuneo, no confiar en htf_1w_up. Para activarlo de verdad habria que bajar el piso de barras del 1w (ver diagnostico).",
     "ENABLED": false,
     "MODE": "soft",
     "PENALTY": 2,
