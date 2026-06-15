@@ -225,7 +225,7 @@
     "RETENTION_DAYS": 90
   },
   "exit_mgmt": {
-    "ENABLED": false,
+    "ENABLED": true,
     "ARM_PCT": 0.12,
     "TRAIL_PCT": 0.08,
     "STOP_PCT": 0.0,
