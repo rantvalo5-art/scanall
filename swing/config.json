@@ -112,7 +112,10 @@
     "BEST_MIN_SCORE": 11,
     "STRONG_MIN_SCORE": 10,
     "IMMEDIATE_MIN_SCORE": 11,
-    "SCORE_CAP": 15
+    "SCORE_CAP": 15,
+    "BEST_MIN_SCORE_PER_SIGNAL": {
+      "HOLD": 13
+    }
   },
   "scoring_prebreak": {
     "BASE_OFFSET": 4,
@@ -220,6 +223,15 @@
     "TRACK_ALL_CANDIDATES": false,
     "BATCH_SIZE": 500,
     "RETENTION_DAYS": 90
+  },
+  "exit_mgmt": {
+    "ENABLED": false,
+    "ARM_PCT": 0.12,
+    "TRAIL_PCT": 0.08,
+    "STOP_PCT": 0.0,
+    "WINDOW_DAYS": 7,
+    "BATCH_SIZE": 100,
+    "RETENTION_DAYS": 30
   },
   "scoring_calibration": {
     "ENABLED": false,

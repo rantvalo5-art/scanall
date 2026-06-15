@@ -1,0 +1,29 @@
+name: Swing Exit Tracker
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [run-swing-exit]
+  # Sin schedule por ahora (igual que swing.yml). La capa de salida gestiona alertas
+  # ya emitidas a lo largo de ~7d, así que conviene una cadencia horaria cuando se
+  # automatice (p.ej. cron "0 * * * *"). No hace nada mientras exit_mgmt.ENABLED=false.
+jobs:
+  exit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install dependencies
+        run: pip install requests
+      - name: Run exit tracker
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          PYTHONIOENCODING: "utf-8"
+        run: python -u swing/exit_tracker.py
