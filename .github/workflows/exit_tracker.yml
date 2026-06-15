@@ -3,9 +3,12 @@ on:
   workflow_dispatch:
   repository_dispatch:
     types: [run-swing-exit]
-  # Sin schedule por ahora (igual que swing.yml). La capa de salida gestiona alertas
-  # ya emitidas a lo largo de ~7d, así que conviene una cadencia horaria cuando se
-  # automatice (p.ej. cron "0 * * * *"). No hace nada mientras exit_mgmt.ENABLED=false.
+  # Para automatizar: descomentar el schedule de abajo AL MISMO TIEMPO que pones
+  # exit_mgmt.ENABLED=true (y tras crear la tabla swing_exit_alerts + verificar
+  # --dry-run). Mientras esté comentado el job solo corre manual (workflow_dispatch).
+  # No dejar el cron activo con ENABLED=false: serían ~720 runs/mes haciendo nada.
+  # schedule:
+  #   - cron: "0 * * * *"   # cada hora; gestiona alertas a lo largo de ~7d
 jobs:
   exit:
     runs-on: ubuntu-latest
