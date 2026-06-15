@@ -1,0 +1,32 @@
+name: Swing Exit Tracker
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [run-swing-exit]
+  # Cron activado (exit_mgmt.ENABLED=true). Prerequisitos para que esto sea seguro:
+  # tabla swing_exit_alerts creada + un --dry-run verificado. Sin la tabla, el dedup
+  # falla en silencio y se repetirían avisos. No dejar el cron activo con ENABLED=false:
+  # serían ~720 runs/mes haciendo nada.
+  schedule:
+    - cron: "0 * * * *"   # cada hora; gestiona alertas a lo largo de ~7d
+jobs:
+  exit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install dependencies
+        run: pip install requests
+      - name: Run exit tracker
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          PYTHONIOENCODING: "utf-8"
+        run: python -u swing/exit_tracker.py
