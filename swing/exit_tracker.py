@@ -50,6 +50,7 @@ ENABLED      = _EX.get("ENABLED", False)
 ARM_PCT      = _EX.get("ARM_PCT", 0.12)
 TRAIL_PCT    = _EX.get("TRAIL_PCT", 0.08)
 STOP_PCT     = _EX.get("STOP_PCT", 0.0)          # 0 = sin stop duro (config validada)
+FRESH_MARGIN = _EX.get("FRESH_MARGIN_PCT", 0.06) # banda de frescura sobre el trail
 WINDOW_DAYS  = _EX.get("WINDOW_DAYS", 7)
 BATCH_SIZE   = _EX.get("BATCH_SIZE", 100)
 RETENTION_DAYS = _EX.get("RETENTION_DAYS", 30)
@@ -64,13 +65,18 @@ BINANCE_KLINES = "https://data-api.binance.vision/api/v3/klines"
 
 
 # ── Lógica pura (testeable sin red ni credenciales) ──────────────────────────
-def eval_exit(entry, highs, lows, closes, arm_pct, trail_pct, stop_pct=0.0):
+def eval_exit(entry, highs, lows, closes, arm_pct, trail_pct, stop_pct=0.0,
+              fresh_margin=0.06):
     """Evalúa el estado ACTUAL de la posición. Devuelve dict con la salida sugerida
     o None si todavía hay que aguantar.
 
     - run_max: máximo alcanzado desde la entrada (incluye la entrada como piso).
     - armado: el pico superó arm_pct (recién ahí el trailing tiene sentido).
     - trail: armado y el precio actual está ≥ trail_pct por debajo del máximo.
+    - fresh_margin: guardia de frescura. Solo dispara si el drop desde el máximo está
+      en la banda [trail_pct, trail_pct+fresh_margin]. Si el precio ya cayó MUCHO más
+      (round-trip viejo, o primer run sobre backlog), el momento de salir ya pasó →
+      no avisar tarde. En cadencia horaria esto no recorta nada (dispara en el cruce).
     - stop (opcional, pre-arme): el mínimo perforó -stop_pct sin haber armado nunca.
     """
     if not entry or not closes:
@@ -90,9 +96,10 @@ def eval_exit(entry, highs, lows, closes, arm_pct, trail_pct, stop_pct=0.0):
             return {"reason": "stop", "exit_price": px, "max_price": run_max,
                     "max_gain": max_gain, "drop_from_max": px / run_max - 1}
 
-    if armed and cur <= run_max * (1 - trail_pct):
+    drop = cur / run_max - 1  # negativo
+    if armed and -trail_pct - fresh_margin <= drop <= -trail_pct:
         return {"reason": "trail", "exit_price": cur, "max_price": run_max,
-                "max_gain": max_gain, "drop_from_max": cur / run_max - 1}
+                "max_gain": max_gain, "drop_from_max": drop}
     return None
 
 
@@ -236,7 +243,8 @@ def purge_old():
 
 
 def main(dry_run=False):
-    if not ENABLED:
+    # dry_run ignora el gate: sirve para probar ANTES de activar en config.
+    if not ENABLED and not dry_run:
         print("exit_mgmt.ENABLED = false — skipping")
         return
     now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
@@ -248,9 +256,12 @@ def main(dry_run=False):
     print(f"  {len(candidates)} candidatas BEST | {len(sent)} ya avisadas")
 
     fired = 0
+    fired_symbols = set()  # dedup por símbolo: un aviso por símbolo por run
     now = datetime.now(timezone.utc)
     for row in candidates:
         if row["id"] in sent or not row.get("entry_price"):
+            continue
+        if row["symbol"] in fired_symbols:
             continue
         t0 = datetime.fromisoformat(row["alerted_at"].replace("Z", "+00:00"))
         start_ms = int(t0.timestamp() * 1000)
@@ -262,10 +273,11 @@ def main(dry_run=False):
         lows = [float(k[3]) for k in kl]
         closes = [float(k[4]) for k in kl]
         res = eval_exit(float(row["entry_price"]), highs, lows, closes,
-                        ARM_PCT, TRAIL_PCT, STOP_PCT)
+                        ARM_PCT, TRAIL_PCT, STOP_PCT, FRESH_MARGIN)
         if not res:
             continue
         fired += 1
+        fired_symbols.add(row["symbol"])
         msg = format_msg(row, res)
         if dry_run:
             print(f"  [DRY] {msg.splitlines()[0]} | pico +{res['max_gain']*100:.1f}% "
