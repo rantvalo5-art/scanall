@@ -59,6 +59,12 @@ RETENTION_DAYS = _EX.get("RETENTION_DAYS", 30)
 # disparar avisos sobre filas de otro proyecto que escriba en la misma tabla).
 SWING_SIGNALS = ("PREBREAK", "BREAKOUT", "RIDING", "HOLD", "COILING")
 
+# Timeframes de swing. signal_type NO basta como discriminador: el daytrader raíz
+# escribe los mismos strings (BREAKOUT/HOLD/...) en la MISMA tabla. El daytrader opera
+# en 5m/15m/1h/4h, así que filtrar por estos TFs evita gestionar sus posiciones (el
+# solape en 1h/4h es inevitable, pero corta el grueso: 5m/15m y deja 1d/1w 100% swing).
+SWING_TIMEFRAMES = ("1h", "4h", "1d", "1w")
+
 SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
 
 BINANCE_KLINES = "https://data-api.binance.vision/api/v3/klines"
@@ -124,9 +130,10 @@ def fetch_candidates():
             f"{SUPABASE_URL}/rest/v1/screener_outcomes",
             headers=_sb_headers(),
             params={
-                "select": "id,alerted_at,symbol,entry_price,signal_type,bucket",
+                "select": "id,alerted_at,symbol,entry_price,signal_type,bucket,timeframe",
                 "bucket": "eq.BEST",
                 "signal_type": f"in.({','.join(SWING_SIGNALS)})",
+                "timeframe": f"in.({','.join(SWING_TIMEFRAMES)})",
                 "alerted_at": f"gte.{since}",
                 "order": "alerted_at.asc",
                 "limit": str(BATCH_SIZE),

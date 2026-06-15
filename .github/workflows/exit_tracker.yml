@@ -3,12 +3,12 @@ on:
   workflow_dispatch:
   repository_dispatch:
     types: [run-swing-exit]
-  # Para automatizar: descomentar el schedule de abajo AL MISMO TIEMPO que pones
-  # exit_mgmt.ENABLED=true (y tras crear la tabla swing_exit_alerts + verificar
-  # --dry-run). Mientras esté comentado el job solo corre manual (workflow_dispatch).
-  # No dejar el cron activo con ENABLED=false: serían ~720 runs/mes haciendo nada.
-  # schedule:
-  #   - cron: "0 * * * *"   # cada hora; gestiona alertas a lo largo de ~7d
+  # Cron activado (exit_mgmt.ENABLED=true). Prerequisitos para que esto sea seguro:
+  # tabla swing_exit_alerts creada + un --dry-run verificado. Sin la tabla, el dedup
+  # falla en silencio y se repetirían avisos. No dejar el cron activo con ENABLED=false:
+  # serían ~720 runs/mes haciendo nada.
+  schedule:
+    - cron: "0 * * * *"   # cada hora; gestiona alertas a lo largo de ~7d
 jobs:
   exit:
     runs-on: ubuntu-latest
