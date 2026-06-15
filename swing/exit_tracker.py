@@ -50,7 +50,7 @@ ENABLED      = _EX.get("ENABLED", False)
 ARM_PCT      = _EX.get("ARM_PCT", 0.12)
 TRAIL_PCT    = _EX.get("TRAIL_PCT", 0.08)
 STOP_PCT     = _EX.get("STOP_PCT", 0.0)          # 0 = sin stop duro (config validada)
-FRESH_MARGIN = _EX.get("FRESH_MARGIN_PCT", 0.06) # banda de frescura sobre el trail
+RECENT_HOURS = _EX.get("RECENT_HOURS", 6)        # solo avisa cruces de las últimas N h
 WINDOW_DAYS  = _EX.get("WINDOW_DAYS", 7)
 BATCH_SIZE   = _EX.get("BATCH_SIZE", 100)
 RETENTION_DAYS = _EX.get("RETENTION_DAYS", 30)
@@ -65,41 +65,42 @@ BINANCE_KLINES = "https://data-api.binance.vision/api/v3/klines"
 
 
 # ── Lógica pura (testeable sin red ni credenciales) ──────────────────────────
-def eval_exit(entry, highs, lows, closes, arm_pct, trail_pct, stop_pct=0.0,
-              fresh_margin=0.06):
-    """Evalúa el estado ACTUAL de la posición. Devuelve dict con la salida sugerida
-    o None si todavía hay que aguantar.
+def eval_exit(entry, times, highs, lows, closes, arm_pct, trail_pct,
+              stop_pct=0.0, now_ms=None, recent_ms=None):
+    """Camina la ruta forward y devuelve el PRIMER cruce de salida (o None).
 
     - run_max: máximo alcanzado desde la entrada (incluye la entrada como piso).
     - armado: el pico superó arm_pct (recién ahí el trailing tiene sentido).
-    - trail: armado y el precio actual está ≥ trail_pct por debajo del máximo.
-    - fresh_margin: guardia de frescura. Solo dispara si el drop desde el máximo está
-      en la banda [trail_pct, trail_pct+fresh_margin]. Si el precio ya cayó MUCHO más
-      (round-trip viejo, o primer run sobre backlog), el momento de salir ya pasó →
-      no avisar tarde. En cadencia horaria esto no recorta nada (dispara en el cruce).
-    - stop (opcional, pre-arme): el mínimo perforó -stop_pct sin haber armado nunca.
+    - trail: armado y un cierre cae ≥ trail_pct por debajo del máximo hasta ese punto.
+    - stop (opcional, pre-arme): un mínimo perfora -stop_pct sin haber armado nunca.
+    - frescura temporal: si recent_ms está dado, solo dispara cuando el cruce ocurrió
+      en las últimas recent_ms (now_ms - t_cruce <= recent_ms). En cadencia periódica
+      esto NO recorta el estado estacionario (el cruce es reciente y se agarra al -8%),
+      e incluye dumps rápidos; solo ignora cruces viejos (backlog/cold-start, round-trips
+      que ya pasaron su momento de salida). Sin recent_ms, dispara en cualquier cruce.
     """
     if not entry or not closes:
         return None
     run_max = entry
-    for hi in highs:
-        if hi > run_max:
-            run_max = hi
-    max_gain = run_max / entry - 1
-    armed = max_gain >= arm_pct
-    cur = closes[-1]
-
-    if stop_pct and not armed:
-        worst = min(lows) if lows else entry
-        if worst / entry - 1 <= -stop_pct:
+    armed = False
+    for t, hi, lo, cl in zip(times, highs, lows, closes):
+        if stop_pct and not armed and lo <= entry * (1 - stop_pct):
+            if recent_ms is not None and now_ms - t > recent_ms:
+                return None
             px = entry * (1 - stop_pct)
             return {"reason": "stop", "exit_price": px, "max_price": run_max,
-                    "max_gain": max_gain, "drop_from_max": px / run_max - 1}
-
-    drop = cur / run_max - 1  # negativo
-    if armed and -trail_pct - fresh_margin <= drop <= -trail_pct:
-        return {"reason": "trail", "exit_price": cur, "max_price": run_max,
-                "max_gain": max_gain, "drop_from_max": drop}
+                    "max_gain": run_max / entry - 1, "drop_from_max": px / run_max - 1,
+                    "trigger_ms": t}
+        if hi > run_max:
+            run_max = hi
+        if not armed and run_max / entry - 1 >= arm_pct:
+            armed = True
+        if armed and cl <= run_max * (1 - trail_pct):
+            if recent_ms is not None and now_ms - t > recent_ms:
+                return None
+            return {"reason": "trail", "exit_price": cl, "max_price": run_max,
+                    "max_gain": run_max / entry - 1, "drop_from_max": cl / run_max - 1,
+                    "trigger_ms": t}
     return None
 
 
@@ -258,6 +259,8 @@ def main(dry_run=False):
     fired = 0
     fired_symbols = set()  # dedup por símbolo: un aviso por símbolo por run
     now = datetime.now(timezone.utc)
+    now_ms = int(now.timestamp() * 1000)
+    recent_ms = RECENT_HOURS * 3600 * 1000
     for row in candidates:
         if row["id"] in sent or not row.get("entry_price"):
             continue
@@ -269,11 +272,12 @@ def main(dry_run=False):
         kl = get_klines_1h(row["symbol"], start_ms, end_ms)
         if len(kl) < 3:
             continue
+        times = [int(k[0]) for k in kl]
         highs = [float(k[2]) for k in kl]
         lows = [float(k[3]) for k in kl]
         closes = [float(k[4]) for k in kl]
-        res = eval_exit(float(row["entry_price"]), highs, lows, closes,
-                        ARM_PCT, TRAIL_PCT, STOP_PCT, FRESH_MARGIN)
+        res = eval_exit(float(row["entry_price"]), times, highs, lows, closes,
+                        ARM_PCT, TRAIL_PCT, STOP_PCT, now_ms, recent_ms)
         if not res:
             continue
         fired += 1
