@@ -54,15 +54,21 @@ def simulate(alert, df1h, arm, trail, stop):
             return cl / e - 1
     return float(fwd.close.iloc[-1]) / e - 1  # hold a fin de ventana
 
+BUCKETS = ("BEST", "STRONG")  # gestionar también STRONG: el score no discrimina outcome
+
+
 def main():
     d = json.load(open("diag_8w.json"))["main"]
-    # BEST maduras (forward 7d real) con entry
-    best = [a for a in d if a.get("bucket") == "BEST" and a.get("entry_price")
+    # BEST+STRONG maduras (forward 7d real) con entry
+    best = [a for a in d if a.get("bucket") in BUCKETS and a.get("entry_price")
             and datetime.fromisoformat(a["alerted_at"].replace("Z", "+00:00")) <= MATURE_BEFORE]
     syms = sorted(set(a["symbol"] for a in best))
     cache = {s: load_1h(s) for s in syms}
     best = [a for a in best if cache.get(a["symbol"]) is not None]
-    print(f"BEST maduras simulables: {len(best)} ({len(syms)} símbolos)")
+    from collections import Counter
+    by_bucket = Counter(a["bucket"] for a in best)
+    print(f"BEST+STRONG maduras simulables: {len(best)} ({len(syms)} símbolos) "
+          f"| {dict(by_bucket)}")
 
     def baseline(a):
         return a["price_7d"] / a["entry_price"] - 1 if a.get("price_7d") else None
@@ -70,12 +76,19 @@ def main():
     print(f"\nBASELINE (hold ciego a 7d): n={len(base)} "
           f"avg {st.mean(base)*100:+.2f}% med {st.median(base)*100:+.2f}% "
           f"win {sum(1 for x in base if x>0)/len(base)*100:.0f}%")
+    # baseline por bucket: ¿STRONG se comporta como BEST? (esperado: sí, score no discrimina)
+    for b in BUCKETS:
+        bb = [baseline(a) for a in best if a["bucket"] == b]
+        bb = [x for x in bb if x is not None]
+        if bb:
+            print(f"  {b:7} n={len(bb):3} avg {st.mean(bb)*100:+.2f}% med {st.median(bb)*100:+.2f}% "
+                  f"win {sum(1 for x in bb if x>0)/len(bb)*100:.0f}%")
     print()
     print(f"{'ARM':>4} {'TRAIL':>5} {'STOP':>4} | {'avg':>7} {'med':>7} {'win':>5} {'p10':>7} {'p90':>7}")
     grid = []
-    for arm in (0.08, 0.12, 0.15, 0.20):
-        for trail in (0.08, 0.12, 0.15):
-            for stop in (0.0, 0.10, 0.15):
+    for arm in (0.05, 0.06, 0.08, 0.12):
+        for trail in (0.08, 0.12):
+            for stop in (0.0, 0.05, 0.06, 0.07, 0.08):
                 rs = [simulate(a, cache[a["symbol"]], arm, trail, stop) for a in best]
                 rs = [x for x in rs if x is not None]
                 if not rs:
@@ -86,11 +99,19 @@ def main():
                 grid.append((avg, arm, trail, stop, med, win, p10, p90))
                 print(f"{arm:>4.2f} {trail:>5.2f} {stop:>4.2f} | {avg*100:>+6.2f}% {med*100:>+6.2f}% "
                       f"{win:>4.0f}% {p10*100:>+6.1f}% {p90*100:>+6.1f}%")
+    print(f"\n(baseline avg {st.mean(base)*100:+.2f}% med {st.median(base)*100:+.2f}% "
+          f"win {sum(1 for x in base if x>0)/len(base)*100:.0f}%)")
     grid.sort(reverse=True)
     print("\nTop 5 por avg realizado:")
     for avg, arm, trail, stop, med, win, p10, p90 in grid[:5]:
         print(f"  ARM {arm:.2f} TRAIL {trail:.2f} STOP {stop:.2f} -> avg {avg*100:+.2f}% "
-              f"med {med*100:+.2f}% win {win:.0f}% (vs baseline avg {st.mean(base)*100:+.2f}%)")
+              f"med {med*100:+.2f}% win {win:.0f}% p10 {p10*100:+.1f}%")
+    # top-5 por p10: el stop protege la cola izquierda, no la media
+    grid.sort(key=lambda g: g[6], reverse=True)
+    print("\nTop 5 por p10 (cola izquierda — qué config corta mejor las pérdidas):")
+    for avg, arm, trail, stop, med, win, p10, p90 in grid[:5]:
+        print(f"  ARM {arm:.2f} TRAIL {trail:.2f} STOP {stop:.2f} -> p10 {p10*100:+.1f}% "
+              f"avg {avg*100:+.2f}% med {med*100:+.2f}% win {win:.0f}%")
 
 if __name__ == "__main__":
     main()
