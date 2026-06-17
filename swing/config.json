@@ -226,12 +226,16 @@
   },
   "exit_mgmt": {
     "ENABLED": true,
+    "BUCKETS": [
+      "BEST",
+      "STRONG"
+    ],
     "ARM_PCT": 0.12,
     "TRAIL_PCT": 0.08,
     "STOP_PCT": 0.0,
     "RECENT_HOURS": 6,
     "WINDOW_DAYS": 7,
-    "BATCH_SIZE": 100,
+    "BATCH_SIZE": 300,
     "RETENTION_DAYS": 30
   },
   "scoring_calibration": {

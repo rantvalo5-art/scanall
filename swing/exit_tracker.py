@@ -47,6 +47,7 @@ with open(CONFIG_PATH, "r", encoding="utf-8") as f:
 
 _EX = CONFIG.get("exit_mgmt", {})
 ENABLED      = _EX.get("ENABLED", False)
+BUCKETS      = _EX.get("BUCKETS", ["BEST"])      # qué buckets gestionar (el score no discrimina outcome)
 ARM_PCT      = _EX.get("ARM_PCT", 0.12)
 TRAIL_PCT    = _EX.get("TRAIL_PCT", 0.08)
 STOP_PCT     = _EX.get("STOP_PCT", 0.0)          # 0 = sin stop duro (config validada)
@@ -123,7 +124,7 @@ def _sb_headers(minimal=False):
 
 
 def fetch_candidates():
-    """Alertas BEST de swing dentro de la ventana, aún relevantes para gestión."""
+    """Alertas de swing (buckets BUCKETS) dentro de la ventana, aún relevantes para gestión."""
     since = (datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)).isoformat()
     try:
         r = requests.get(
@@ -131,11 +132,13 @@ def fetch_candidates():
             headers=_sb_headers(),
             params={
                 "select": "id,alerted_at,symbol,entry_price,signal_type,bucket,timeframe",
-                "bucket": "eq.BEST",
+                "bucket": f"in.({','.join(BUCKETS)})",
                 "signal_type": f"in.({','.join(SWING_SIGNALS)})",
                 "timeframe": f"in.({','.join(SWING_TIMEFRAMES)})",
                 "alerted_at": f"gte.{since}",
-                "order": "alerted_at.asc",
+                # desc: si el cap recorta, conserva las MÁS RECIENTES (posición activa, gestión
+                # relevante). También fija el dedup por símbolo a la entrada más nueva.
+                "order": "alerted_at.desc",
                 "limit": str(BATCH_SIZE),
             },
             timeout=15,
@@ -261,7 +264,7 @@ def main(dry_run=False):
 
     candidates = fetch_candidates()
     sent = set() if dry_run else fetch_already_sent()
-    print(f"  {len(candidates)} candidatas BEST | {len(sent)} ya avisadas")
+    print(f"  {len(candidates)} candidatas {'+'.join(BUCKETS)} | {len(sent)} ya avisadas")
 
     fired = 0
     fired_symbols = set()  # dedup por símbolo: un aviso por símbolo por run
