@@ -19,6 +19,7 @@ Prerequisito: columnas creadas (ALTER TABLE ya corrido). Corre con python 3.11+ 
 """
 import os
 import sys
+import time
 import requests
 from datetime import datetime, timezone, timedelta
 
@@ -67,17 +68,24 @@ def fetch_pending():
 
 
 def get_klines_1h(symbol, start_ms, end_ms):
-    """Klines 1h en [start,end]. 7d = 168 velas → un request. [[open_time,high,low,close]]."""
-    try:
-        r = requests.get(BINANCE_KLINES, params={
-            "symbol": symbol, "interval": "1h",
-            "startTime": start_ms, "endTime": end_ms, "limit": 1000,
-        }, timeout=15)
-        r.raise_for_status()
-        return r.json()
-    except Exception as e:
-        print(f"  klines {symbol} error: {e}")
-        return []
+    """Klines 1h en [start,end]. 7d = 168 velas → un request. Devuelve la lista (puede ser []
+    si el símbolo está delisted = respuesta vacía GENUINA), o None ante error de red persistente.
+    Distinguir None (red, reintentar) de [] (delisted, grace) evita perder datos por timeouts
+    transitorios. Retry con backoff ante fallos transitorios."""
+    for attempt in range(3):
+        try:
+            r = requests.get(BINANCE_KLINES, params={
+                "symbol": symbol, "interval": "1h",
+                "startTime": start_ms, "endTime": end_ms, "limit": 1000,
+            }, timeout=20)
+            r.raise_for_status()
+            return r.json()                 # puede ser [] (delisted) → ≠ None
+        except Exception as e:
+            if attempt < 2:
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            print(f"  klines {symbol} error de red (reintentar próximo run): {e}")
+            return None
 
 
 def compute_7d(row):
@@ -86,11 +94,13 @@ def compute_7d(row):
     t0 = int(alerted.timestamp() * 1000)
     t1 = t0 + (WINDOW_DAYS + 1) * DAY_MS
     kl = get_klines_1h(row["symbol"], t0, t1)
+    if kl is None:
+        return None  # error de RED → siempre reintentar, nunca grace (no perder el dato)
     if not kl:
-        # sin klines: si la alerta es muy vieja (delisted), marcar complete para no reintentar
+        # respuesta VACÍA genuina (delisted): grace para no reintentar infinito
         if datetime.now(timezone.utc) - alerted >= timedelta(days=GRACE_DAYS):
             return {"complete_7d": True}
-        return None  # transitorio → reintentar próximo run
+        return None  # aún joven → reintentar (puede aparecer)
     target = t0 + WINDOW_DAYS * DAY_MS
     win = [k for k in kl if t0 < int(k[0]) <= target]
     if len(win) < 3:
