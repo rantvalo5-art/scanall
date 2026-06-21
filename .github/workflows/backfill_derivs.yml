@@ -1,0 +1,25 @@
+name: Swing Backfill Derivs (funding/OI)
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [run-swing-derivs]
+  # Self-hosted (IP no-US): fapi.binance.com está geo-bloqueado (451) desde los runners
+  # GitHub-hosted, así que el screener (ubuntu-latest) loguea funding/OI null. Este job
+  # patchea funding/OI de las alertas RECIENTES desde una IP no bloqueada. Horario (:15,
+  # tras el screener de :02) para capturar cada alerta dentro de su ventana de funding de 8h.
+  schedule:
+    - cron: "15 * * * *"
+jobs:
+  derivs:
+    runs-on: self-hosted
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Run backfill derivs
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          PYTHONIOENCODING: "utf-8"
+        run: |
+          source ~/scanall/venv/bin/activate
+          python -u swing/backfill_derivs.py
