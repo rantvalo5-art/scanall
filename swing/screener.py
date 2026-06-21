@@ -283,6 +283,61 @@ def insert_pairs_snapshot(pairs):
         print(f"Supabase insert_pairs_snapshot error: {e}")
 
 
+# ── Derivados (forward-test P-A: SOLO logueo, sin gate) ─────────────────────────
+# Funding rate vigente + open interest al momento de cada alerta. NO cambia qué se
+# alerta (el gate de funding sigue OFF): solo persiste el snapshot junto al outcome
+# para validar en un BEAR real el gate que pasó walk-forward en backtest (sim_funding,
+# WF 5/5 + ortogonal a atr). Todo fail-safe: cualquier error de fapi deja funding/OI
+# en None y el run sigue normal. El swing es spot; los perps se mapean con prefijo 1000x.
+FAPI_URL = "https://fapi.binance.com"
+
+
+def _perp_name(spot_sym, perp_set):
+    """Mapea símbolo spot→perp USDT-M. Maneja el prefijo 1000x (PEPEUSDT→1000PEPEUSDT)."""
+    if spot_sym in perp_set:
+        return spot_sym
+    base = spot_sym[:-4]  # quita USDT
+    for pref in ("1000", "1000000"):
+        cand = f"{pref}{base}USDT"
+        if cand in perp_set:
+            return cand
+    return None
+
+
+def fetch_derivatives_snapshot(symbols):
+    """{spot_symbol: (funding_rate, open_interest)} para los símbolos dados.
+    funding = lastFundingRate vigente (premiumIndex, una sola llamada bulk que además da
+    el set de perps activos). OI = openInterest actual (una llamada por símbolo; pocos por
+    run). Cualquier fallo → (None, None) para ese símbolo, nunca rompe el run."""
+    out = {s: (None, None) for s in symbols}
+    if not symbols:
+        return out
+    try:
+        r = SESSION.get(f"{FAPI_URL}/fapi/v1/premiumIndex", timeout=10)
+        r.raise_for_status()
+        fmap = {d["symbol"]: float(d["lastFundingRate"]) for d in r.json()
+                if d.get("lastFundingRate") not in (None, "")}
+    except Exception as e:
+        print(f"  derivados: premiumIndex error ({e}); funding/OI=None este run")
+        return out
+    perp_set = set(fmap.keys())
+    for s in symbols:
+        perp = _perp_name(s, perp_set)
+        if perp is None:
+            continue
+        fr = fmap.get(perp)
+        oi = None
+        try:
+            ro = SESSION.get(f"{FAPI_URL}/fapi/v1/openInterest",
+                             params={"symbol": perp}, timeout=10)
+            if ro.status_code == 200:
+                oi = float(ro.json().get("openInterest"))
+        except Exception:
+            oi = None
+        out[s] = (fr, oi)
+    return out
+
+
 def insert_outcomes(alerts):
     """Inserta filas en screener_outcomes para tracking de cómo evolucionan las alertas.
     Solo guarda el snapshot del momento; los precios futuros los completa update_outcomes.py.
@@ -290,10 +345,13 @@ def insert_outcomes(alerts):
     if not OUTCOMES_ENABLED or not alerts:
         return
     now_iso = datetime.now(timezone.utc).isoformat()
+    # P-A forward-test: snapshot de funding/OI vigente al alertar (gate OFF, solo logueo).
+    deriv = fetch_derivatives_snapshot(sorted({a["symbol"] for a in alerts}))
     rows = []
     for a in alerts:
         obv = a.get("obv_slope")
         cvd = a.get("cvd_ratio")
+        fr, oi = deriv.get(a["symbol"], (None, None))
         rows.append({
             "alerted_at": now_iso,
             "symbol": a["symbol"],
@@ -307,6 +365,8 @@ def insert_outcomes(alerts):
             "obv_slope": float(obv) if obv is not None else None,
             "cvd_ratio": float(cvd) if cvd is not None else None,
             "recent_long_ok": bool(a["recent_long_ok"]) if a.get("recent_long_ok") is not None else None,
+            "funding_rate": fr,
+            "open_interest": oi,
         })
     try:
         r = SESSION.post(
