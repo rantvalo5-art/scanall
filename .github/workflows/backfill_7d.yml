@@ -1,0 +1,29 @@
+name: Swing Backfill 7d
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [run-swing-backfill-7d]
+  # Las filas maduran a 7d; no hay apuro. Cada 6h alcanza de sobra (retención 90d).
+  # Job ADITIVO: solo escribe columnas 7d propias (complete_7d) — no toca la lógica de
+  # outcomes_complete (24h) que comparte el daytrader. Prerequisito: columnas creadas.
+  schedule:
+    - cron: "30 */6 * * *"
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install dependencies
+        run: pip install requests
+      - name: Run backfill 7d
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          PYTHONIOENCODING: "utf-8"
+        run: python -u swing/backfill_7d.py
