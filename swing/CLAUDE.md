@@ -32,12 +32,11 @@ El day trader se separó a tablas propias. **El reparto ahora es:**
 
 ## Workflows
 - `.github/workflows/swing.yml` — scan manual (sin cron; `workflow_dispatch` / `run-swing`).
+  El paso "Fill outcomes" corre **`swing/update_outcomes.py`** (filler PROPIO del swing →
+  `screener_outcomes`, retención de `swing/config.json`). NO el del root (ese apunta a
+  `daytrader_outcomes`). Es un fork de `../update_outcomes.py`: si arreglás un bug del filler,
+  aplicalo a los dos.
 - `.github/workflows/exit_tracker.yml` — cron **horario**; lee `screener_outcomes`.
-- ⚠️ **CABO SUELTO pre-deploy del day trader:** el paso "Fill outcomes" de `swing.yml`
-  corre el `update_outcomes.py` de la **raíz**, que tras la separación apunta a
-  `daytrader_outcomes`. Hoy no molesta (no mergeado + swing.yml manual), pero **antes de
-  mergear `day/*` a main** hay que darle a swing su propio filler hacia `screener_outcomes`
-  (filler propio o parametrizar la tabla por env). Si no, swing deja de llenar sus outcomes.
 
 ## Reglas
 - Editar **solo** `swing/` acá. Branches del swing: `swing/*`. (El day trader usa `day/*`.)
