@@ -1,0 +1,74 @@
+{
+  "n_syms": 227,
+  "corr_mean_offdiag": 0.25026130545190495,
+  "raw": {
+    "label": "RAW (pop crudo \u2014 confundido por factor de mercado)",
+    "n_events": 1096,
+    "quiet_frac": 0.5437751004015337,
+    "by_H": {
+      "3": {
+        "cond_n": 4061,
+        "cond_mean": 0.005448313287082963,
+        "base_mean": 0.005957031929084962,
+        "edge_mean_pp": -0.0005087186420019993,
+        "contemp_mean": -0.2422799698320253
+      },
+      "6": {
+        "cond_n": 4061,
+        "cond_mean": -0.11574555198877677,
+        "base_mean": 0.0025747022794832732,
+        "edge_mean_pp": -0.11832025426826004,
+        "contemp_mean": -0.3280185134953957
+      },
+      "12": {
+        "cond_n": 4061,
+        "cond_mean": -0.16517605053531106,
+        "base_mean": 0.005200442831137977,
+        "edge_mean_pp": -0.17037649336644903,
+        "contemp_mean": -0.8745881384541262
+      },
+      "24": {
+        "cond_n": 4060,
+        "cond_mean": -0.34387499113502984,
+        "base_mean": 0.025987964555270294,
+        "edge_mean_pp": -0.36986295569030014,
+        "contemp_mean": -1.734974883910613
+      }
+    }
+  },
+  "idio": {
+    "label": "IDIOSINCR\u00c1TICO (l\u00edder rompe vs mercado; forward residual)",
+    "n_events": 627,
+    "quiet_frac": 0.905698436711824,
+    "by_H": {
+      "3": {
+        "cond_n": 3591,
+        "cond_mean": -0.0019337169877822829,
+        "base_mean": -0.006770312482875789,
+        "edge_mean_pp": 0.004836595495093507,
+        "contemp_mean": -0.19365148004546112
+      },
+      "6": {
+        "cond_n": 3591,
+        "cond_mean": -0.05811146913005877,
+        "base_mean": -0.019007977609431445,
+        "edge_mean_pp": -0.03910349152062732,
+        "contemp_mean": -0.4361383819780451
+      },
+      "12": {
+        "cond_n": 3591,
+        "cond_mean": -0.08226845700718902,
+        "base_mean": -0.042611398710471135,
+        "edge_mean_pp": -0.03965705829671788,
+        "contemp_mean": -0.47497320974043306
+      },
+      "24": {
+        "cond_n": 3590,
+        "cond_mean": -0.22289750954747367,
+        "base_mean": -0.09026310176738489,
+        "edge_mean_pp": -0.13263440778008878,
+        "contemp_mean": -0.6219025192779195
+      }
+    }
+  }
+}

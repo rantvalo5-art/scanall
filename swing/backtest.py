@@ -1229,6 +1229,8 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             late_min          = cfg.g("scoring_breakout", "LATE_ENTRY_MIN", default=0.025)
             late_pen_entry    = cfg.g("scoring_breakout", "LATE_ENTRY_PENALTY", default=-1)
             struct_pen        = cfg.g("scoring_breakout", "STRUCT_PENALTY", default=-1)
+            htf_1d_b          = cfg.g("scoring_breakout", "HTF_1D_BONUS",        default=0)
+            recent_ok_b       = cfg.g("scoring_breakout", "RECENT_LONG_OK_BONUS", default=0)
 
             score = base_score
             bd = {"BASE": base_score}
@@ -1277,6 +1279,10 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             if not tf_4h.get("recent_long_ok", True):
                 score += struct_pen
                 bd["STRUCT"] = struct_pen
+            if htf_1d_b and tf_1d.get("ema_trend_up"):
+                score += htf_1d_b; bd["HTF_1D"] = htf_1d_b
+            if recent_ok_b and tf_4h.get("recent_long_ok"):
+                score += recent_ok_b; bd["RECENT_LONG_OK"] = recent_ok_b
 
             # LATE_REPEAT_PENALTY (mismo comportamiento que screener.py)
             late_repeat_pen = cfg.g("scoring_breakout", "LATE_REPEAT_PENALTY", default=-1)
@@ -1433,6 +1439,8 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             momentum_b    = cfg.g("scoring_hold", "STRONG_MOMENTUM_BONUS", default=0)
             momentum_obv  = cfg.g("scoring_hold", "STRONG_MOMENTUM_OBV_MIN", default=0.2)
             momentum_dist = cfg.g("scoring_hold", "STRONG_MOMENTUM_DIST_MIN", default=0.05)
+            htf_1d_b      = cfg.g("scoring_hold", "HTF_1D_BONUS",        default=0)
+            recent_ok_b   = cfg.g("scoring_hold", "RECENT_LONG_OK_BONUS", default=0)
 
             score = base + above_b + pullback_b + close_b
             bd = {"BASE": base, "ABOVE_RESIST": above_b, "PULLBACK": pullback_b, "STRONG_CLOSE": close_b}
@@ -1457,6 +1465,10 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 score += momentum_b
                 if momentum_b:
                     bd["MOMENTUM"] = momentum_b
+            if htf_1d_b and tf_1d.get("ema_trend_up"):
+                score += htf_1d_b; bd["HTF_1D"] = htf_1d_b
+            if recent_ok_b and tf_4h.get("recent_long_ok"):
+                score += recent_ok_b; bd["RECENT_LONG_OK"] = recent_ok_b
 
             # LATE_REPEAT_PENALTY (mismo comportamiento que screener.py)
             late_repeat_pen = cfg.g("scoring_hold", "LATE_REPEAT_PENALTY", default=-1)
@@ -1633,6 +1645,24 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 if "breakdown" in c:
                     c["breakdown"]["ATR1D_GATE"] = f">{coil_atr_gate_min}@{_atr1d_v:.2f}"
 
+    # ── Filtro ATR para HOLD y BREAKOUT: demote BEST→STRONG si atr_pct_1d < umbral ─
+    # Inverso al gate de PREBREAK/COILING: en vez de promover scores bajos con ATR alto,
+    # filtra BEST con ATR bajo (símbolo poco volátil → late entry probable).
+    hold_atr_req = cfg.g("scoring_hold",     "ATR1D_BEST_MIN", default=0.0)
+    brk_atr_req  = cfg.g("scoring_breakout", "ATR1D_BEST_MIN", default=0.0)
+    if hold_atr_req > 0 or brk_atr_req > 0:
+        for c in candidates:
+            if c["bucket"] != "BEST":
+                continue
+            if c["history_tf"] == "HOLD" and hold_atr_req > 0 and _atr1d_v < hold_atr_req:
+                c["bucket"] = "STRONG"
+                if "breakdown" in c:
+                    c["breakdown"]["ATR1D_FILTER"] = f"<{hold_atr_req}@{_atr1d_v:.2f}"
+            elif c["history_tf"] == "BREAKOUT" and brk_atr_req > 0 and _atr1d_v < brk_atr_req:
+                c["bucket"] = "STRONG"
+                if "breakdown" in c:
+                    c["breakdown"]["ATR1D_FILTER"] = f"<{brk_atr_req}@{_atr1d_v:.2f}"
+
     candidates.sort(
         key=lambda x: (_normalize_score(x["score"], x["history_tf"], _cal_cfg, SCORE_CAP), x["priority"], x["score"]),
         reverse=True,
@@ -1696,6 +1726,48 @@ def calculate_outcomes(df_4h, alert_idx, alert_price):
 
 
 
+def _process_symbol_scans(sym, sym_tasks, sym_by_tf, sym_klines, sym_prepared, params, cfg):
+    """Worker (nivel módulo → picklable por loky): procesa TODOS los scans de UN símbolo
+    llevando solo SUS datos. sym_tasks = [(pos, i, ts_ms), ...]; `pos` global preserva el
+    orden original del scan al re-mergear. Retorna [(pos, i, ts_ms, sym, tf_data, idx_4h)]."""
+    out = []
+    idx4h = sym_by_tf.get("4h")
+    for (pos, i, ts_ms) in sym_tasks:
+        tf_data = {}
+        valid = True
+        for tf in ("1h", "4h", "1d"):
+            idxs = sym_by_tf.get(tf)
+            if idxs is None:
+                valid = False
+                break
+            idx = int(idxs[i])
+            if idx < 80:
+                valid = False
+                break
+            prep_df = (sym_prepared or {}).get(tf)
+            df = prep_df if prep_df is not None else (sym_klines or {}).get(tf)
+            result = analyze_at_index(df, idx, params) if prep_df is not None \
+                     else analyze_at_time(df, idx, cfg)
+            if result is None:
+                valid = False
+                break
+            tf_data[tf] = result
+        if not valid:
+            continue
+        # 1w opcional para filtro de tendencia (fail-safe si falta o índice insuficiente)
+        _idxs_1w = sym_by_tf.get("1w")
+        if _idxs_1w is not None:
+            _idx_1w = int(_idxs_1w[i])
+            if _idx_1w >= 12:  # 1w: umbral bajo (12 semanas ≈ 90d buffer)
+                _df_1w = (sym_klines or {}).get("1w")
+                if _df_1w is not None:
+                    _r_1w = analyze_at_time(_df_1w, _idx_1w, cfg)
+                    if _r_1w is not None:
+                        tf_data["1w"] = _r_1w
+        out.append((pos, i, ts_ms, sym, tf_data, int(idx4h[i])))
+    return out
+
+
 def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivatives):
     """Primer pase del scan: construye la lista de candidatos (sym, ts, tf_data, idx_4h)
     que pasan validación de datos. Variant-independiente para cfgs con el mismo _analyze_key.
@@ -1737,63 +1809,37 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
             return list(klines.keys())
         return [s for s in snapshot_pairs[best] if s in klines]
 
-    # ── Función pura que procesa UN símbolo en UN scan ──
-    def _process_symbol(i, ts_ms, sym):
-        """Procesa un símbolo en un scan. Retorna candidato o None."""
-        by_tf = bar_idx_cache.get(sym, {})
-        tf_data = {}
-        valid = True
-        for tf in ("1h", "4h", "1d"):
-            idxs = by_tf.get(tf)
-            if idxs is None:
-                valid = False
-                break
-            idx = int(idxs[i])
-            if idx < 80:
-                valid = False
-                break
-            sym_prep = (prepared.get(sym) or {}) if prepared else {}
-            prep_df = sym_prep.get(tf)
-            df = prep_df if prep_df is not None else klines.get(sym, {}).get(tf)
-            result = analyze_at_index(df, idx, params) if prep_df is not None \
-                     else analyze_at_time(df, idx, cfg)
-            if result is None:
-                valid = False
-                break
-            tf_data[tf] = result
-        if not valid:
-            return None
-        # 1w opcional para filtro de tendencia (fail-safe si falta o índice insuficiente)
-        _idxs_1w = by_tf.get("1w")
-        if _idxs_1w is not None:
-            _idx_1w = int(_idxs_1w[i])
-            if _idx_1w >= 12:  # 1w: umbral bajo (12 semanas ≈ 90d buffer)
-                _df_1w = klines.get(sym, {}).get("1w")
-                if _df_1w is not None:
-                    _r_1w = analyze_at_time(_df_1w, _idx_1w, cfg)
-                    if _r_1w is not None:
-                        tf_data["1w"] = _r_1w
-        idx_4h = int(by_tf["4h"][i])
-        return (i, ts_ms, sym, tf_data, idx_4h)
-
-    # ── Lista plana de tareas: un Parallel para todas las combinaciones scan×símbolo ──
-    # Evita crear/destruir el thread pool 1344 veces (overhead ~100ms cada una).
-    all_tasks = []
+    # ── Tareas agrupadas POR SÍMBOLO ──
+    # Antes: una tarea por (símbolo, scan) con prefer="threads" → el GIL serializaba
+    # analyze_at_* (Python/pandas puro) → ~1 core efectivo. Ahora: una tarea por símbolo
+    # (procesa todos sus scans) llevando solo SUS datos → poco pickle → procesos reales
+    # (backend loky) con paralelismo de verdad. El `pos` global preserva el orden original.
+    from collections import defaultdict
+    tasks_by_sym = defaultdict(list)
+    pos = 0
     for i, ts_ms in enumerate(scan_ts):
         for sym in pairs_for_scan(ts_ms):
-            all_tasks.append((i, ts_ms, sym))
+            tasks_by_sym[sym].append((pos, i, ts_ms))
+            pos += 1
 
-    total_tasks = len(all_tasks)
     total_scans = len(scan_ts)
-    print(f"    [analyze] {total_scans} scans × ~{len(klines)} pares = {total_tasks} tareas")
+    print(f"    [analyze] {total_scans} scans × ~{len(klines)} pares = {pos} tareas "
+          f"({len(tasks_by_sym)} símbolos, procesos loky)")
 
-    raw = Parallel(n_jobs=-1, prefer="threads")(
-        delayed(_process_symbol)(i, ts_ms, sym)
-        for i, ts_ms, sym in all_tasks
+    raw_lists = Parallel(n_jobs=-1)(  # backend loky (procesos): paralelismo real, sin GIL
+        delayed(_process_symbol_scans)(
+            sym, sym_tasks, bar_idx_cache.get(sym, {}),
+            klines.get(sym), (prepared.get(sym) if prepared else None),
+            params, cfg)
+        for sym, sym_tasks in tasks_by_sym.items()
     )
 
-    # joblib preserva el orden de los inputs → all_tasks ya está ordenado por scan index
-    all_candidates = [cand for cand in raw if cand is not None]
+    # Re-mergear y ordenar por `pos` → orden cronológico IDÉNTICO al original (el classify
+    # pass depende del orden por scan para cooldowns/LATE_REPEAT).
+    flat = [c for lst in raw_lists for c in lst]
+    flat.sort(key=lambda c: c[0])
+    all_candidates = [(i, ts_ms, sym, tf_data, idx_4h)
+                      for (_pos, i, ts_ms, sym, tf_data, idx_4h) in flat]
     print(f"    [analyze] {len(all_candidates)} candidatos encontrados")
     return all_candidates
 
