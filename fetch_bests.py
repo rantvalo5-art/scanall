@@ -31,7 +31,7 @@ all_rows = []
 offset = 0
 while True:
     r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/screener_outcomes",
+        f"{SUPABASE_URL}/rest/v1/daytrader_outcomes",
         headers={**headers, "Range": f"{offset}-{offset+999}"},
         params={
             "select": "*",

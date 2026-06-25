@@ -1,10 +1,16 @@
 """
-Job separado de tracking de outcomes.
+Job separado de tracking de outcomes — FORK del SWING.
+
+Copia de ../update_outcomes.py pero apunta a `screener_outcomes` (tabla del
+swinger) y usa swing/config.json (retención propia, 90d). El day trader raíz usa
+daytrader_outcomes y su propio filler; por eso swing NO comparte el del root
+(antes lo hacía y mezclaba tabla + config — ver swing/CLAUDE.md).
+
 Lee filas de screener_outcomes con outcomes incompletos y completa los precios
 a 15min, 1h, 4h, 24h post-alerta + máximos/mínimos en esas ventanas.
 
 Diseño:
-- Corre en su propio workflow cada N minutos (ver outcomes.yml).
+- Corre desde swing.yml (paso "Fill outcomes") tras el scan del swing.
 - Una alerta se considera "completa" cuando ya pasaron 24h desde alerted_at.
 - Actualizamos todos los checkpoints que ya vencieron en cada run.
 - Procesamos en batches para no saturar Binance ni Supabase.
@@ -60,7 +66,7 @@ def fetch_pending_outcomes():
     parcialmente bloquee la cola hasta que cumpla 24h."""
     try:
         r = requests.get(
-            f"{SUPABASE_URL}/rest/v1/daytrader_outcomes",
+            f"{SUPABASE_URL}/rest/v1/screener_outcomes",
             headers={**_sb_headers(), "Prefer": ""},
             params={
                 "select": "id,alerted_at,symbol,entry_price,price_15m,price_1h,price_4h,price_24h,outcomes_complete",
@@ -203,7 +209,7 @@ def patch_outcome(row_id, update):
     """PATCH a Supabase para una sola fila."""
     try:
         r = requests.patch(
-            f"{SUPABASE_URL}/rest/v1/daytrader_outcomes",
+            f"{SUPABASE_URL}/rest/v1/screener_outcomes",
             headers=_sb_headers(),
             params={"id": f"eq.{row_id}"},
             json=update,
@@ -219,7 +225,7 @@ def purge_old():
     purge_before = (datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)).isoformat()
     try:
         r = requests.delete(
-            f"{SUPABASE_URL}/rest/v1/daytrader_outcomes",
+            f"{SUPABASE_URL}/rest/v1/screener_outcomes",
             headers=_sb_headers(),
             params={"alerted_at": f"lt.{purge_before}"},
             timeout=15,

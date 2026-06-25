@@ -34,7 +34,9 @@ jobs:
           # pip install --quiet joblib mplfinance
           python -u swing/screener.py
       # Rellena precios futuros (15m/1h/4h/24h) de las alertas guardadas y purga
-      # filas >RETENTION_DAYS. Tabla screener_outcomes compartida; agnóstico al TF.
+      # filas >RETENTION_DAYS. Usa swing/update_outcomes.py (filler PROPIO del swing →
+      # tabla screener_outcomes, retención de swing/config.json). NO el del root: ese
+      # apunta a daytrader_outcomes desde la separación de tablas.
       # continue-on-error: un fallo del filler no debe marcar fallido el scan ya hecho.
       - name: Fill outcomes
         continue-on-error: true
@@ -43,4 +45,4 @@ jobs:
           PYTHONIOENCODING: "utf-8"
         run: |
           #source ~/scanall/venv/bin/activate
-          python -u update_outcomes.py
+          python -u swing/update_outcomes.py

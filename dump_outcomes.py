@@ -24,7 +24,7 @@ page_size = 1000
 
 while True:
     r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/screener_outcomes",
+        f"{SUPABASE_URL}/rest/v1/daytrader_outcomes",
         headers={**headers, "Range": f"{offset}-{offset + page_size - 1}"},
         params={"select": "*", "order": "alerted_at.desc"},
         timeout=30,

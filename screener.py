@@ -242,7 +242,7 @@ def fetch_history():
     since = (datetime.now(timezone.utc) - timedelta(hours=HISTORY_HOURS)).isoformat()
     try:
         r = requests.get(
-            f"{SUPABASE_URL}/rest/v1/screener_history",
+            f"{SUPABASE_URL}/rest/v1/daytrader_history",
             headers={**_sb_headers(), "Prefer": ""},
             params={"select": "symbol,timeframe,alerted_at", "alerted_at": f"gte.{since}"},
             timeout=10,
@@ -270,10 +270,10 @@ def insert_history(alert_rows):
     if not rows:
         return
     try:
-        r = requests.post(f"{SUPABASE_URL}/rest/v1/screener_history", headers=_sb_headers(), json=rows, timeout=10)
+        r = requests.post(f"{SUPABASE_URL}/rest/v1/daytrader_history", headers=_sb_headers(), json=rows, timeout=10)
         r.raise_for_status()
         SESSION.delete(
-            f"{SUPABASE_URL}/rest/v1/screener_history",
+            f"{SUPABASE_URL}/rest/v1/daytrader_history",
             headers=_sb_headers(),
             params={"alerted_at": f"lt.{since}"},
             timeout=10,
@@ -351,7 +351,7 @@ def insert_outcomes(alerts):
         })
     try:
         r = requests.post(
-            f"{SUPABASE_URL}/rest/v1/screener_outcomes",
+            f"{SUPABASE_URL}/rest/v1/daytrader_outcomes",
             headers=_sb_headers(),
             json=rows,
             timeout=10,
