@@ -60,7 +60,7 @@ def fetch_pending_outcomes():
     parcialmente bloquee la cola hasta que cumpla 24h."""
     try:
         r = requests.get(
-            f"{SUPABASE_URL}/rest/v1/screener_outcomes",
+            f"{SUPABASE_URL}/rest/v1/daytrader_outcomes",
             headers={**_sb_headers(), "Prefer": ""},
             params={
                 "select": "id,alerted_at,symbol,entry_price,price_15m,price_1h,price_4h,price_24h,outcomes_complete",
@@ -203,7 +203,7 @@ def patch_outcome(row_id, update):
     """PATCH a Supabase para una sola fila."""
     try:
         r = requests.patch(
-            f"{SUPABASE_URL}/rest/v1/screener_outcomes",
+            f"{SUPABASE_URL}/rest/v1/daytrader_outcomes",
             headers=_sb_headers(),
             params={"id": f"eq.{row_id}"},
             json=update,
@@ -219,7 +219,7 @@ def purge_old():
     purge_before = (datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)).isoformat()
     try:
         r = requests.delete(
-            f"{SUPABASE_URL}/rest/v1/screener_outcomes",
+            f"{SUPABASE_URL}/rest/v1/daytrader_outcomes",
             headers=_sb_headers(),
             params={"alerted_at": f"lt.{purge_before}"},
             timeout=15,
