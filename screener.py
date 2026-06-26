@@ -272,7 +272,7 @@ def insert_history(alert_rows):
     try:
         r = requests.post(f"{SUPABASE_URL}/rest/v1/daytrader_history", headers=_sb_headers(), json=rows, timeout=10)
         r.raise_for_status()
-        SESSION.delete(
+        r2 = SESSION.delete(
             f"{SUPABASE_URL}/rest/v1/daytrader_history",
             headers=_sb_headers(),
             params={"alerted_at": f"lt.{since}"},
