@@ -25,8 +25,9 @@ jobs:
         run: pip install requests pandas==2.2.3 ta mplfinance
       - name: Run screener
         env:
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # Day trader usa su propio bot (@Deitraderbot), separado del swing.
+          TELEGRAM_TOKEN: ${{ secrets.DAY_TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.DAY_TELEGRAM_CHAT_ID }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         run: |
           #source ~/scanall/venv/bin/activate
