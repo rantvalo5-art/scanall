@@ -138,7 +138,7 @@
     "IMMEDIATE_MIN_SCORE_FORMING": 9,
     "BEST_MIN_SCORE_PER_SIGNAL": {
       "RIDING": 8,
-      "EXPLOSION": 11
+      "EXPLOSION": 12
     }
   },
   "scoring_prebreak": {
