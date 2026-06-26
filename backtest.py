@@ -41,8 +41,8 @@ import ta
 # 15-120min hacen que la cadencia efectiva ronde 7-15min. 15 es buen balance entre
 # fidelidad a producción y runtime del backtest. Override por CLI con --scan-interval-min.
 SCAN_INTERVAL_MIN = 15
-OUTCOME_OFFSETS_MIN = [15, 60, 240, 1440]
-OUTCOME_NAMES = ["price_15m", "price_1h", "price_4h", "price_24h"]
+OUTCOME_OFFSETS_MIN = [15, 60, 240, 480, 1440]
+OUTCOME_NAMES = ["price_15m", "price_1h", "price_4h", "price_8h", "price_24h"]
 MAX_DOWNLOAD_WORKERS = 20
 MAX_PAIRS = 200
 
@@ -1927,27 +1927,20 @@ def calculate_outcomes(df_15m, alert_idx, alert_price):
         else:
             outcomes[name] = None
 
-    end_4h = alert_ts + 240 * 60 * 1000
-    end_24h = alert_ts + 1440 * 60 * 1000
-    end_4h_idx = find_idx_at_or_before(df_15m, end_4h)
-    end_24h_idx = find_idx_at_or_before(df_15m, end_24h)
-    max_high_4h = min_low_4h = max_high_24h = min_low_24h = None
-    if end_4h_idx > alert_idx:
-        w = df_15m.iloc[alert_idx + 1:end_4h_idx + 1]
-        if len(w) > 0:
-            max_high_4h = float(w["high"].max())
-            min_low_4h = float(w["low"].min())
-    if end_24h_idx > alert_idx:
-        w = df_15m.iloc[alert_idx + 1:end_24h_idx + 1]
-        if len(w) > 0:
-            max_high_24h = float(w["high"].max())
-            min_low_24h = float(w["low"].min())
-    outcomes["max_high_4h"] = max_high_4h
-    outcomes["min_low_4h"] = min_low_4h
-    outcomes["max_high_24h"] = max_high_24h
-    outcomes["min_low_24h"] = min_low_24h
+    # Excursión máxima favorable/adversa (MFE/MAE) en ventanas intradía + 24h. Para un day
+    # trader importan las cortas (1h/4h/8h): mejor salida disponible y riesgo de drawdown.
+    for win_min, tag in ((60, "1h"), (240, "4h"), (480, "8h"), (1440, "24h")):
+        end_idx = find_idx_at_or_before(df_15m, alert_ts + win_min * 60 * 1000)
+        mx = mn = None
+        if end_idx > alert_idx:
+            w = df_15m.iloc[alert_idx + 1:end_idx + 1]
+            if len(w) > 0:
+                mx = float(w["high"].max())
+                mn = float(w["low"].min())
+        outcomes[f"max_high_{tag}"] = mx
+        outcomes[f"min_low_{tag}"] = mn
     outcomes["entry_price"] = alert_price
-    outcomes["complete"] = max_high_24h is not None
+    outcomes["complete"] = outcomes.get("max_high_24h") is not None
     return outcomes
 
 
