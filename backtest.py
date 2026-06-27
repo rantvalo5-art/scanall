@@ -55,6 +55,7 @@ BINANCE_FAPI_URL = "https://fapi.binance.com"
 _I_CACHE = Path(r"I:\.backtest_cache")
 CACHE_DIR = _I_CACHE if _I_CACHE.parent.exists() else Path(__file__).resolve().parent / ".backtest_cache"
 _NO_CACHE = False  # override con --no-cache en CLI
+_N_JOBS = 8  # procesos loky (override con --workers; -1 = todos los cores)
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ecgdswroygkfckkaguxp.supabase.co")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
@@ -2346,7 +2347,7 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
 
     # Paraleliza por SÍMBOLO con procesos (loky) → escala a todos los cores sin GIL.
     syms = [s for s in klines if sym_active.get(s)]
-    raw = Parallel(n_jobs=-1, backend="loky")(
+    raw = Parallel(n_jobs=_N_JOBS, backend="loky")(
         delayed(_extract_symbol_worker)(
             sym, bar_idx_cache.get(sym, {}),
             prepared.get(sym) if prepared else None,
@@ -2469,7 +2470,7 @@ def _simulate_parallel(klines, prepared, cfg, scan_ts, snapshot_pairs, derivativ
     total_tasks = sum(len(v) for v in sym_active.values())
     print(f"    [analyze] {len(scan_ts)} scans × ~{len(klines)} pares = {total_tasks} tareas (fusionado)")
     syms = [s for s in klines if sym_active.get(s)]
-    raw = Parallel(n_jobs=-1, backend="loky")(
+    raw = Parallel(n_jobs=_N_JOBS, backend="loky")(
         delayed(_simulate_symbol_worker)(
             sym, bar_idx_cache.get(sym, {}),
             prepared.get(sym) if prepared else None,
@@ -2867,9 +2868,10 @@ def main():
                              f"production cron usa 5min)")
     parser.add_argument("--no-cache", action="store_true",
                         help="Ignora y no escribe caché de disco de klines/derivatives")
-    parser.add_argument("--workers", type=int, default=1,
-                        help="Procesos paralelos para candidate building (default 1; "
-                             "no usar cuando sweep.py ya paraleliza ventanas)")
+    parser.add_argument("--workers", type=int, default=8,
+                        help="Cores/procesos loky para la simulación por símbolo (default 8; "
+                             "-1 = todos los cores). Bajar si la máquina queda inusable; "
+                             "poner 1 cuando sweep.py ya paraleliza ventanas (evita oversubscription).")
     parser.add_argument("--results-dir", default=None,
                         help="Directorio para resultados incrementales por-config (usado por sweep.py). "
                              "Cada variante se escribe al terminar y se salta si ya existe.")
@@ -2905,6 +2907,10 @@ def main():
     _NO_CACHE = args.no_cache
     if _NO_CACHE:
         print("  [cache] Desactivado por --no-cache")
+
+    global _N_JOBS
+    _N_JOBS = args.workers
+    print(f"  [cores] loky n_jobs={_N_JOBS}" + (" (todos)" if _N_JOBS == -1 else ""))
 
     results_dir = None
     if args.results_dir:
