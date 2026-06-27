@@ -559,6 +559,8 @@ def analyze_at_time(df_full, end_idx, cfg):
     price = close.iloc[-1]
     # Cambio % de la vela actual vs la anterior (feature usada por EXPLOSION).
     close_change_curr = safe_pct(price, close.iloc[-2]) if len(close) >= 2 else 0.0
+    # Momentum 12 barras (roc12): mover-predictor ortogonal usado por scoring_momentum.
+    roc12 = safe_pct(price, close.iloc[-13]) if len(close) >= 13 else 0.0
 
     ema_slow = ta.trend.EMAIndicator(close, window=EMA_SLOW).ema_indicator()
     ema_trend_up = price > ema_slow.iloc[-1] and ema_slow.iloc[-1] > ema_slow.iloc[-4]
@@ -735,6 +737,7 @@ def analyze_at_time(df_full, end_idx, cfg):
         "strong_close": strong_close,
         "candle_body_pct": candle_body_pct,
         "close_change_curr": close_change_curr,
+        "roc12": roc12,
         "recent_max": recent_max,
         "near_recent_max": near_recent_max,
         "breakout": breakout,
@@ -978,6 +981,8 @@ def analyze_at_index(df, end_idx, params):
     price = float(arr["close"][end_idx])
     # Cambio % de la vela actual vs la anterior (feature usada por EXPLOSION).
     close_change_curr = (price / float(arr["close"][end_idx - 1]) - 1) if end_idx >= 1 and float(arr["close"][end_idx - 1]) > 0 else 0.0
+    # Momentum 12 barras (roc12): mover-predictor ortogonal usado por scoring_momentum.
+    roc12 = (price / float(arr["close"][end_idx - 12]) - 1) if end_idx >= 12 and float(arr["close"][end_idx - 12]) > 0 else 0.0
 
     # EMA
     ema_val = arr["_ema_slow"][end_idx]
@@ -1167,6 +1172,7 @@ def analyze_at_index(df, end_idx, params):
         "strong_close": strong_close,
         "candle_body_pct": candle_body_pct,
         "close_change_curr": close_change_curr,
+        "roc12": roc12,
         "recent_max": recent_max,
         "near_recent_max": near_recent_max,
         "breakout": breakout,
@@ -1878,6 +1884,28 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             c["bucket"] = final_bucket(c["score"], c["history_tf"], cfg)
             if "breakdown" in c:
                 c["breakdown"]["EMA_SOFT"] = _ema_pen
+
+    # Bonus de MOMENTUM (roc12 = close/close[-12]-1 en la TF de la señal). Único
+    # feature de entrada ORTOGONAL que rankea movers (ver memoria roc12-momentum-lead).
+    # Alfa de buen tiempo: mejora precisión en trending, ~neutral en tape muerto.
+    _mom = cfg.raw.get("scoring_momentum") or {}
+    if _mom.get("ENABLED"):
+        _mom_sigs = set(_mom.get("SIGNALS", []))
+        _hi_min = _mom.get("ROC_HIGH_MIN", 0.085); _hi_b = _mom.get("ROC_HIGH_BONUS", 0)
+        _mid_min = _mom.get("ROC_MID_MIN", 0.04);  _mid_b = _mom.get("ROC_MID_BONUS", 0)
+        _lo_pen = _mom.get("ROC_LOW_PENALTY", 0)
+        for c in candidates:
+            if c.get("history_tf") not in _mom_sigs:
+                continue
+            _r = (tf_data.get(c["timeframe"]) or {}).get("roc12")
+            if _r is None:
+                continue
+            _b = _hi_b if _r >= _hi_min else (_mid_b if _r >= _mid_min else _lo_pen)
+            if _b:
+                c["score"] = max(0, c["score"] + _b)
+                c["bucket"] = final_bucket(c["score"], c["history_tf"], cfg)
+                if "breakdown" in c:
+                    c["breakdown"]["MOMENTUM"] = _b
 
     # Final cap loop (mismo screener.py). Redundante porque cada bloque ya
     # aplicó min(score, SCORE_CAP), pero se mantiene para que la simulación sea espejo.
