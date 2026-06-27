@@ -41,8 +41,8 @@ import ta
 # 15-120min hacen que la cadencia efectiva ronde 7-15min. 15 es buen balance entre
 # fidelidad a producción y runtime del backtest. Override por CLI con --scan-interval-min.
 SCAN_INTERVAL_MIN = 15
-OUTCOME_OFFSETS_MIN = [15, 60, 240, 1440]
-OUTCOME_NAMES = ["price_15m", "price_1h", "price_4h", "price_24h"]
+OUTCOME_OFFSETS_MIN = [15, 60, 240, 480, 1440]
+OUTCOME_NAMES = ["price_15m", "price_1h", "price_4h", "price_8h", "price_24h"]
 MAX_DOWNLOAD_WORKERS = 20
 MAX_PAIRS = 200
 
@@ -50,7 +50,10 @@ BINANCE_DATA_URL = "https://data-api.binance.vision/api/v3"
 BINANCE_FALLBACK_URL = "https://api.binance.com/api/v3"
 BINANCE_FAPI_URL = "https://fapi.binance.com"
 
-CACHE_DIR = Path(r"I:\.backtest_cache")
+# Cache de klines. Preferimos I:\ (máquina principal); si ese disco no existe, caemos al
+# .backtest_cache del proyecto. Override explícito con --cache-dir.
+_I_CACHE = Path(r"I:\.backtest_cache")
+CACHE_DIR = _I_CACHE if _I_CACHE.parent.exists() else Path(__file__).resolve().parent / ".backtest_cache"
 _NO_CACHE = False  # override con --no-cache en CLI
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://ecgdswroygkfckkaguxp.supabase.co")
@@ -1924,27 +1927,20 @@ def calculate_outcomes(df_15m, alert_idx, alert_price):
         else:
             outcomes[name] = None
 
-    end_4h = alert_ts + 240 * 60 * 1000
-    end_24h = alert_ts + 1440 * 60 * 1000
-    end_4h_idx = find_idx_at_or_before(df_15m, end_4h)
-    end_24h_idx = find_idx_at_or_before(df_15m, end_24h)
-    max_high_4h = min_low_4h = max_high_24h = min_low_24h = None
-    if end_4h_idx > alert_idx:
-        w = df_15m.iloc[alert_idx + 1:end_4h_idx + 1]
-        if len(w) > 0:
-            max_high_4h = float(w["high"].max())
-            min_low_4h = float(w["low"].min())
-    if end_24h_idx > alert_idx:
-        w = df_15m.iloc[alert_idx + 1:end_24h_idx + 1]
-        if len(w) > 0:
-            max_high_24h = float(w["high"].max())
-            min_low_24h = float(w["low"].min())
-    outcomes["max_high_4h"] = max_high_4h
-    outcomes["min_low_4h"] = min_low_4h
-    outcomes["max_high_24h"] = max_high_24h
-    outcomes["min_low_24h"] = min_low_24h
+    # Excursión máxima favorable/adversa (MFE/MAE) en ventanas intradía + 24h. Para un day
+    # trader importan las cortas (1h/4h/8h): mejor salida disponible y riesgo de drawdown.
+    for win_min, tag in ((60, "1h"), (240, "4h"), (480, "8h"), (1440, "24h")):
+        end_idx = find_idx_at_or_before(df_15m, alert_ts + win_min * 60 * 1000)
+        mx = mn = None
+        if end_idx > alert_idx:
+            w = df_15m.iloc[alert_idx + 1:end_idx + 1]
+            if len(w) > 0:
+                mx = float(w["high"].max())
+                mn = float(w["low"].min())
+        outcomes[f"max_high_{tag}"] = mx
+        outcomes[f"min_low_{tag}"] = mn
     outcomes["entry_price"] = alert_price
-    outcomes["complete"] = max_high_24h is not None
+    outcomes["complete"] = outcomes.get("max_high_24h") is not None
     return outcomes
 
 
@@ -2232,13 +2228,64 @@ def _print_forming_lateness_summary(results, scan_minutes):
     _quality_table(forming_with_data, "quality_forming", "max_gain_24h_forming", "drawdown_24h_forming", "FORMING (alertas que habrían disparado en forming)")
 
 
-def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivatives):
-    """Primer pase del scan: construye la lista de candidatos (sym, ts, tf_data, idx_15m)
-    que pasan validación de datos. Variant-independiente para cfgs con el mismo _analyze_key.
-    Cada elemento: (scan_i, ts_ms, sym, tf_data, idx_15m)."""
+def _extract_symbol_worker(sym, by_tf, sym_prepared, sym_klines, sym_deriv,
+                           scan_ts, active_idxs, params, cfg,
+                           deriv_enabled, deriv_lookback):
+    """Worker paralelizable por símbolo: extrae los candidatos de UN símbolo en todos
+    sus scans activos. Equivale a iterar el viejo _process_symbol(i, ts, sym) para cada
+    i en active_idxs. Módulo-nivel (no closure) para que loky pueda pickearlo en Windows."""
+    sym_prepared = sym_prepared or {}
+    sym_klines = sym_klines or {}
+    out = []
+    for i in active_idxs:
+        tf_data = {}
+        valid = True
+        for tf in ("5m", "15m", "1h"):
+            idxs = by_tf.get(tf)
+            if idxs is None:
+                valid = False
+                break
+            idx = int(idxs[i])
+            if idx < 80:
+                valid = False
+                break
+            prep_df = sym_prepared.get(tf)
+            df = prep_df if prep_df is not None else sym_klines.get(tf)
+            result = analyze_at_index(df, idx, params) if prep_df is not None \
+                     else analyze_at_time(df, idx, cfg)
+            if result is None:
+                valid = False
+                break
+            tf_data[tf] = result
+        if not valid:
+            continue
+        ts_ms = scan_ts[i]
+        # 4h opcional para filtro de tendencia (fail-safe si falta o índice insuficiente)
+        _idxs_4h = by_tf.get("4h")
+        if _idxs_4h is not None:
+            _idx4 = int(_idxs_4h[i])
+            if _idx4 >= 80:
+                _df4 = sym_klines.get("4h")
+                if _df4 is not None:
+                    _r4 = analyze_at_time(_df4, _idx4, cfg)
+                    if _r4 is not None:
+                        tf_data["4h"] = _r4
+        if deriv_enabled:
+            oi_delta, funding_rate = lookup_derivatives_at(
+                sym_deriv, ts_ms, oi_lookback_min=deriv_lookback)
+            tf_data["15m"]["oi_delta_30m"] = oi_delta
+            tf_data["15m"]["funding_rate"] = funding_rate
+        idx_15m = int(by_tf["15m"][i])
+        out.append((i, ts_ms, sym, tf_data, idx_15m))
+    return out
+
+
+def _prepare_scan_indices(klines, prepared, cfg, scan_ts, snapshot_pairs, derivatives):
+    """Setup compartido entre el camino de dos pases y el fusionado: parámetros de cfg,
+    índices de barra por (sym,TF) (searchsorted vectorizado) e índices de scan activos por
+    símbolo. Devuelve (params, bar_idx_cache, sym_active, deriv_enabled, deriv_lookback)."""
     deriv_enabled = bool(derivatives) and cfg.g("derivatives", "ENABLED", default=False)
     deriv_lookback = cfg.g("derivatives", "OI_LOOKBACK_MIN", default=30)
-
     # Pre-cachear parámetros de cfg una sola vez (evita ~24M cfg.g() en el hot loop)
     params = _build_analyze_params(cfg)
 
@@ -2260,26 +2307,82 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
             by_tf[tf] = idxs
         bar_idx_cache[sym] = by_tf
 
-    snap_runs_sorted = sorted(snapshot_pairs.keys()) if snapshot_pairs else []
+    # Índices de scan activos por símbolo (soporta snapshots variables).
+    if snapshot_pairs:
+        snap_runs_sorted = sorted(snapshot_pairs.keys())
+        def pairs_for_scan(ts_ms):
+            scan_iso = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat()
+            best = None
+            for run_iso in snap_runs_sorted:
+                if run_iso <= scan_iso:
+                    best = run_iso
+                else:
+                    break
+            if best is None:
+                return list(klines.keys())
+            return [s for s in snapshot_pairs[best] if s in klines]
+        sym_active = {}
+        for i, ts_ms in enumerate(scan_ts):
+            for sym in pairs_for_scan(ts_ms):
+                sym_active.setdefault(sym, []).append(i)
+    else:
+        all_i = list(range(len(scan_ts)))
+        sym_active = {sym: all_i for sym in klines}
 
-    def pairs_for_scan(ts_ms):
-        if not snapshot_pairs:
-            return list(klines.keys())
-        scan_iso = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat()
-        best = None
-        for run_iso in snap_runs_sorted:
-            if run_iso <= scan_iso:
-                best = run_iso
-            else:
-                break
-        if best is None:
-            return list(klines.keys())
-        return [s for s in snapshot_pairs[best] if s in klines]
+    return params, bar_idx_cache, sym_active, deriv_enabled, deriv_lookback
 
-    # ── Función pura que procesa UN símbolo en UN scan ──
-    def _process_symbol(i, ts_ms, sym):
-        """Procesa un símbolo en un scan. Retorna candidato o None."""
-        by_tf = bar_idx_cache.get(sym, {})
+
+def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivatives):
+    """Primer pase del scan: construye la lista de candidatos (sym, ts, tf_data, idx_15m)
+    que pasan validación de datos. Variant-independiente para cfgs con el mismo _analyze_key.
+    Usado por el camino de dos pases (--variants/--compare/--audit-scoring, que reutiliza
+    candidatos vía analyze_cache). Cada elemento: (scan_i, ts_ms, sym, tf_data, idx_15m)."""
+    params, bar_idx_cache, sym_active, deriv_enabled, deriv_lookback = \
+        _prepare_scan_indices(klines, prepared, cfg, scan_ts, snapshot_pairs, derivatives)
+
+    total_scans = len(scan_ts)
+    total_tasks = sum(len(v) for v in sym_active.values())
+    print(f"    [analyze] {total_scans} scans × ~{len(klines)} pares = {total_tasks} tareas")
+
+    # Paraleliza por SÍMBOLO con procesos (loky) → escala a todos los cores sin GIL.
+    syms = [s for s in klines if sym_active.get(s)]
+    raw = Parallel(n_jobs=-1, backend="loky")(
+        delayed(_extract_symbol_worker)(
+            sym, bar_idx_cache.get(sym, {}),
+            prepared.get(sym) if prepared else None,
+            klines.get(sym),
+            derivatives.get(sym) if derivatives else None,
+            scan_ts, sym_active[sym], params, cfg,
+            deriv_enabled, deriv_lookback)
+        for sym in syms
+    )
+
+    # Aplanar y reordenar cronológicamente por índice de scan. El orden intra-scan entre
+    # símbolos es irrelevante: classify() sólo lee el propio símbolo en counts_history,
+    # y hay a lo sumo un candidato por (símbolo, scan). sort estable = determinista.
+    all_candidates = [c for sub in raw for c in sub]
+    all_candidates.sort(key=lambda c: c[0])
+    print(f"    [analyze] {len(all_candidates)} candidatos encontrados")
+    return all_candidates
+
+
+def _simulate_symbol_worker(sym, by_tf, sym_prepared, sym_klines, sym_deriv,
+                            scan_ts, active_idxs, params, cfg,
+                            deriv_enabled, deriv_lookback,
+                            cooldown_min_by_state, history_window_ms, audit_mode):
+    """Camino FUSIONADO por símbolo: extrae candidatos + classify + cooldowns + outcomes para
+    UN símbolo en todos sus scans, devolviendo directamente sus alert_records. No materializa
+    los 800k candidatos en el proceso main (clave para no OOMear). Equivale a
+    _extract_symbol_worker seguido del cuerpo de _classify_pass restringido a un símbolo:
+    válido porque classify() sólo lee el propio símbolo en counts_history y los cooldowns son
+    por (sym, history_tf), así que los símbolos son independientes entre sí."""
+    sym_prepared = sym_prepared or {}
+    sym_klines = sym_klines or {}
+    last_alert_ts = {}
+    sim_alert_history = []  # sólo alertas de este símbolo (LATE_REPEAT)
+    alerts = []
+    for i in active_idxs:
+        # ── extracción ──
         tf_data = {}
         valid = True
         for tf in ("5m", "15m", "1h"):
@@ -2291,9 +2394,8 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
             if idx < 80:
                 valid = False
                 break
-            sym_prep = (prepared.get(sym) or {}) if prepared else {}
-            prep_df = sym_prep.get(tf)
-            df = prep_df if prep_df is not None else klines.get(sym, {}).get(tf)
+            prep_df = sym_prepared.get(tf)
+            df = prep_df if prep_df is not None else sym_klines.get(tf)
             result = analyze_at_index(df, idx, params) if prep_df is not None \
                      else analyze_at_time(df, idx, cfg)
             if result is None:
@@ -2301,45 +2403,86 @@ def _build_candidates(klines, prepared, cfg, scan_ts, snapshot_pairs, derivative
                 break
             tf_data[tf] = result
         if not valid:
-            return None
-        # 4h opcional para filtro de tendencia (fail-safe si falta o índice insuficiente)
+            continue
+        ts_ms = scan_ts[i]
         _idxs_4h = by_tf.get("4h")
         if _idxs_4h is not None:
             _idx4 = int(_idxs_4h[i])
             if _idx4 >= 80:
-                _df4 = klines.get(sym, {}).get("4h")
+                _df4 = sym_klines.get("4h")
                 if _df4 is not None:
                     _r4 = analyze_at_time(_df4, _idx4, cfg)
                     if _r4 is not None:
                         tf_data["4h"] = _r4
         if deriv_enabled:
             oi_delta, funding_rate = lookup_derivatives_at(
-                derivatives.get(sym), ts_ms, oi_lookback_min=deriv_lookback)
+                sym_deriv, ts_ms, oi_lookback_min=deriv_lookback)
             tf_data["15m"]["oi_delta_30m"] = oi_delta
             tf_data["15m"]["funding_rate"] = funding_rate
         idx_15m = int(by_tf["15m"][i])
-        return (i, ts_ms, sym, tf_data, idx_15m)
 
-    # ── Lista plana de tareas: un Parallel para todas las combinaciones scan×símbolo ──
-    # Evita crear/destruir el thread pool 1344 veces (overhead ~100ms cada una).
-    all_tasks = []
-    for i, ts_ms in enumerate(scan_ts):
-        for sym in pairs_for_scan(ts_ms):
-            all_tasks.append((i, ts_ms, sym))
+        # ── classify + cooldown + historia simulada (LATE_REPEAT) ──
+        cutoff_ms = ts_ms - history_window_ms
+        if sim_alert_history and sim_alert_history[0][0] < cutoff_ms:
+            sim_alert_history = [h for h in sim_alert_history if h[0] >= cutoff_ms]
+        counts_history = {}
+        for (_, s, h) in sim_alert_history:
+            counts_history[(s, h)] = counts_history.get((s, h), 0) + 1
 
-    total_tasks = len(all_tasks)
-    total_scans = len(scan_ts)
-    print(f"    [analyze] {total_scans} scans × ~{len(klines)} pares = {total_tasks} tareas")
+        alert = classify(sym, tf_data, cfg, counts_history)
+        if alert is None:
+            continue
+        key = (sym, alert["history_tf"])
+        cooldown_ms = cooldown_min_by_state.get(alert["history_tf"], 60) * 60 * 1000
+        if key in last_alert_ts and (ts_ms - last_alert_ts[key]) < cooldown_ms:
+            continue
+        last_alert_ts[key] = ts_ms
+        sim_alert_history.append((ts_ms, sym, alert["history_tf"]))
 
-    raw = Parallel(n_jobs=-1, prefer="threads")(
-        delayed(_process_symbol)(i, ts_ms, sym)
-        for i, ts_ms, sym in all_tasks
+        outcomes = calculate_outcomes(sym_klines["15m"], idx_15m, alert["price"])
+        alert_record = {
+            "alerted_at": datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc).isoformat(),
+            "symbol": sym, "signal_type": alert["history_tf"],
+            "label": alert["label"], "score": alert["score"],
+            "bucket": alert["bucket"], "timeframe": alert["timeframe"],
+            "entry_price": alert["price"], "ref_price": alert["ref_price"],
+            "obv_slope": alert.get("obv_slope"),
+            "cvd_ratio": alert.get("cvd_ratio"),
+            "recent_long_ok": alert.get("recent_long_ok"),
+            "htf_1h_up": alert.get("htf_1h_up"),
+            "htf_4h_up": alert.get("htf_4h_up"),
+            "candle_status": alert.get("candle_status"),
+            **outcomes,
+        }
+        if audit_mode and alert.get("breakdown"):
+            alert_record["breakdown"] = alert["breakdown"]
+        alerts.append(alert_record)
+    return alerts
+
+
+def _simulate_parallel(klines, prepared, cfg, scan_ts, snapshot_pairs, derivatives,
+                       cooldown_min_by_state, history_window_ms, audit_mode):
+    """Camino fusionado paralelo por símbolo (config única, sin reuse de caché de variantes).
+    Escala a todos los cores en TODO el pipeline (extract+classify) y devuelve alert_records."""
+    params, bar_idx_cache, sym_active, deriv_enabled, deriv_lookback = \
+        _prepare_scan_indices(klines, prepared, cfg, scan_ts, snapshot_pairs, derivatives)
+    total_tasks = sum(len(v) for v in sym_active.values())
+    print(f"    [analyze] {len(scan_ts)} scans × ~{len(klines)} pares = {total_tasks} tareas (fusionado)")
+    syms = [s for s in klines if sym_active.get(s)]
+    raw = Parallel(n_jobs=-1, backend="loky")(
+        delayed(_simulate_symbol_worker)(
+            sym, bar_idx_cache.get(sym, {}),
+            prepared.get(sym) if prepared else None,
+            klines.get(sym),
+            derivatives.get(sym) if derivatives else None,
+            scan_ts, sym_active[sym], params, cfg,
+            deriv_enabled, deriv_lookback,
+            cooldown_min_by_state, history_window_ms, audit_mode)
+        for sym in syms
     )
-
-    # joblib preserva el orden de los inputs → all_tasks ya está ordenado por scan index
-    all_candidates = [cand for cand in raw if cand is not None]
-    print(f"    [analyze] {len(all_candidates)} candidatos encontrados")
-    return all_candidates
+    alerts = [a for sub in raw for a in sub]
+    alerts.sort(key=lambda a: (a["alerted_at"], a["symbol"], a.get("label", "")))
+    return alerts
 
 
 def _classify_pass(candidates, cfg, cooldown_min_by_state, history_window_ms,
@@ -2421,6 +2564,17 @@ def simulate(cfg, klines, start_dt, end_dt, snapshot_pairs=None,
         scan_ts.append(int(cur.timestamp() * 1000))
         cur += timedelta(minutes=scan_interval_min)
 
+    # Config única (sin reuse de candidatos/outcomes entre variantes ni audit): camino
+    # fusionado paralelo → escala a todos los cores en extract+classify y no materializa
+    # los candidatos en el proceso main (evita el OOM del run grande).
+    if analyze_cache is None and outcomes_cache is None and not audit_mode:
+        print(f"    [analyze] Extrayendo candidatos ({len(scan_ts)} scans × {len(klines)} pares)...")
+        alerts = _simulate_parallel(klines, prepared, cfg, scan_ts, snapshot_pairs, derivatives,
+                                    cooldown_min_by_state, history_window_ms, audit_mode)
+        print(f"    Total alertas simuladas: {len(alerts)}")
+        return alerts
+
+    # Camino de dos pases (--variants/--compare/--audit-scoring): reutiliza candidatos.
     akey = _analyze_key(cfg)
     if analyze_cache is not None and akey in analyze_cache:
         candidates = analyze_cache[akey]
@@ -2924,11 +3078,13 @@ def main():
                     compare_runs(all_results["full (todo activo)"], "full", alerts, name,
                                  period_days=period_days)
     else:
+        # Config única: no hay reuse entre variantes, así que pasamos caches en None para
+        # habilitar el camino fusionado paralelo (extract+classify por símbolo en todos los cores).
         alerts = run_backtest(cfg_main, args.weeks, klines, start_dt, end_dt,
                               snapshot_pairs, label=f"config: {args.config}",
                               scan_interval_min=args.scan_interval_min,
                               derivatives=derivatives, prepared_cache=prepared_cache,
-                              analyze_cache=analyze_cache, outcomes_cache=outcomes_cache,
+                              analyze_cache=None, outcomes_cache=None,
                               audit_mode=_audit)
         all_results = {"main": alerts}
 
