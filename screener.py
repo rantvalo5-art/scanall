@@ -1092,6 +1092,22 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             if tf5.get("breakout_distance", 0) > ex_late_max:
                 score += ex_late_pen
                 reasons.append(f"⚠ ya extendido {tf5['breakout_distance']:.2%} sobre máximo")
+            # ── Volumen: penalty por climax extremo + bonus por eficiencia ──────
+            # Estudio 30d: el pico de volumen MUY alto marca al pump-and-dump; los
+            # movers limpios se mueven lejos con volumen moderado (eficiencia = move/vol).
+            _ex_vr = tf5.get("vol_ratio", 0) or 0
+            _ex_climax_max = _cfg("scoring_explosion", "VOL_CLIMAX_MAX", default=999.0)
+            _ex_climax_pen = _cfg("scoring_explosion", "VOL_CLIMAX_PENALTY", default=0)
+            if _ex_climax_pen and _ex_vr >= _ex_climax_max:
+                score += _ex_climax_pen
+                reasons.append(f"⚠ climax de volumen {_ex_vr:.1f}x")
+            _ex_eff_bonus = _cfg("scoring_explosion", "EFFICIENCY_BONUS", default=0)
+            _ex_eff_min   = _cfg("scoring_explosion", "EFFICIENCY_MIN", default=999.0)
+            if _ex_eff_bonus and _ex_vr > 0:
+                _ex_eff = (tf5.get("close_change_curr", 0) or 0) * 100.0 / _ex_vr
+                if _ex_eff >= _ex_eff_min:
+                    score += _ex_eff_bonus
+                    reasons.append(f"eficiencia {_ex_eff:.2f}")
             score = max(0, min(score, SCORE_CAP))
             candidates.append({
                 "symbol": symbol,
@@ -1144,6 +1160,20 @@ def classify_symbol(symbol, tf_map, counts_history, last_seen):
             if tf5_forming.get("breakout_distance", 0) > ex_late_max:
                 score += ex_late_pen
                 reasons.append(f"⚠ ya extendido {tf5_forming['breakout_distance']:.2%} sobre máximo")
+            # ── Volumen: penalty por climax extremo + bonus por eficiencia (forming) ──
+            _ex_vr = tf5_forming.get("vol_ratio", 0) or 0
+            _ex_climax_max = _cfg("scoring_explosion", "VOL_CLIMAX_MAX", default=999.0)
+            _ex_climax_pen = _cfg("scoring_explosion", "VOL_CLIMAX_PENALTY", default=0)
+            if _ex_climax_pen and _ex_vr >= _ex_climax_max:
+                score += _ex_climax_pen
+                reasons.append(f"⚠ climax de volumen {_ex_vr:.1f}x")
+            _ex_eff_bonus = _cfg("scoring_explosion", "EFFICIENCY_BONUS", default=0)
+            _ex_eff_min   = _cfg("scoring_explosion", "EFFICIENCY_MIN", default=999.0)
+            if _ex_eff_bonus and _ex_vr > 0:
+                _ex_eff = (tf5_forming.get("close_change_curr", 0) or 0) * 100.0 / _ex_vr
+                if _ex_eff >= _ex_eff_min:
+                    score += _ex_eff_bonus
+                    reasons.append(f"eficiencia {_ex_eff:.2f}")
             score = max(0, min(score, SCORE_CAP))
             candidates.append({
                 "symbol":       symbol,
