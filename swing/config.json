@@ -232,7 +232,7 @@
     ],
     "ARM_PCT": 0.12,
     "TRAIL_PCT": 0.08,
-    "STOP_PCT": 0.0,
+    "STOP_PCT": 0.10,
     "RECENT_HOURS": 6,
     "WINDOW_DAYS": 7,
     "BATCH_SIZE": 300,
