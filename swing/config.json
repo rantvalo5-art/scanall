@@ -117,6 +117,13 @@
       "HOLD": 13
     }
   },
+  "bucket_atr_band": {
+    "_COMMENT": "Rediseño de buckets jul-2026: BEST = banda atr_pct_1d x score alto (densidad de movers 48% WF 7/7, exit-ret 2.4x), STRONG = resto de banda (cobertura exit tracker), WATCH = fuera de banda. Cuando ENABLED pisa los buckets por score y los gates ATR1D_GATE_* per-senal.",
+    "ENABLED": true,
+    "BAND_MIN": 5.0,
+    "BAND_MAX": 15.0,
+    "BEST_MIN_SCORE": 11
+  },
   "scoring_prebreak": {
     "BASE_OFFSET": 4,
     "BASE_MULTIPLIER": 3,

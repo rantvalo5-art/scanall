@@ -1633,6 +1633,32 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 if "breakdown" in c:
                     c["breakdown"]["ATR1D_GATE"] = f">{coil_atr_gate_min}@{_atr1d_v:.2f}"
 
+    # ── Bucket por banda de ATR (rediseño jul-2026, config-driven, default OFF) ──
+    # El score NO predice el cierre (Spearman ≈ −0.06 backtest / −0.14 live) pero
+    # banda-ATR × score alto SÍ concentra movers (MFE≥10%: 48% vs 39% base, WF 7/7),
+    # y con la capa de exit (trail+stop) lo que importa es densidad de pop, no cierre.
+    # Regla: BEST = atr_pct_1d ∈ [BAND_MIN, BAND_MAX] y score ≥ BEST_MIN_SCORE;
+    # STRONG = resto de la banda (mantiene cobertura del exit tracker: 99% de movers
+    # per-símbolo en BEST+STRONG); WATCH = fuera de banda (atr<5 casi no mueve,
+    # atr>15 es vol-junk con EV mediana −8.5%). Cuando está ON pisa los buckets de
+    # score y los gates ATR per-señal de arriba (quedan solo para el modo legacy).
+    _band_cfg = cfg.raw.get("bucket_atr_band", {})
+    if _band_cfg.get("ENABLED", False):
+        _band_min  = float(_band_cfg.get("BAND_MIN", 5.0))
+        _band_max  = float(_band_cfg.get("BAND_MAX", 15.0))
+        _band_best = int(_band_cfg.get("BEST_MIN_SCORE", 11))
+        _inband = _band_min <= _atr1d_v <= _band_max
+        for c in candidates:
+            if _inband and c["score"] >= _band_best:
+                c["bucket"] = "BEST"
+            elif _inband:
+                c["bucket"] = "STRONG"
+            else:
+                c["bucket"] = "WATCH"
+            if "breakdown" in c:
+                c["breakdown"]["BUCKET_ATR_BAND"] = (
+                    f"atr1d={_atr1d_v:.2f} {'in' if _inband else 'out'} [{_band_min},{_band_max}]")
+
     candidates.sort(
         key=lambda x: (_normalize_score(x["score"], x["history_tf"], _cal_cfg, SCORE_CAP), x["priority"], x["score"]),
         reverse=True,
