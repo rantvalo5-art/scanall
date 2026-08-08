@@ -120,6 +120,32 @@ CHART_STYLE   = _g("chart", "STYLE", default="nightclouds")
 OUTCOMES_ENABLED = _g("outcomes", "ENABLED", default=False)
 
 _CAL_CFG = CFG.raw.get("scoring_calibration") or {}
+_REGIME_CFG = CFG.raw.get("regime_filter") or {}
+
+
+def market_regime_up():
+    """Estado risk-on/risk-off del mercado para este scan (global, no per-símbolo).
+
+    Espejo en vivo de backtest.MarketRegime: close 1d del símbolo de referencia sobre su
+    SMA. Devuelve None si el filtro está off o si falla el fetch → classify no aplica nada
+    (fail-safe: ante duda no bloqueamos señales).
+    """
+    if not _REGIME_CFG.get("ENABLED", False):
+        return None
+    sym = _REGIME_CFG.get("SYMBOL", "BTCUSDT")
+    bars = int(_REGIME_CFG.get("MA_BARS_1D", 20))
+    try:
+        df = get_klines(sym, "1d")
+    except Exception as e:
+        print(f"  regime: fetch {sym} 1d falló ({e}) → filtro inerte este run")
+        return None
+    # Descartar la vela diaria en formación: el régimen se evalúa sobre la última CERRADA.
+    df = df.iloc[:-1]
+    if len(df) < bars + 1:
+        print(f"  regime: {len(df)} barras 1d < {bars + 1} → filtro inerte este run")
+        return None
+    close = df["close"].astype(float)
+    return bool(close.iloc[-1] > close.rolling(bars).mean().iloc[-1])
 
 
 def _norm(raw_score, signal_type):
@@ -719,6 +745,14 @@ def main():
 
     insert_pairs_snapshot(pairs)
 
+    # Régimen de mercado: se resuelve UNA vez por scan (es global) y se le pasa a classify.
+    regime_up = market_regime_up()
+    if regime_up is not None:
+        print(f"Régimen de mercado ({_REGIME_CFG.get('SYMBOL', 'BTCUSDT')} 1d vs SMA"
+              f"{_REGIME_CFG.get('MA_BARS_1D', 20)}): "
+              f"{'RISK-ON' if regime_up else 'RISK-OFF'} → "
+              f"{'sin ajuste' if regime_up else _REGIME_CFG.get('MODE', 'soft').upper()}")
+
     counts_history, last_seen = fetch_history()
     tasks = [(sym, tf) for sym in pairs for tf in INTERVALS]
     per_symbol = {sym: {} for sym in pairs}
@@ -740,7 +774,8 @@ def main():
                 continue
 
             # classify recibe el dict {tf: features}; requiere 1h/4h/1d (1w opcional, fail-safe).
-            alert = classify(symbol, per_symbol[symbol], CFG, counts_history)
+            alert = classify(symbol, per_symbol[symbol], CFG, counts_history,
+                             regime_up=regime_up)
             processed.add(symbol)
             if not alert:
                 continue

@@ -245,6 +245,43 @@
     "BATCH_SIZE": 300,
     "RETENTION_DAYS": 30
   },
+  "benchmark": {
+    "_COMMENT": "Retorno relativo vs BTC (ago-2026). Solo MEDICION: no altera senales ni buckets. Sin esto el sistema mide en absoluto y no distingue 'la moneda subio' de 'el mercado subio' -> en jul-2026 las alertas rindieron -1.5% a 7d con BTC plano, o sea perdieron contra no hacer nada, y nada en el pipeline lo mostraba. rs_7d = retorno de la alerta - retorno del benchmark en la MISMA ventana.",
+    "ENABLED": true,
+    "SYMBOL": "BTCUSDT",
+    "TRAILING_DAYS": 7
+  },
+  "evaluation": {
+    "_COMMENT": "Metrica de cabecera del backtest (ago-2026). El CATCH RATE (recall sobre los top movers) premia lo que la volatilidad regala: medido sobre 14.813 obs del universo USDT, reglas de ATR/ancho de rango triplican P(+30%) pero suben P(-30%) igual o mas (ratio 0.59-1.05 vs 1.50 del universo). Y el score del swing sube P(+30%) de 2.0% a 4.9% con el ratio clavado en ~1.8 = el que el universo ya da gratis -> mide volatilidad, no direccion. Lo unico que califica como ventaja es subir el RATIO sube/baja por encima del universo (lift > 1) y la MEDIANA del exceso. Solo REPORTE: no altera deteccion ni buckets.",
+    "TAIL_PCT": 0.30,
+    "BASELINE_ENABLED": true,
+    "BASELINE_STEP_HOURS": 24
+  },
+  "regime_filter": {
+    "_COMMENT": "Estado risk-on/risk-off del mercado (BTC 1d close vs SMA). Barre ARMxTRAILxSTOP: en mes plano 0/144 configs de salida le ganan a no hacer nada; en ventana bajista 144/144 -> el signo lo pone el regimen, no el parametro. MODE soft = resta PENALTY al score; hard = bloquea la senal. OFF por default: prender recien tras validar en backtest. NO confundir con trend_filter_1w, que es per-simbolo y esta INERTE.",
+    "ENABLED": false,
+    "SYMBOL": "BTCUSDT",
+    "MA_BARS_1D": 20,
+    "MODE": "soft",
+    "PENALTY": 2,
+    "SIGNALS": ["PREBREAK", "BREAKOUT", "HOLD", "COILING"]
+  },
+  "costs": {
+    "_COMMENT": "Comisiones + slippage por lado. Antes de esto NINGUN numero del backtest incluia costos. Spot Binance taker = 0.1%/lado; SLIPPAGE cubre spread + impacto (MIN_QUOTE_VOLUME=1M es permisivo, hay pares donde el spread solo ya come el trade). Round-trip = 2 x (FEE + SLIPPAGE). Solo afecta REPORTE, no deteccion.",
+    "ENABLED": true,
+    "FEE_PCT_PER_SIDE": 0.001,
+    "SLIPPAGE_PCT_PER_SIDE": 0.0005
+  },
+  "portfolio": {
+    "_COMMENT": "Capa de cartera: el screener emite ~1200 alertas BEST+STRONG/mes y nunca dice cuanto poner. A 7d de hold serian ~210 posiciones abiertas a la vez, pero las alts estan ~0.8 correlacionadas -> no son 210 apuestas diversificadas sino UNA apuesta a beta de alts repetida. MAX_CONCURRENT es el tope real de exposicion. Solo simulacion (--portfolio), no altera el screener en vivo.",
+    "ENABLED": false,
+    "MAX_CONCURRENT": 10,
+    "MAX_PER_SYMBOL": 1,
+    "BUCKETS": ["BEST", "STRONG"],
+    "RISK_PCT_PER_TRADE": 0.01,
+    "STOP_PCT_FOR_SIZING": 0.10,
+    "HOLD_DAYS": 7
+  },
   "scoring_calibration": {
     "ENABLED": false,
     "MIN_SAMPLES_PER_SIGNAL": 30,

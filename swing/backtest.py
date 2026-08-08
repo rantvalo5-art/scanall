@@ -63,6 +63,12 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY", "")
 # CONFIG: lectura del config.json
 # ════════════════════════════════════════════════════════════════════════════
 
+# Overrides de CLI aplicados a TODA Config que se instancie ({sección: {clave: valor}}).
+# Necesario porque main() crea varias Configs (base, variantes, compare) y los flags
+# --portfolio/--regime/--no-costs tienen que valer para todas.
+_CLI_OVERRIDES = {}
+
+
 class Config:
     """Wrapper sobre config.json. g() admite defaults para back-compat."""
 
@@ -70,6 +76,8 @@ class Config:
         with open(path, "r", encoding="utf-8") as f:
             self.raw = json.load(f)
         self.path = path
+        for section, kv in _CLI_OVERRIDES.items():
+            self.raw.setdefault(section, {}).update(kv)
 
     def g(self, *keys, default=None):
         """Acceso anidado: cfg.g('breakout', 'BREAKOUT_MIN_VOL_RATIO').
@@ -95,6 +103,121 @@ def _compute_atr_threshold(atr_pct_series, mode: str, floor: float, fixed_min: f
     if len(series) < 24:
         return floor
     return max(floor, float(series.quantile(rank_0_to_100 / 100.0)))
+
+
+def round_trip_cost(cfg) -> float:
+    """Costo ida+vuelta como fracción (fee + slippage por lado, x2). 0.0 si está off.
+    Ningún número del backtest incluía costos antes de esto; con ~1200 trades/mes
+    un round-trip de 0.3% no es despreciable."""
+    c = cfg.raw.get("costs") or {}
+    if not c.get("ENABLED", False):
+        return 0.0
+    return 2.0 * (float(c.get("FEE_PCT_PER_SIDE", 0.0)) +
+                  float(c.get("SLIPPAGE_PCT_PER_SIDE", 0.0)))
+
+
+def net_of_costs(gross_ret, cfg):
+    """Aplica el costo round-trip a un retorno bruto (fracción, no %). None-safe."""
+    if gross_ret is None:
+        return None
+    return gross_ret - round_trip_cost(cfg)
+
+
+class Benchmark:
+    """Serie de referencia (BTC por default) para medir retorno RELATIVO.
+
+    Sin esto todo se mide en absoluto y no se distingue "la moneda subió" de
+    "el mercado subió". price_at() usa búsqueda binaria sobre close_time del 4h,
+    que es el mismo TF con el que calculate_outcomes arma los outcomes forward.
+    Fail-safe: si no hay klines del símbolo, queda inerte y ret() devuelve None.
+    """
+
+    def __init__(self, klines, cfg):
+        b = cfg.raw.get("benchmark") or {}
+        self.enabled = bool(b.get("ENABLED", False))
+        self.symbol = b.get("SYMBOL", "BTCUSDT")
+        self.trailing_days = int(b.get("TRAILING_DAYS", 7))
+        self._ct = None
+        self._close = None
+        df = (klines.get(self.symbol) or {}).get("4h") if klines else None
+        if self.enabled and df is not None and len(df) > 0:
+            self._ct = df["close_time"].values.astype(np.int64)
+            self._close = df["close"].values.astype(float)
+
+    @property
+    def active(self):
+        return self._ct is not None
+
+    def price_at(self, ts_ms):
+        """Último close del benchmark en o antes de ts_ms. None si cae fuera de rango."""
+        if not self.active:
+            return None
+        i = int(np.searchsorted(self._ct, np.int64(ts_ms), side="right")) - 1
+        if i < 0:
+            return None
+        return float(self._close[i])
+
+    def ret(self, ts_from_ms, ts_to_ms):
+        """Retorno del benchmark entre dos instantes (fracción). None si falta data."""
+        a = self.price_at(ts_from_ms)
+        b = self.price_at(ts_to_ms)
+        if a is None or b is None or a == 0:
+            return None
+        return b / a - 1
+
+
+class MarketRegime:
+    """Estado risk-on/risk-off del mercado, global (no per-símbolo).
+
+    Regla: close 1d del símbolo de referencia por encima de su SMA(MA_BARS_1D) → risk-on.
+    Es el gate que le falta al sistema: barriendo ARM×TRAIL×STOP, en un mes plano ninguna
+    config de salida le gana a no hacer nada y en una ventana bajista le ganan todas —
+    o sea que el régimen decide el signo, no el parámetro.
+
+    OJO: distinto de trend_filter_1w, que es per-símbolo y está inerte.
+    Fail-safe: sin datos suficientes, up() devuelve True (no bloquea nada).
+    """
+
+    def __init__(self, klines, cfg):
+        r = cfg.raw.get("regime_filter") or {}
+        self.enabled = bool(r.get("ENABLED", False))
+        self.symbol = r.get("SYMBOL", "BTCUSDT")
+        self.mode = r.get("MODE", "soft")
+        self.penalty = float(r.get("PENALTY", 0))
+        self.signals = set(r.get("SIGNALS") or [])
+        self.ma_bars = int(r.get("MA_BARS_1D", 20))
+        self._ct = None
+        self._up = None
+        if not self.enabled:
+            return
+        df = (klines.get(self.symbol) or {}).get("1d") if klines else None
+        if df is None or len(df) < self.ma_bars + 1:
+            return
+        close = df["close"].astype(float)
+        sma = close.rolling(self.ma_bars).mean()
+        self._ct = df["close_time"].values.astype(np.int64)
+        self._up = (close > sma).values           # NaN de warm-up → False
+
+    @property
+    def active(self):
+        return self.enabled and self._ct is not None
+
+    def up(self, ts_ms):
+        """True = risk-on (o fail-safe si no hay data). Usa la última barra 1d CERRADA."""
+        if not self.active:
+            return True
+        i = int(np.searchsorted(self._ct, np.int64(ts_ms), side="right")) - 1
+        if i < self.ma_bars:          # warm-up de la SMA: no bloquear
+            return True
+        return bool(self._up[i])
+
+    def apply(self, signal_type, score, ts_ms):
+        """Devuelve (score_ajustado, bloqueado). En risk-on no toca nada."""
+        if not self.active or signal_type not in self.signals or self.up(ts_ms):
+            return score, False
+        if self.mode == "hard":
+            return score, True
+        return score - self.penalty, False
 
 
 def _normalize_score(raw_score: float, signal_type: str, cal_cfg: dict, score_cap: float) -> float:
@@ -1035,7 +1158,7 @@ def final_bucket(score, signal_type, cfg):
     return "WATCH"
 
 
-def classify(symbol, tf_data, cfg, counts_history=None):
+def classify(symbol, tf_data, cfg, counts_history=None, regime_up=None):
     """Replica classify_symbol del screener con scoring totalmente parametrizado.
     tf_data = {'1h': dict, '4h': dict, '1d': dict}
     counts_history: dict {(symbol, history_tf): n_alertas_recientes} — usado para
@@ -1581,6 +1704,30 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             if "breakdown" in c:
                 c["breakdown"]["EMA_SOFT"] = _ema_pen
 
+    # ── Filtro de régimen de mercado (risk-off) ──
+    # regime_up lo resuelve el caller (backtest con la serie histórica, screener con la
+    # última barra 1d): acá sólo se aplica. None = sin info → no toca nada (fail-safe).
+    _reg_cfg = cfg.raw.get("regime_filter") or {}
+    if _reg_cfg.get("ENABLED", False) and regime_up is False:
+        _reg_signals = set(_reg_cfg.get("SIGNALS") or [])
+        _reg_hard = _reg_cfg.get("MODE", "soft") == "hard"
+        _reg_pen = int(_reg_cfg.get("PENALTY", 2))
+        _kept = []
+        for c in candidates:
+            if c["history_tf"] not in _reg_signals:
+                _kept.append(c)
+                continue
+            if _reg_hard:
+                continue                      # risk-off: la señal no se emite
+            c["score"] = max(0, c["score"] - _reg_pen)
+            c["bucket"] = final_bucket(c["score"], c["history_tf"], cfg)
+            if "breakdown" in c:
+                c["breakdown"]["REGIME_OFF"] = -_reg_pen
+            _kept.append(c)
+        candidates = _kept
+        if not candidates:
+            return None
+
     # Penalización suave por major_struct fallido (solo cuando MAJOR_STRUCT_GATE_HARD=false).
     if _struct_soft_pen:
         _struct_pen = int(cfg.g("hold", "MAJOR_STRUCT_SOFT_PENALTY", default=-2))
@@ -1835,6 +1982,38 @@ def _classify_pass(candidates, cfg, cooldown_min_by_state, history_window_ms,
     # LATE_REPEAT_PENALTY igual que en producción.
     sim_alert_history = []
     alerts = []
+    bench = Benchmark(klines, cfg)
+    regime = MarketRegime(klines, cfg)
+    if regime.enabled and not regime.active:
+        print(f"    [regime] AVISO: sin klines 1d de {regime.symbol} → filtro inerte")
+    _trail_ms = bench.trailing_days * 86400 * 1000
+    _bars_4h_trail = bench.trailing_days * 6  # 6 barras de 4h por día
+
+    def _rs_fields(sym, ts_ms, idx_4h, entry, outcomes):
+        """Retorno relativo al benchmark: lo mismo que ya medimos, pero descontando
+        lo que hizo el mercado en la MISMA ventana. rs>0 = le ganó a BTC."""
+        out = {"bench_ret_1d": None, "bench_ret_7d": None,
+               "rs_1d": None, "rs_7d": None, "rs_trailing": None}
+        if not bench.active or not entry:
+            return out
+        for name, off_min, key_b, key_rs in (("price_1d", 1440, "bench_ret_1d", "rs_1d"),
+                                             ("price_7d", 10080, "bench_ret_7d", "rs_7d")):
+            b = bench.ret(ts_ms, ts_ms + off_min * 60 * 1000)
+            out[key_b] = b
+            px = outcomes.get(name)
+            if b is not None and px:
+                out[key_rs] = (float(px) / entry - 1) - b
+        # Fuerza relativa PREVIA a la alerta (candidata a feature de scoring: mide si
+        # la moneda ya venía ganándole al mercado antes de disparar).
+        b_prev = bench.ret(ts_ms - _trail_ms, ts_ms)
+        if b_prev is not None:
+            df_4h = klines.get(sym, {}).get("4h")
+            j = idx_4h - _bars_4h_trail
+            if df_4h is not None and j >= 0:
+                prev = float(df_4h["close"].iloc[j])
+                if prev:
+                    out["rs_trailing"] = (entry / prev - 1) - b_prev
+        return out
 
     for (i, ts_ms, sym, tf_data, idx_4h) in candidates:
         # Ventana móvil: descartar alertas más viejas que HISTORY_HOURS para que counts_history
@@ -1846,7 +2025,8 @@ def _classify_pass(candidates, cfg, cooldown_min_by_state, history_window_ms,
         for (_, s, h) in sim_alert_history:
             counts_history[(s, h)] = counts_history.get((s, h), 0) + 1
 
-        alert = classify(sym, tf_data, cfg, counts_history)
+        alert = classify(sym, tf_data, cfg, counts_history,
+                         regime_up=regime.up(ts_ms) if regime.active else None)
         if alert is None:
             continue
 
@@ -1895,6 +2075,7 @@ def _classify_pass(candidates, cfg, cooldown_min_by_state, history_window_ms,
             "close_change_curr": alert.get("close_change_curr"),
             "bars_since_major_max": alert.get("bars_since_major_max"),
             **outcomes,
+            **_rs_fields(sym, ts_ms, idx_4h, alert["price"], outcomes),
         }
         if audit_mode and alert.get("breakdown"):
             alert_record["breakdown"] = alert["breakdown"]
@@ -1969,7 +2150,192 @@ def pct_move(end, start):
     return (end / start - 1) * 100
 
 
-def summarize(alerts, label="resultados"):
+def _avg(xs):
+    xs = [x for x in xs if x is not None]
+    return sum(xs) / len(xs) if xs else None
+
+
+def _median(xs):
+    xs = sorted(x for x in xs if x is not None)
+    if not xs:
+        return None
+    n = len(xs)
+    return xs[n // 2] if n % 2 else (xs[n // 2 - 1] + xs[n // 2]) / 2
+
+
+def tail_rates(xs, tail):
+    """(P(x >= +tail), P(x <= -tail), ratio sube/baja, es_cota).
+
+    Si no hubo ni una caída grande el ratio sería infinito; en vez de eso se usa media
+    observación (corrección de continuidad) y se devuelve es_cota=True, que se imprime
+    como ">N". Con n chico eso pasa seguido y un "inf" haría ver ventaja donde no la hay.
+    """
+    xs = [x for x in xs if x is not None]
+    if not xs:
+        return None
+    up = sum(1 for x in xs if x >= tail) / len(xs)
+    dn = sum(1 for x in xs if x <= -tail) / len(xs)
+    if dn > 0:
+        return up, dn, up / dn, False
+    if up > 0:
+        return up, dn, up / (0.5 / len(xs)), True
+    return up, dn, None, False
+
+
+def universe_tail_baseline(klines, cfg, start_dt, end_dt):
+    """Distribución de exceso 7d de TODO el universo en la misma ventana.
+
+    Es el denominador honesto del ratio de colas: sin esto un ratio de 1.8 parece bueno
+    cuando el universo ya lo regala. Grilla por símbolo cada BASELINE_STEP_HOURS, forward
+    7d sobre 4h y neto del benchmark — el mismo cálculo que rs_7d, para que sea comparable.
+    """
+    e_cfg = cfg.raw.get("evaluation") or {}
+    if not e_cfg.get("BASELINE_ENABLED", True):
+        return None
+    bench = Benchmark(klines, cfg)
+    if not bench.active:
+        return None
+    step_ms = max(1, int(e_cfg.get("BASELINE_STEP_HOURS", 24))) * 3600 * 1000
+    fwd_ms = 10080 * 60 * 1000                      # 7d, igual que price_7d
+    # La grilla cubre la MISMA ventana de scan que las alertas; el forward sale de las
+    # klines, que se descargan más allá de end_dt justamente para poder medir outcomes.
+    # (Restarle 7d a end_dt dejaba la grilla vacía en corridas de 1 semana.)
+    t0 = int(start_dt.timestamp() * 1000)
+    t1 = int(end_dt.timestamp() * 1000)
+    if t1 <= t0:
+        return None
+    out = []
+    for sym, tfs in klines.items():
+        if sym == bench.symbol:
+            continue
+        df = tfs.get("4h")
+        if df is None or len(df) == 0:
+            continue
+        ct = df["close_time"].values.astype(np.int64)
+        close = df["close"].values.astype(float)
+        for ts in range(t0, t1 + 1, step_ms):
+            if ct[-1] < ts + fwd_ms:
+                break                               # sin forward completo: no inventar
+            i = int(np.searchsorted(ct, np.int64(ts), side="right")) - 1
+            j = int(np.searchsorted(ct, np.int64(ts + fwd_ms), side="right")) - 1
+            if i < 0 or j <= i or close[i] == 0:
+                continue
+            b = bench.ret(ts, ts + fwd_ms)
+            if b is not None:
+                out.append(close[j] / close[i] - 1 - b)
+    return out or None
+
+
+def summarize_tails(alerts, cfg, baseline=None):
+    """★ Métrica de cabecera: ¿el bucket mejora el RATIO sube/baja del universo?
+
+    Reemplaza al CATCH RATE como número principal. Medido en ago-2026: subir el corte de
+    score lleva P(+30%) de 2.0% a 4.9% y P(-30%) de 1.1% a 2.7% — el ratio queda en ~1.8,
+    que es exactamente el que el universo regala. Detectar movers = detectar volatilidad, y
+    la volatilidad es simétrica; el CATCH RATE premia justo eso. Lo que sí es ventaja:
+    lift > 1 (el bucket mejora el ratio del universo) y una MEDIANA de exceso que suba.
+    """
+    if cfg is None:
+        return
+    e_cfg = cfg.raw.get("evaluation") or {}
+    tail = float(e_cfg.get("TAIL_PCT", 0.30))
+    cost = round_trip_cost(cfg)
+    con_rs = [a for a in alerts if a.get("rs_7d") is not None]
+    if not con_rs:
+        return
+
+    base = tail_rates(baseline, tail) if baseline else None
+    base_ratio = base[2] if base else None
+
+    def _r_txt(t):
+        """ratio formateado; '>' marca cota inferior (no hubo cola izquierda)."""
+        if t is None or t[2] is None:
+            return f"{'—':>8}"
+        return f"{('>' if t[3] else '') + format(t[2], '.2f'):>8}"
+
+    print(f"\n★ COLAS — ¿el bucket aporta DIRECCIÓN o solo volatilidad? "
+          f"(exceso 7d vs {cfg.raw.get('benchmark', {}).get('SYMBOL', 'BTCUSDT')}, "
+          f"umbral ±{tail*100:.0f}%, alertas netas de costos)")
+    print(f"  {'':<10} {'n':>6} {'P(+)':>8} {'P(-)':>8} {'ratio':>8} {'lift':>7} "
+          f"{'exc medio':>11} {'exc mediana':>12}")
+    for b in ["BEST", "STRONG", "WATCH", "TODAS"]:
+        items = con_rs if b == "TODAS" else [a for a in con_rs if a["bucket"] == b]
+        if not items:
+            continue
+        exc = [a["rs_7d"] - cost for a in items]
+        t = tail_rates(exc, tail)
+        if not t:
+            continue
+        up, dn, ratio, _ = t
+        lift = (ratio / base_ratio) if (ratio is not None and base_ratio) else None
+        l_txt = f"{lift:>6.2f}x" if lift is not None else f"{'—':>7}"
+        print(f"  {b:<10} {len(items):>6} {up*100:>7.2f}% {dn*100:>7.2f}% {_r_txt(t)} {l_txt} "
+              f"{_avg(exc)*100:>+10.2f}% {_median(exc)*100:>+11.2f}%")
+
+    if base:
+        print(f"  {'-'*10} {'-'*6} {'-'*8} {'-'*8} {'-'*8} {'-'*7} {'-'*11} {'-'*12}")
+        print(f"  {'universo':<10} {len(baseline):>6} {base[0]*100:>7.2f}% {base[1]*100:>7.2f}% "
+              f"{_r_txt(base)} {'1.00x':>7} {_avg(baseline)*100:>+10.2f}% "
+              f"{_median(baseline)*100:>+11.2f}%")
+        print(f"  lift = ratio del bucket / ratio del universo. lift ≤ 1.00 → el bucket "
+              f"NO aporta dirección,\n  solo volatilidad (más cola derecha Y más cola "
+              f"izquierda). Mirar también la mediana.")
+    else:
+        print(f"  (sin baseline del universo: el ratio no se puede juzgar solo — "
+              f"el universo ya trae ~1.5)")
+
+
+def summarize_vs_benchmark(alerts, cfg):
+    """Retorno REALIZADO a 7d: bruto, neto de costos y contra el benchmark.
+
+    El resto del resumen mide max_7d (el pico, o sea el mejor caso). Esta tabla mide
+    lo que efectivamente queda al cierre de la ventana, descuenta costos, y lo compara
+    con lo que hizo el mercado en la MISMA ventana. rs>0 = la alerta le ganó a BTC.
+    Sin esta comparación un mes alcista hace ver bien a cualquier screener long-only.
+    """
+    if cfg is None:
+        return
+    b_cfg = cfg.raw.get("benchmark") or {}
+    cost = round_trip_cost(cfg)
+    con_rs = [a for a in alerts if a.get("rs_7d") is not None]
+    if not b_cfg.get("ENABLED", False) or not con_rs:
+        if cost:
+            print(f"\nCostos: round-trip {cost*100:.2f}% (fee+slippage x2) — "
+                  f"benchmark sin datos, no se puede comparar contra el mercado")
+        return
+
+    print(f"\nRetorno realizado 7d vs {b_cfg.get('SYMBOL', 'BTCUSDT')} "
+          f"(costos round-trip {cost*100:.2f}%):")
+    print(f"  {'':<8} {'n':>5} {'bruto':>9} {'neto':>9} {'benchmark':>11} {'exceso':>9} {'gana-bench':>11}")
+    for b in ["BEST", "STRONG", "WATCH", "TODAS"]:
+        items = con_rs if b == "TODAS" else [a for a in con_rs if a["bucket"] == b]
+        if not items:
+            continue
+        brutos = [a["price_7d"] / a["entry_price"] - 1 for a in items
+                  if a.get("price_7d") and a.get("entry_price")]
+        if not brutos:
+            continue
+        bench = [a["bench_ret_7d"] for a in items]
+        # El exceso se mide neto: los costos los paga la alerta, no el benchmark.
+        exceso = [a["rs_7d"] - cost for a in items]
+        gana = sum(1 for x in exceso if x > 0) * 100 / len(exceso)
+        print(f"  {b:<8} {len(items):>5} {_avg(brutos)*100:>+8.2f}% "
+              f"{(_avg(brutos)-cost)*100:>+8.2f}% {_avg(bench)*100:>+10.2f}% "
+              f"{_avg(exceso)*100:>+8.2f}% {gana:>10.0f}%")
+
+    trail = [a for a in con_rs if a.get("rs_trailing") is not None]
+    if len(trail) >= 30:
+        # ¿La fuerza relativa PREVIA predice la posterior? Si separa, es candidata a
+        # entrar al scoring; si no, confirma que la entrada no tiene ventaja.
+        print("\n  Fuerza relativa previa a la alerta → exceso posterior:")
+        fuerte = [a["rs_7d"] - cost for a in trail if a["rs_trailing"] > 0]
+        debil = [a["rs_7d"] - cost for a in trail if a["rs_trailing"] <= 0]
+        for nombre, grupo in (("ya le ganaba a BTC", fuerte), ("venía perdiendo", debil)):
+            if grupo:
+                print(f"    {nombre:<22} n={len(grupo):>4}  exceso {_avg(grupo)*100:+6.2f}%")
+
+
+def summarize(alerts, label="resultados", cfg=None, baseline=None):
     print()
     print("═" * 70)
     print(f" {label.upper()}")
@@ -1999,8 +2365,13 @@ def summarize(alerts, label="resultados"):
         avg_max = sum(moves) / len(moves) if moves else 0
         avg_dd = sum(drops) / len(drops) if drops else 0
         winrate = wins * 100 / len(moves) if moves else 0
-        print(f"  {b:<6} {len(items):>4} — max_24h: {avg_max:+5.2f}%, drawdown: {avg_dd:+5.2f}%, "
+        print(f"  {b:<6} {len(items):>4} — max_7d: {avg_max:+5.2f}%, drawdown: {avg_dd:+5.2f}%, "
               f"win >2%: {winrate:.0f}%")
+
+    summarize_tails(alerts, cfg, baseline)
+    summarize_vs_benchmark(alerts, cfg)
+    if cfg is not None:
+        summarize_portfolio(alerts, cfg)
 
     print("\nCVD análisis:")
     cvd_groups = {"bullish (>+0.05)": [], "neutral": [], "bearish (<-0.05)": []}
@@ -2017,7 +2388,7 @@ def summarize(alerts, label="resultados"):
             cvd_groups["neutral"].append(m)
     for name, moves in cvd_groups.items():
         if moves:
-            print(f"  CVD {name:<20} n={len(moves):>3}  avg max 24h: {sum(moves)/len(moves):+5.2f}%")
+            print(f"  CVD {name:<20} n={len(moves):>3}  avg max 7d: {sum(moves)/len(moves):+5.2f}%")
 
     print("\nOBV análisis:")
     obv_groups = {"rising (>+0.05)": [], "neutral": [], "falling (<-0.05)": []}
@@ -2034,7 +2405,7 @@ def summarize(alerts, label="resultados"):
             obv_groups["neutral"].append(m)
     for name, moves in obv_groups.items():
         if moves:
-            print(f"  OBV {name:<20} n={len(moves):>3}  avg max 24h: {sum(moves)/len(moves):+5.2f}%")
+            print(f"  OBV {name:<20} n={len(moves):>3}  avg max 7d: {sum(moves)/len(moves):+5.2f}%")
 
     print("\nrecent_long_ok análisis:")
     for ok in (True, False):
@@ -2044,13 +2415,13 @@ def summarize(alerts, label="resultados"):
         drops = [pct_move(a["min_low_7d"], a["entry_price"]) for a in items]
         drops = [d for d in drops if d is not None]
         if moves:
-            print(f"  {str(ok):<5} n={len(moves):>3}  avg max 24h: {sum(moves)/len(moves):+5.2f}%, "
+            print(f"  {str(ok):<5} n={len(moves):>3}  avg max 7d: {sum(moves)/len(moves):+5.2f}%, "
                   f"drawdown: {sum(drops)/len(drops):+5.2f}%")
 
     ranked = [(pct_move(a["max_high_7d"], a["entry_price"]) or -999, a) for a in alerts]
     ranked.sort(key=lambda x: x[0], reverse=True)
     print("\nTOP 30 movers detectados (alert-derived, SESGADA — rankea por fila, no por símbolo):")
-    print(f"  {'#':>3} {'Symbol':<14} {'Type':<10} {'Score':>5} {'Bucket':<7} {'max24h':>8} "
+    print(f"  {'#':>3} {'Symbol':<14} {'Type':<10} {'Score':>5} {'Bucket':<7} {'max7d':>8} "
           f"{'cvd':>7} {'obv':>7} {'long_ok':>7}")
     for i, (move, a) in enumerate(ranked[:30], start=1):
         cvd = a.get("cvd_ratio") or 0
@@ -2122,11 +2493,126 @@ def summarize(alerts, label="resultados"):
           f"STRONG={sym_bucket_counts['STRONG']}, WATCH={sym_bucket_counts['WATCH']}")
 
 
-def compare_runs(alerts_a, label_a, alerts_b, label_b, period_days=7):
+def simulate_portfolio(alerts, cfg):
+    """Cartera con capital finito: qué pasa si además de detectar, OPERÁS las alertas.
+
+    El screener emite ~1200 alertas BEST+STRONG/mes sin decir cuánto poner. A 7d de hold
+    serían ~210 posiciones simultáneas — y como las alts van todas juntas, eso no es
+    diversificación sino apalancamiento a un solo factor. Acá se impone un tope real de
+    posiciones concurrentes: las alertas que llegan con la cartera llena se DESCARTAN
+    (es lo que pasaría de verdad, no se puede comprar sin capital libre).
+
+    Sizing por riesgo: cada posición arriesga RISK_PCT_PER_TRADE del equity, asumiendo
+    una pérdida de STOP_PCT_FOR_SIZING → nominal = equity * riesgo / stop.
+    Salida: al cierre de HOLD_DAYS (price_7d), neta de costos.
+    Devuelve dict con métricas, o None si falta config/datos.
+    """
+    p = cfg.raw.get("portfolio") or {}
+    if not p.get("ENABLED", False):
+        return None
+    buckets = set(p.get("BUCKETS") or ["BEST", "STRONG"])
+    max_conc = int(p.get("MAX_CONCURRENT", 10))
+    max_per_sym = int(p.get("MAX_PER_SYMBOL", 1))
+    risk_pct = float(p.get("RISK_PCT_PER_TRADE", 0.01))
+    stop_sizing = float(p.get("STOP_PCT_FOR_SIZING", 0.10))
+    hold_days = float(p.get("HOLD_DAYS", 7))
+    cost = round_trip_cost(cfg)
+    hold_ms = int(hold_days * 86400 * 1000)
+
+    ops = []
+    for a in alerts:
+        if a.get("bucket") not in buckets or not a.get("entry_price") or not a.get("price_7d"):
+            continue
+        try:
+            ts = int(datetime.fromisoformat(a["alerted_at"]).timestamp() * 1000)
+        except (ValueError, KeyError):
+            continue
+        ops.append((ts, a))
+    ops.sort(key=lambda x: x[0])
+    if not ops:
+        return None
+
+    equity = 1.0
+    abiertas = []        # (cierre_ms, symbol, nominal, ret_neto)
+    tomadas, descartadas_llena, descartadas_sym = 0, 0, 0
+    curva, cerradas = [], []
+
+    def cerrar_hasta(ts):
+        nonlocal equity
+        vivas = []
+        for cierre_ms, sym, nominal, ret in abiertas:
+            if cierre_ms <= ts:
+                equity += nominal * ret
+                cerradas.append(ret)
+                curva.append((cierre_ms, equity))
+            else:
+                vivas.append((cierre_ms, sym, nominal, ret))
+        abiertas[:] = vivas
+
+    for ts, a in ops:
+        cerrar_hasta(ts)
+        if len(abiertas) >= max_conc:
+            descartadas_llena += 1
+            continue
+        if max_per_sym and sum(1 for o in abiertas if o[1] == a["symbol"]) >= max_per_sym:
+            descartadas_sym += 1
+            continue
+        ret = (a["price_7d"] / a["entry_price"] - 1) - cost
+        # Nominal por riesgo, topeado al equity libre (sin apalancamiento).
+        libre = max(0.0, equity - sum(o[2] for o in abiertas))
+        nominal = min(equity * risk_pct / stop_sizing, libre)
+        if nominal <= 0:
+            descartadas_llena += 1
+            continue
+        abiertas.append((ts + hold_ms, a["symbol"], nominal, ret))
+        tomadas += 1
+    cerrar_hasta(float("inf"))
+
+    if not cerradas:
+        return None
+    dias = (ops[-1][0] - ops[0][0]) / 86400000 or 1
+    pico, max_dd = 1.0, 0.0
+    for _, eq in curva:
+        pico = max(pico, eq)
+        max_dd = min(max_dd, eq / pico - 1)
+    return {
+        "equity_final": equity, "ret_total": equity - 1.0,
+        "ret_mensual": (equity - 1.0) / dias * 30, "max_drawdown": max_dd,
+        "tomadas": tomadas, "descartadas_llena": descartadas_llena,
+        "descartadas_sym": descartadas_sym, "elegibles": len(ops),
+        "ret_medio": sum(cerradas) / len(cerradas),
+        "win": sum(1 for r in cerradas if r > 0) * 100 / len(cerradas),
+        "dias": dias, "max_conc": max_conc, "cost": cost,
+    }
+
+
+def summarize_portfolio(alerts, cfg):
+    r = simulate_portfolio(alerts, cfg)
+    if not r:
+        return
+    print(f"\nCartera simulada (tope {r['max_conc']} posiciones, "
+          f"costos {r['cost']*100:.2f}% round-trip):")
+    print(f"  Alertas elegibles      : {r['elegibles']}")
+    print(f"  Operadas               : {r['tomadas']}  "
+          f"(descartadas: {r['descartadas_llena']} sin capital, "
+          f"{r['descartadas_sym']} ya en cartera)")
+    print(f"  Retorno por trade      : {r['ret_medio']*100:+.2f}%   win {r['win']:.1f}%")
+    print(f"  Retorno del CAPITAL    : {r['ret_total']*100:+.2f}% en {r['dias']:.0f}d  "
+          f"→ {r['ret_mensual']*100:+.2f}%/mes")
+    print(f"  Max drawdown           : {r['max_drawdown']*100:.2f}%")
+
+
+def compare_runs(alerts_a, label_a, alerts_b, label_b, period_days=7, cfg=None,
+                 baseline=None):
     print()
     print("═" * 70)
     print(f" COMPARACIÓN: {label_a}  vs  {label_b}  ({period_days} días)")
     print("═" * 70)
+    e_cfg = (cfg.raw.get("evaluation") or {}) if cfg is not None else {}
+    tail = float(e_cfg.get("TAIL_PCT", 0.30))
+    cost = round_trip_cost(cfg) if cfg is not None else 0.0
+    _b = tail_rates(baseline, tail) if baseline else None
+    base_ratio = _b[2] if _b else None
 
     def stats(alerts):
         if not alerts:
@@ -2135,7 +2621,9 @@ def compare_runs(alerts_a, label_a, alerts_b, label_b, period_days=7):
                     "best_max": 0, "strong_max": 0, "explosivos_n": 0,
                     "best_per_day": 0, "best_win_5pct": 0, "best_win_10pct": 0,
                     "top30_in_best": 0, "top30_in_best_strong": 0,
-                    "best_dd": 0, "best_rr": 0}
+                    "best_dd": 0, "best_rr": 0,
+                    "ratio_bs": None, "lift_bs": None, "exc_med_bs": None,
+                    "ratio_best": None, "exc_med_best": None}
         moves = [pct_move(a["max_high_7d"], a["entry_price"]) for a in alerts]
         moves = [m for m in moves if m is not None]
         drops = [pct_move(a["min_low_7d"], a["entry_price"]) for a in alerts]
@@ -2168,8 +2656,21 @@ def compare_runs(alerts_a, label_a, alerts_b, label_b, period_days=7):
         best_avg_max = sum(best_moves) / len(best_moves) if best_moves else 0
         best_rr = abs(best_avg_max / best_avg_dd) if best_avg_dd != 0 else 0
 
+        # Colas: la métrica que reemplaza al CATCH RATE. Se mide sobre BEST+STRONG (lo
+        # que se opera) y sobre BEST solo. Ver summarize_tails() para el porqué.
+        def _cola(items):
+            exc = [a["rs_7d"] - cost for a in items if a.get("rs_7d") is not None]
+            t = tail_rates(exc, tail)
+            return (t[2] if t else None), _median(exc)
+
+        ratio_bs, exc_med_bs = _cola([a for a in alerts if a["bucket"] in ("BEST", "STRONG")])
+        ratio_best, exc_med_best = _cola(best)
+
         return {
             "n": len(alerts),
+            "ratio_bs": ratio_bs, "exc_med_bs": exc_med_bs,
+            "lift_bs": (ratio_bs / base_ratio) if (ratio_bs and base_ratio) else None,
+            "ratio_best": ratio_best, "exc_med_best": exc_med_best,
             "avg_max_24h": sum(moves) / len(moves) if moves else 0,
             "avg_drawdown": sum(drops) / len(drops) if drops else 0,
             "win_2pct": sum(1 for m in moves if m >= 2) * 100 / len(moves) if moves else 0,
@@ -2200,20 +2701,47 @@ def compare_runs(alerts_a, label_a, alerts_b, label_b, period_days=7):
     print(f"  {'STRONG count':<32} {s_a['strong_n']:>15} {s_b['strong_n']:>15}")
     print(f"  {'Explosivos totales (>20%)':<32} {s_a['explosivos_n']:>15} {s_b['explosivos_n']:>15}")
     print(f"  {'-'*32} {'-'*15} {'-'*15}")
-    print(f"  ★ CATCH RATE (lo más importante):")
+    print(f"  ★ COLAS (lo más importante) — ±{tail*100:.0f}% de exceso 7d, neto de costos:")
+
+    def _f(v, fmt):
+        """Celda de 15 caracteres; '—' cuando no hay dato (n insuficiente o sin cola)."""
+        return format(v, fmt) if v is not None else f"{'—':>15}"
+
+    def _fp(v):
+        """Idem pero en porcentaje, con el % adentro para no correr la columna."""
+        return f"{format(v * 100, '+.2f') + '%':>15}" if v is not None else f"{'—':>15}"
+
+    print(f"  {'Ratio sube/baja BEST+STRONG':<32} {_f(s_a['ratio_bs'], '>15.2f')} "
+          f"{_f(s_b['ratio_bs'], '>15.2f')}")
+    def _fx(v):
+        """Lift como '1.25x' en celda de 15."""
+        return f"{format(v, '.2f') + 'x':>15}" if v is not None else f"{'—':>15}"
+
+    if base_ratio:
+        print(f"  {'  lift vs universo (>1 = aporta)':<32} "
+              f"{_fx(s_a['lift_bs'])} {_fx(s_b['lift_bs'])}")
+    print(f"  {'Ratio sube/baja BEST':<32} {_f(s_a['ratio_best'], '>15.2f')} "
+          f"{_f(s_b['ratio_best'], '>15.2f')}")
+    print(f"  {'Exceso MEDIANA BEST+STRONG':<32} {_fp(s_a['exc_med_bs'])} {_fp(s_b['exc_med_bs'])}")
+    print(f"  {'Exceso MEDIANA BEST':<32} {_fp(s_a['exc_med_best'])} {_fp(s_b['exc_med_best'])}")
+    if base_ratio:
+        print(f"  (universo en la misma ventana: ratio {base_ratio:.2f})")
+    print(f"  {'-'*32} {'-'*15} {'-'*15}")
+    print(f"  CATCH RATE (ojo: recall sobre movers — sube solo con volatilidad,")
+    print(f"   no distingue dirección. Usarlo como control de que no se rompió nada):")
     print(f"  {'Top 30 movers en BEST':<32} {s_a['top30_in_best']:>14}/30 {s_b['top30_in_best']:>14}/30")
     print(f"  {'Top 30 movers en BEST+STRONG':<32} {s_a['top30_in_best_strong']:>14}/30 {s_b['top30_in_best_strong']:>14}/30")
     print(f"  {'-'*32} {'-'*15} {'-'*15}")
     print(f"  ★ CALIDAD del bucket BEST:")
-    print(f"  {'Avg max 24h BEST':<32} {s_a['best_max']:>+14.2f}% {s_b['best_max']:>+14.2f}%")
+    print(f"  {'Avg max 7d BEST':<32} {s_a['best_max']:>+14.2f}% {s_b['best_max']:>+14.2f}%")
     print(f"  {'Avg drawdown BEST':<32} {s_a['best_dd']:>+14.2f}% {s_b['best_dd']:>+14.2f}%")
     print(f"  {'R/R BEST':<32} {s_a['best_rr']:>15.2f} {s_b['best_rr']:>15.2f}")
     print(f"  {'Win >5% en BEST':<32} {s_a['best_win_5pct']:>14.0f}%  {s_b['best_win_5pct']:>14.0f}%")
     print(f"  {'Win >10% en BEST':<32} {s_a['best_win_10pct']:>14.0f}%  {s_b['best_win_10pct']:>14.0f}%")
     print(f"  {'-'*32} {'-'*15} {'-'*15}")
     print(f"  Otros:")
-    print(f"  {'Avg max 24h global':<32} {s_a['avg_max_24h']:>+14.2f}% {s_b['avg_max_24h']:>+14.2f}%")
-    print(f"  {'Avg max 24h STRONG':<32} {s_a['strong_max']:>+14.2f}% {s_b['strong_max']:>+14.2f}%")
+    print(f"  {'Avg max 7d global':<32} {s_a['avg_max_24h']:>+14.2f}% {s_b['avg_max_24h']:>+14.2f}%")
+    print(f"  {'Avg max 7d STRONG':<32} {s_a['strong_max']:>+14.2f}% {s_b['strong_max']:>+14.2f}%")
     print(f"  {'Avg drawdown global':<32} {s_a['avg_drawdown']:>+14.2f}% {s_b['avg_drawdown']:>+14.2f}%")
     print(f"  {'Win >2% global':<32} {s_a['win_2pct']:>14.0f}%  {s_b['win_2pct']:>14.0f}%")
     print(f"  {'Win >5% global':<32} {s_a['win_5pct']:>14.0f}%  {s_b['win_5pct']:>14.0f}%")
@@ -2226,7 +2754,7 @@ def compare_runs(alerts_a, label_a, alerts_b, label_b, period_days=7):
 def run_backtest(cfg, weeks, klines, start_dt, end_dt, snapshot_pairs=None,
                  label="run", scan_interval_min=SCAN_INTERVAL_MIN, derivatives=None,
                  prepared_cache=None, analyze_cache=None, outcomes_cache=None,
-                 audit_mode=False):
+                 audit_mode=False, baseline_cache=None):
     print(f"\n  >>> Corriendo backtest: {label}")
     key = _indicator_key(cfg)
     if prepared_cache is not None and key in prepared_cache:
@@ -2250,7 +2778,15 @@ def run_backtest(cfg, weeks, klines, start_dt, end_dt, snapshot_pairs=None,
                       scan_interval_min=scan_interval_min, derivatives=derivatives,
                       prepared=prepared, analyze_cache=analyze_cache,
                       outcomes_cache=outcomes_cache, audit_mode=audit_mode)
-    summarize(alerts, label=label)
+    # Baseline del universo: no depende de la cfg de señales, así que entre variantes se
+    # calcula una sola vez (la ventana y las klines son las mismas).
+    if baseline_cache is not None and "base" in baseline_cache:
+        baseline = baseline_cache["base"]
+    else:
+        baseline = universe_tail_baseline(klines, cfg, start_dt, end_dt)
+        if baseline_cache is not None:
+            baseline_cache["base"] = baseline
+    summarize(alerts, label=label, cfg=cfg, baseline=baseline)
     return alerts
 
 
@@ -2289,11 +2825,27 @@ def main():
                         help="Dumpea trayectorias de features por-barra. Lista de símbolos o 'ALL'.")
     parser.add_argument("--trace-out", default="trace_features.jsonl",
                         help="Path del JSONL de trace (default trace_features.jsonl).")
+    parser.add_argument("--portfolio", action="store_true",
+                        help="Fuerza portfolio.ENABLED=true: simula cartera con capital "
+                             "finito y tope de posiciones concurrentes.")
+    parser.add_argument("--regime", action="store_true",
+                        help="Fuerza regime_filter.ENABLED=true: aplica el gate risk-on/off "
+                             "de mercado. Sin esto se usa lo que diga config.json.")
+    parser.add_argument("--no-costs", action="store_true",
+                        help="Fuerza costs.ENABLED=false (reporta bruto, como antes).")
     parser.add_argument("--extra-symbols", nargs="+", metavar="SYM", default=None,
                         help="Símbolos extra a forzar dentro del universo (UNION con el top-N/snapshot). "
                              "Útil para escanear movers fuera del universo por volumen sin tocar --max-pairs.")
     args = parser.parse_args()
     _audit = getattr(args, "audit_scoring", False)
+
+    # Overrides de CLI: se registran ANTES de instanciar cualquier Config.
+    if args.portfolio:
+        _CLI_OVERRIDES["portfolio"] = {"ENABLED": True}
+    if args.regime:
+        _CLI_OVERRIDES["regime_filter"] = {"ENABLED": True}
+    if args.no_costs:
+        _CLI_OVERRIDES["costs"] = {"ENABLED": False}
 
     global CACHE_DIR
     if args.cache_dir:
@@ -2360,6 +2912,17 @@ def main():
         if missing:
             print(f"  (ya estaban en el universo base: {' '.join(missing)})")
 
+    # El benchmark y el filtro de régimen leen su símbolo de klines, así que tiene que
+    # estar sí o sí en el universo aunque no califique por volumen ni esté en el snapshot.
+    _bench_syms = {
+        (cfg_main.raw.get("benchmark") or {}).get("SYMBOL", "BTCUSDT"),
+        (cfg_main.raw.get("regime_filter") or {}).get("SYMBOL", "BTCUSDT"),
+    }
+    _bench_add = [s for s in sorted(_bench_syms) if s and s not in set(symbols)]
+    if _bench_add:
+        symbols = symbols + _bench_add
+        print(f"  +benchmark/régimen: {' '.join(_bench_add)} agregado(s) al universo")
+
     print(f"\n[2/4] Descargando klines históricas...")
     klines = download_all_klines(symbols, start_dt, end_dt)
     if not klines:
@@ -2378,6 +2941,7 @@ def main():
     prepared_cache = {}  # compartido entre cfgs con mismos parámetros de indicadores
     analyze_cache  = {}  # compartido entre cfgs con mismo _analyze_key (variant-independent)
     outcomes_cache = {}  # compartido entre cfgs: outcomes(sym, idx_4h) son variant-independent
+    baseline_cache = {}  # baseline de colas del universo: misma ventana para todas las cfgs
 
     if args.variants:
         # Modo nuevo: --variants base.json A.json B.json C.json
@@ -2392,7 +2956,7 @@ def main():
                                    scan_interval_min=args.scan_interval_min,
                                    derivatives=derivatives, prepared_cache=prepared_cache,
                                    analyze_cache=analyze_cache, outcomes_cache=outcomes_cache,
-                                   audit_mode=_audit)
+                                   audit_mode=_audit, baseline_cache=baseline_cache)
         all_results[Path(base_path).stem] = alerts_base
         n_variants = len(variant_paths)
         for vi, vp in enumerate(variant_paths, 1):
@@ -2416,7 +2980,7 @@ def main():
                                     scan_interval_min=args.scan_interval_min,
                                     derivatives=derivatives, prepared_cache=prepared_cache,
                                     analyze_cache=analyze_cache, outcomes_cache=outcomes_cache,
-                                    audit_mode=_audit)
+                                    audit_mode=_audit, baseline_cache=baseline_cache)
             elapsed  = time.perf_counter() - t_cfg
             prep_st  = "miss" if len(prepared_cache) > prev_prep else "hit"
             ana_st   = "miss" if len(analyze_cache)  > prev_ana  else "hit"
@@ -2424,7 +2988,8 @@ def main():
                   f"prep={prep_st} ana={ana_st}")
             all_results[cfg_stem] = alerts_v
             compare_runs(alerts_base, Path(base_path).stem, alerts_v, cfg_stem,
-                         period_days=period_days)
+                         period_days=period_days, cfg=cfg_v,
+                         baseline=baseline_cache.get("base"))
             if results_dir:
                 result_file = results_dir / f"{result_prefix}__{cfg_stem}.json"
                 tmp_file    = result_file.with_suffix(".tmp")
@@ -2442,15 +3007,16 @@ def main():
                                   scan_interval_min=args.scan_interval_min,
                                   derivatives=derivatives, prepared_cache=prepared_cache,
                                   analyze_cache=analyze_cache, outcomes_cache=outcomes_cache,
-                                  audit_mode=_audit)
+                                  audit_mode=_audit, baseline_cache=baseline_cache)
         alerts_new = run_backtest(cfg_new, args.weeks, klines, start_dt, end_dt,
                                   snapshot_pairs, label=f"NEW ({args.compare[1]})",
                                   scan_interval_min=args.scan_interval_min,
                                   derivatives=derivatives, prepared_cache=prepared_cache,
                                   analyze_cache=analyze_cache, outcomes_cache=outcomes_cache,
-                                  audit_mode=_audit)
+                                  audit_mode=_audit, baseline_cache=baseline_cache)
         compare_runs(alerts_old, args.compare[0], alerts_new, args.compare[1],
-                     period_days=period_days)
+                     period_days=period_days, cfg=cfg_new,
+                     baseline=baseline_cache.get("base"))
         all_results = {"old": alerts_old, "new": alerts_new}
 
     elif args.ablation:
@@ -2475,20 +3041,21 @@ def main():
                                   scan_interval_min=args.scan_interval_min,
                                   derivatives=derivatives, prepared_cache=prepared_cache,
                                   analyze_cache=analyze_cache, outcomes_cache=outcomes_cache,
-                                  audit_mode=_audit)
+                                  audit_mode=_audit, baseline_cache=baseline_cache)
             all_results[name] = alerts
         if "full (todo activo)" in all_results:
             for name, alerts in all_results.items():
                 if name != "full (todo activo)":
                     compare_runs(all_results["full (todo activo)"], "full", alerts, name,
-                                 period_days=period_days)
+                                 period_days=period_days, cfg=cfg_main,
+                                 baseline=baseline_cache.get("base"))
     else:
         alerts = run_backtest(cfg_main, args.weeks, klines, start_dt, end_dt,
                               snapshot_pairs, label=f"config: {args.config}",
                               scan_interval_min=args.scan_interval_min,
                               derivatives=derivatives, prepared_cache=prepared_cache,
                               analyze_cache=analyze_cache, outcomes_cache=outcomes_cache,
-                              audit_mode=_audit)
+                              audit_mode=_audit, baseline_cache=baseline_cache)
         all_results = {"main": alerts}
 
     if args.out:
