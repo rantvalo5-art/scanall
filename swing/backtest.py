@@ -466,6 +466,12 @@ def analyze_at_time(df_full, end_idx, cfg):
     CVD_LOOKBACK = cfg.g("indicators", "CVD_LOOKBACK", default=10)
     CVD_BULLISH_MIN = cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05)
     BREAKOUT_BUFFER = cfg.g("breakout", "BREAKOUT_BUFFER")
+    BREAKOUT_MIN_VOL_RATIO    = cfg.g("breakout", "BREAKOUT_MIN_VOL_RATIO")
+    BREAKOUT_MAX_EXTENDED     = cfg.g("breakout", "BREAKOUT_MAX_EXTENDED")
+    BREAKOUT_BB_EXPANSION_MIN = cfg.g("breakout", "BREAKOUT_BB_EXPANSION_MIN")
+    BREAKOUT_MIN_BODY_PCT     = cfg.g("breakout", "BREAKOUT_MIN_BODY_PCT")
+    DEFER_ENABLED   = cfg.g("breakout", "DEFER_ENABLED", default=False)
+    DEFER_BARS      = cfg.g("breakout", "DEFER_BARS", default=12)
     PREBREAK_NEAR_MAX = cfg.g("prebreak", "PREBREAK_NEAR_MAX")
     ONE_H_RESIST_LOOKBACK = cfg.g("hold", "ONE_H_RESIST_LOOKBACK")
     ONE_H_RESIST_BUFFER = cfg.g("hold", "ONE_H_RESIST_BUFFER")
@@ -499,6 +505,8 @@ def analyze_at_time(df_full, end_idx, cfg):
     width_curr = ((hband.iloc[-1] - lband.iloc[-1]) / mavg.iloc[-1]) if mavg.iloc[-1] else 0.0
     width_prev = ((hband.iloc[-2] - lband.iloc[-2]) / mavg.iloc[-2]) if mavg.iloc[-2] else 0.0
     width_expansion = safe_pct(width_curr, width_prev)
+    # Serie completa: la necesita el breakout diferido para evaluar barras pasadas.
+    bb_width_series = ((hband - lband) / mavg.replace(0, np.nan)).fillna(0.0)
 
     atr_series = ta.volatility.AverageTrueRange(high, low, close, window=14).average_true_range()
     atr = atr_series.iloc[-1]
@@ -619,6 +627,36 @@ def analyze_at_time(df_full, end_idx, cfg):
                 last = post.iloc[-1]
                 hold_strong = close_position(last["close"], last["high"], last["low"]) >= STRONG_CLOSE_MIN
 
+    # ── BREAKOUT DIFERIDO ─────────────────────────────────────────────────
+    # Espejo de analyze_at_index(): ver el comentario largo allá. Conserva la detección
+    # del breakout pero mueve la entrada 24-48h, que es donde está el defecto medido.
+    defer_breakout = False
+    defer_bars_since = None
+    defer_distance = None
+    if DEFER_ENABLED:
+        idx = len(df) - 1 - DEFER_BARS
+        _ref_slice = high.iloc[max(0, idx - RECENT_LOOKBACK):idx] if idx >= 26 else []
+        if len(_ref_slice) >= RECENT_LOOKBACK:
+            _lvl = float(_ref_slice.max())
+            _vmean = df["volume"].iloc[max(0, idx - 20):idx].mean()
+            _vr = float(df["volume"].iloc[idx] / _vmean) if _vmean else 0.0
+            _rng = max(float(high.iloc[idx] - low.iloc[idx]), 1e-12)
+            _bp = abs(float(close.iloc[idx] - df["open"].iloc[idx])) / _rng
+            _cp = close_position(float(close.iloc[idx]), float(high.iloc[idx]), float(low.iloc[idx]))
+            _wpv = float(bb_width_series.iloc[idx - 1]) if idx >= 1 else 0.0
+            _wexp = safe_pct(float(bb_width_series.iloc[idx]), _wpv) if _wpv else 0.0
+            if (_lvl > 0
+                    and close.iloc[idx] > _lvl * (1 + BREAKOUT_BUFFER)
+                    and _vr >= BREAKOUT_MIN_VOL_RATIO
+                    and safe_pct(float(close.iloc[idx]), _lvl) <= BREAKOUT_MAX_EXTENDED
+                    and _wexp >= BREAKOUT_BB_EXPANSION_MIN
+                    and _cp >= STRONG_CLOSE_MIN
+                    and _bp >= BREAKOUT_MIN_BODY_PCT
+                    and price > _lvl):
+                defer_breakout = True
+                defer_bars_since = DEFER_BARS
+                defer_distance = safe_pct(price, _lvl)
+
     riding_break_idx = None
     riding_break_close = None
     riding_break_ref = None
@@ -680,6 +718,9 @@ def analyze_at_time(df_full, end_idx, cfg):
         "major_struct_ok": major_struct_ok,
         "major_struct_dist": major_dist,
         "bars_since_major_max": bars_since_major_max,
+        "defer_breakout": defer_breakout,
+        "defer_bars_since": defer_bars_since,
+        "defer_distance": defer_distance,
         "hold_recent_break": hold_recent_break,
         "hold_kept_zone": hold_kept_zone,
         "hold_pullback_ok": hold_pullback_ok,
@@ -733,6 +774,12 @@ def _analyze_key(cfg):
         "OBV_SLOPE_LOOKBACK":      cfg.g("indicators", "OBV_SLOPE_LOOKBACK", default=10),
         "CVD_LOOKBACK":            cfg.g("indicators", "CVD_LOOKBACK", default=10),
         "BREAKOUT_BUFFER":         cfg.g("breakout", "BREAKOUT_BUFFER"),
+        "BREAKOUT_MIN_VOL_RATIO":     cfg.g("breakout", "BREAKOUT_MIN_VOL_RATIO"),
+        "BREAKOUT_MAX_EXTENDED":      cfg.g("breakout", "BREAKOUT_MAX_EXTENDED"),
+        "BREAKOUT_BB_EXPANSION_MIN":  cfg.g("breakout", "BREAKOUT_BB_EXPANSION_MIN"),
+        "BREAKOUT_MIN_BODY_PCT":      cfg.g("breakout", "BREAKOUT_MIN_BODY_PCT"),
+        "DEFER_ENABLED":           cfg.g("breakout", "DEFER_ENABLED", default=False),
+        "DEFER_BARS":              cfg.g("breakout", "DEFER_BARS", default=12),
         "PREBREAK_NEAR_MAX":       cfg.g("prebreak", "PREBREAK_NEAR_MAX"),
         "ONE_H_RESIST_BUFFER":     cfg.g("hold", "ONE_H_RESIST_BUFFER"),
         "MAJOR_STRUCT_LOOKBACK":   cfg.g("hold", "MAJOR_STRUCT_LOOKBACK"),
@@ -850,6 +897,12 @@ def _build_analyze_params(cfg):
         "CVD_LOOKBACK":              cfg.g("indicators", "CVD_LOOKBACK", default=10),
         "CVD_BULLISH_MIN":           cfg.g("indicators", "CVD_BULLISH_MIN", default=0.05),
         "BREAKOUT_BUFFER":           cfg.g("breakout", "BREAKOUT_BUFFER"),
+        "BREAKOUT_MIN_VOL_RATIO":       cfg.g("breakout", "BREAKOUT_MIN_VOL_RATIO"),
+        "BREAKOUT_MAX_EXTENDED":        cfg.g("breakout", "BREAKOUT_MAX_EXTENDED"),
+        "BREAKOUT_BB_EXPANSION_MIN":    cfg.g("breakout", "BREAKOUT_BB_EXPANSION_MIN"),
+        "BREAKOUT_MIN_BODY_PCT":        cfg.g("breakout", "BREAKOUT_MIN_BODY_PCT"),
+        "DEFER_ENABLED":             cfg.g("breakout", "DEFER_ENABLED", default=False),
+        "DEFER_BARS":                cfg.g("breakout", "DEFER_BARS", default=12),
         "PREBREAK_NEAR_MAX":         cfg.g("prebreak", "PREBREAK_NEAR_MAX"),
         "ONE_H_RESIST_BUFFER":       cfg.g("hold", "ONE_H_RESIST_BUFFER"),
         "MAJOR_STRUCT_LOOKBACK":     cfg.g("hold", "MAJOR_STRUCT_LOOKBACK"),
@@ -881,6 +934,12 @@ def analyze_at_index(df, end_idx, params):
     CVD_LOOKBACK = params["CVD_LOOKBACK"]
     CVD_BULLISH_MIN = params["CVD_BULLISH_MIN"]
     BREAKOUT_BUFFER = params["BREAKOUT_BUFFER"]
+    BREAKOUT_MIN_VOL_RATIO    = params["BREAKOUT_MIN_VOL_RATIO"]
+    BREAKOUT_MAX_EXTENDED     = params["BREAKOUT_MAX_EXTENDED"]
+    BREAKOUT_BB_EXPANSION_MIN = params["BREAKOUT_BB_EXPANSION_MIN"]
+    BREAKOUT_MIN_BODY_PCT     = params["BREAKOUT_MIN_BODY_PCT"]
+    DEFER_ENABLED   = params["DEFER_ENABLED"]
+    DEFER_BARS      = params["DEFER_BARS"]
     PREBREAK_NEAR_MAX = params["PREBREAK_NEAR_MAX"]
     ONE_H_RESIST_BUFFER = params["ONE_H_RESIST_BUFFER"]
     MAJOR_STRUCT_LOOKBACK = params["MAJOR_STRUCT_LOOKBACK"]
@@ -1040,6 +1099,40 @@ def analyze_at_index(df, end_idx, params):
                                                 float(arr["high"][end_idx]),
                                                 float(arr["low"][end_idx])) >= STRONG_CLOSE_MIN)
 
+    # ── BREAKOUT DIFERIDO (vectorizado) ───────────────────────────────────
+    # BREAKOUT dispara en la vela de ruptura y ahí compra el techo: contra un momento al
+    # azar de la MISMA moneda pierde -4.2pp (926 alertas reales de jul-2026) y -3.6pp
+    # (alertas del backtest, jul 18-31), con el 84% de las monedas repitiendo la brecha.
+    # Apagarlo empeora (elige bien la moneda, mal el instante), así que se conserva la
+    # detección y se mueve la entrada: se busca una barra que HABRÍA disparado BREAKOUT
+    # hace DEFER_BARS y se exige que el precio siga sobre el nivel roto.
+    # Sin estado: se re-deriva de la serie, igual que HOLD.
+    # Se mira UNA sola barra (la de hace DEFER_BARS), no una ventana: si se acepta
+    # cualquier barra del rango, la misma ruptura vuelve a disparar scan tras scan y
+    # multiplica las alertas por ~3.7, diluyendo el bucket BEST.
+    defer_breakout = False
+    defer_bars_since = None
+    defer_distance = None
+    if DEFER_ENABLED:
+        _b_d = end_idx - DEFER_BARS
+        if _b_d >= 26:
+            _lvl_d = arr["_recent_max_shift1"][_b_d]
+            if np.isfinite(_lvl_d) and _lvl_d > 0:
+                _lvl_d = float(_lvl_d)
+                _c_d = float(arr["close"][_b_d])
+                _wp_d = float(arr["_bb_width"][_b_d - 1])
+                _wexp_d = safe_pct(float(arr["_bb_width"][_b_d]), _wp_d) if _wp_d > 0 else 0.0
+                if (_c_d > _lvl_d * (1 + BREAKOUT_BUFFER)
+                        and arr["_vol_ratio"][_b_d] >= BREAKOUT_MIN_VOL_RATIO
+                        and safe_pct(_c_d, _lvl_d) <= BREAKOUT_MAX_EXTENDED
+                        and _wexp_d >= BREAKOUT_BB_EXPANSION_MIN
+                        and arr["_close_pos"][_b_d] >= STRONG_CLOSE_MIN
+                        and arr["_candle_body_pct"][_b_d] >= BREAKOUT_MIN_BODY_PCT
+                        and price > _lvl_d):                # sigue sobre el nivel roto
+                    defer_breakout = True
+                    defer_bars_since = DEFER_BARS
+                    defer_distance = safe_pct(price, _lvl_d)
+
     # RIDING lookback (vectorizado sobre slice de arrays numpy)
     riding_break_idx = None
     riding_break_close = None
@@ -1105,6 +1198,9 @@ def analyze_at_index(df, end_idx, params):
         "major_struct_ok": major_struct_ok,
         "major_struct_dist": major_dist,
         "bars_since_major_max": bars_since_major_max,
+        "defer_breakout": defer_breakout,
+        "defer_bars_since": defer_bars_since,
+        "defer_distance": defer_distance,
         "hold_recent_break": hold_recent_break,
         "hold_kept_zone": hold_kept_zone,
         "hold_pullback_ok": hold_pullback_ok,
@@ -1315,15 +1411,27 @@ def classify(symbol, tf_data, cfg, counts_history=None, regime_up=None):
     # ── BREAKOUT ──────────────────────────────────────────────────────────
     if _trad_signals_eligible and cfg.g("active_signals", "BREAKOUT"):
         require_obv_nn = cfg.g("breakout", "BREAKOUT_REQUIRE_OBV_NON_NEGATIVE", default=True)
-        if (tf_4h.get("breakout")
-            and tf_4h.get("vol_ratio", 0) >= cfg.g("breakout", "BREAKOUT_MIN_VOL_RATIO")
-            and tf_4h.get("breakout_distance", 9) <= cfg.g("breakout", "BREAKOUT_MAX_EXTENDED")
-            and tf_4h.get("width_expansion", -9) >= cfg.g("breakout", "BREAKOUT_BB_EXPANSION_MIN")
-            and tf_4h.get("strong_close", False)
-            and tf_4h.get("candle_body_pct", 0) >= cfg.g("breakout", "BREAKOUT_MIN_BODY_PCT")
-            and tf_1h.get("vol_ratio", 0) >= cfg.g("breakout", "BREAKOUT_1H_MIN_VOL_RATIO")
-            and tf_1h.get("strong_close", False)
-            and (not require_obv_nn or tf_4h.get("obv_slope", 0) >= 0)):
+        if cfg.g("breakout", "DEFER_ENABLED", default=False):
+            # Modo diferido: los gates de la ruptura ya se evaluaron sobre la barra de
+            # hace DEFER_BARS dentro de analyze_*; acá solo queda exigir que el
+            # precio siga sobre el nivel. Los gates de 1h ("está rompiendo AHORA con
+            # volumen") no aplican 24-48h después, por eso no se piden.
+            _bo_fires = bool(tf_4h.get("defer_breakout"))
+            # Para el bonus/penalty de entrada importa cuán extendido está respecto del
+            # nivel ROTO, no del máximo reciente de hoy.
+            _bo_dist = tf_4h.get("defer_distance") or 0.0
+        else:
+            _bo_fires = bool(
+                tf_4h.get("breakout")
+                and tf_4h.get("vol_ratio", 0) >= cfg.g("breakout", "BREAKOUT_MIN_VOL_RATIO")
+                and tf_4h.get("breakout_distance", 9) <= cfg.g("breakout", "BREAKOUT_MAX_EXTENDED")
+                and tf_4h.get("width_expansion", -9) >= cfg.g("breakout", "BREAKOUT_BB_EXPANSION_MIN")
+                and tf_4h.get("strong_close", False)
+                and tf_4h.get("candle_body_pct", 0) >= cfg.g("breakout", "BREAKOUT_MIN_BODY_PCT")
+                and tf_1h.get("vol_ratio", 0) >= cfg.g("breakout", "BREAKOUT_1H_MIN_VOL_RATIO")
+                and tf_1h.get("strong_close", False))
+            _bo_dist = tf_4h.get("breakout_distance", 0)
+        if _bo_fires and (not require_obv_nn or tf_4h.get("obv_slope", 0) >= 0):
 
             base_score        = cfg.g("scoring_breakout", "BASE_SCORE", default=8)
             obv_explosive_min = cfg.g("scoring_breakout", "OBV_TIER_EXPLOSIVE_MIN", default=0.3)
@@ -1386,14 +1494,14 @@ def classify(symbol, tf_data, cfg, counts_history=None, regime_up=None):
             if tf_4h.get("candle_body_pct", 0) >= climax_body_min:
                 climax_signals += 1
             _climax_late_only = cfg.g("indicators", "CLIMAX_REQUIRES_LATE_ENTRY", default=False)
-            if climax_signals >= climax_thresh and (not _climax_late_only or tf_4h["breakout_distance"] >= late_min):
+            if climax_signals >= climax_thresh and (not _climax_late_only or _bo_dist >= late_min):
                 score += climax_pen
                 bd["CLIMAX"] = climax_pen
 
-            if tf_4h["breakout_distance"] <= early_max:
+            if _bo_dist <= early_max:
                 score += early_bonus
                 bd["EARLY_ENTRY"] = early_bonus
-            elif tf_4h["breakout_distance"] >= late_min:
+            elif _bo_dist >= late_min:
                 score += late_pen_entry
                 bd["LATE_ENTRY"] = late_pen_entry
 
@@ -1428,6 +1536,10 @@ def classify(symbol, tf_data, cfg, counts_history=None, regime_up=None):
                     "bb_width": tf_4h.get("width_curr"),
                     "breakout_distance": tf_4h.get("breakout_distance"),
                     "dist_to_res": tf_1d.get("dist_to_res"),
+                    # En modo diferido: cuántas barras pasaron desde la ruptura y cuánto
+                    # está por encima del nivel roto (None si disparó en la vela misma).
+                    "defer_bars_since": tf_4h.get("defer_bars_since"),
+                    "defer_distance": tf_4h.get("defer_distance"),
                 })
 
     # ── RIDING ────────────────────────────────────────────────────────────

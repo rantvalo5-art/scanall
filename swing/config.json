@@ -68,7 +68,10 @@
     "BREAKOUT_BB_EXPANSION_MIN": 0,
     "BREAKOUT_1H_MIN_VOL_RATIO": 1.0,
     "BREAKOUT_MIN_BODY_PCT": 0.4,
-    "BREAKOUT_REQUIRE_OBV_NON_NEGATIVE": true
+    "BREAKOUT_REQUIRE_OBV_NON_NEGATIVE": true,
+    "_COMMENT_DEFER": "BREAKOUT diferido (ago-2026). Disparando en la vela de ruptura, la senal compra el techo: contra un momento al azar de la MISMA moneda pierde -4.2pp a 7d (926 alertas reales jul-2026) y -3.6pp (alertas del backtest, jul 18-31), con 84% de las monedas repitiendo la brecha y 70% de los casos cayendo. Apagarla es peor (elige bien la moneda y mal el instante). Con DEFER_ENABLED, en vez de disparar en la ruptura se mira si la barra de hace DEFER_BARS HABRIA disparado hace DEFER_BARS y se exige que el precio siga sobre el nivel roto. 12 barras de 4h = 48h, el punto donde el exceso deja de caer (t0 -3.75% -> t0+48h +2.06%). No usa estado: se re-deriva de la serie como HOLD. Los gates de 1h no se piden (miden que este rompiendo AHORA). Se mira UNA barra, no una ventana: aceptar cualquiera del rango multiplica las alertas x3.7 y diluye BEST.",
+    "DEFER_ENABLED": true,
+    "DEFER_BARS": 12
   },
   "hold": {
     "HOLD_LOOKBACK_BARS": 8,
@@ -92,7 +95,7 @@
   "riding": {
     "RIDING_LOOKBACK_BARS": 20,
     "RIDING_MIN_GAIN": 0.015,
-    "RIDING_MAX_GAIN": 0.30,
+    "RIDING_MAX_GAIN": 0.3,
     "RIDING_ZONE_BUFFER": 0.02,
     "RIDING_MIN_VOL_RATIO": 1.0,
     "RIDING_EMA_MUST_TREND": true,
@@ -118,7 +121,7 @@
     }
   },
   "bucket_atr_band": {
-    "_COMMENT": "Rediseño de buckets jul-2026: BEST = banda atr_pct_1d x score alto (densidad de movers 48% WF 7/7, exit-ret 2.4x), STRONG = resto de banda (cobertura exit tracker), WATCH = fuera de banda. Cuando ENABLED pisa los buckets por score y los gates ATR1D_GATE_* per-senal.",
+    "_COMMENT": "Redise\u00c3\u00b1o de buckets jul-2026: BEST = banda atr_pct_1d x score alto (densidad de movers 48% WF 7/7, exit-ret 2.4x), STRONG = resto de banda (cobertura exit tracker), WATCH = fuera de banda. Cuando ENABLED pisa los buckets por score y los gates ATR1D_GATE_* per-senal.",
     "ENABLED": true,
     "BAND_MIN": 5.0,
     "BAND_MAX": 15.0,
@@ -239,7 +242,7 @@
     ],
     "ARM_PCT": 0.12,
     "TRAIL_PCT": 0.08,
-    "STOP_PCT": 0.10,
+    "STOP_PCT": 0.1,
     "RECENT_HOURS": 6,
     "WINDOW_DAYS": 7,
     "BATCH_SIZE": 300,
@@ -253,7 +256,7 @@
   },
   "evaluation": {
     "_COMMENT": "Metrica de cabecera del backtest (ago-2026). El CATCH RATE (recall sobre los top movers) premia lo que la volatilidad regala: medido sobre 14.813 obs del universo USDT, reglas de ATR/ancho de rango triplican P(+30%) pero suben P(-30%) igual o mas (ratio 0.59-1.05 vs 1.50 del universo). Y el score del swing sube P(+30%) de 2.0% a 4.9% con el ratio clavado en ~1.8 = el que el universo ya da gratis -> mide volatilidad, no direccion. Lo unico que califica como ventaja es subir el RATIO sube/baja por encima del universo (lift > 1) y la MEDIANA del exceso. Solo REPORTE: no altera deteccion ni buckets.",
-    "TAIL_PCT": 0.30,
+    "TAIL_PCT": 0.3,
     "BASELINE_ENABLED": true,
     "BASELINE_STEP_HOURS": 24
   },
@@ -264,7 +267,12 @@
     "MA_BARS_1D": 20,
     "MODE": "soft",
     "PENALTY": 2,
-    "SIGNALS": ["PREBREAK", "BREAKOUT", "HOLD", "COILING"]
+    "SIGNALS": [
+      "PREBREAK",
+      "BREAKOUT",
+      "HOLD",
+      "COILING"
+    ]
   },
   "costs": {
     "_COMMENT": "Comisiones + slippage por lado. Antes de esto NINGUN numero del backtest incluia costos. Spot Binance taker = 0.1%/lado; SLIPPAGE cubre spread + impacto (MIN_QUOTE_VOLUME=1M es permisivo, hay pares donde el spread solo ya come el trade). Round-trip = 2 x (FEE + SLIPPAGE). Solo afecta REPORTE, no deteccion.",
@@ -277,9 +285,12 @@
     "ENABLED": false,
     "MAX_CONCURRENT": 10,
     "MAX_PER_SYMBOL": 1,
-    "BUCKETS": ["BEST", "STRONG"],
+    "BUCKETS": [
+      "BEST",
+      "STRONG"
+    ],
     "RISK_PCT_PER_TRADE": 0.01,
-    "STOP_PCT_FOR_SIZING": 0.10,
+    "STOP_PCT_FOR_SIZING": 0.1,
     "HOLD_DAYS": 7
   },
   "scoring_calibration": {
@@ -293,7 +304,11 @@
     "ENABLED": false,
     "MODE": "soft",
     "PENALTY": 2,
-    "SIGNALS": ["BREAKOUT", "HOLD", "RIDING"]
+    "SIGNALS": [
+      "BREAKOUT",
+      "HOLD",
+      "RIDING"
+    ]
   },
   "coiling": {
     "COILING_MAX_DIST": 0.06,
