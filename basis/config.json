@@ -1,0 +1,41 @@
+{
+  "_comment": "Basis/funding delta-neutral — Fase 1 (medicion). Ver HANDOFF_BASIS.md.",
+
+  "window": {
+    "_comment": "Ventana FIJA con fechas explicitas. Nunca relativa a hoy (leccion del swing).",
+    "start_utc": "2025-08-01",
+    "end_utc": "2026-08-01"
+  },
+
+  "costs": {
+    "_comment": "4 patas por round-trip. VIP0. taker=0.30%, maker=0.24% sobre el notional.",
+    "spot_taker_pct": 0.10,
+    "spot_maker_pct": 0.10,
+    "perp_taker_pct": 0.05,
+    "perp_maker_pct": 0.02,
+    "MODE": "taker"
+  },
+
+  "capital": {
+    "_comment": "Notional 1.0 en spot + margen del short perp. A 3x con colchon: 1.0 + 0.35.",
+    "PERP_MARGIN_FRACTION": 0.35
+  },
+
+  "floor": {
+    "_comment": "Piso real contra el que compite: prestar stablecoins. No es cero.",
+    "STABLECOIN_APY_PCT": 7.0
+  },
+
+  "windows_days": [7, 14, 30],
+
+  "persistence": {
+    "_comment": "Pregunta central: el funding alto dura mas que el break-even (~10d)?",
+    "LOOKBACK_DAYS": 3,
+    "HIGH_APY_THRESHOLD_PCT": 20.0
+  },
+
+  "universe": {
+    "MIN_HISTORY_DAYS": 180,
+    "REQUIRE_SPOT_LEG": true
+  }
+}

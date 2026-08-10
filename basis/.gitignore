@@ -1,0 +1,2 @@
+# cache de funding bajado de fapi (16MB, se regenera con fetch_funding.py)
+.funding_cache/

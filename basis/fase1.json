@@ -1,0 +1,237 @@
+{
+ "config": {
+  "window": {
+   "_comment": "Ventana FIJA con fechas explicitas. Nunca relativa a hoy (leccion del swing).",
+   "start_utc": "2025-08-01",
+   "end_utc": "2026-08-01"
+  },
+  "round_trip_pct": 0.30000000000000004,
+  "capital_factor": 1.35,
+  "floor_apy": 7.0,
+  "n_symbols": 351
+ },
+ "windows": {
+  "7": {
+   "n_obs": 122665,
+   "net_apy": {
+    "n": 122665,
+    "mean": -23.80595033228328,
+    "median": -8.308249735449765,
+    "p25": -15.903764550264853,
+    "p75": -4.788066137565961
+   },
+   "pct_beat_floor": 0.4002771776790446,
+   "pct_positive": 0.7875106998736395,
+   "median_of_symbol_medians": -8.41525846560846,
+   "pct_symbols_beat_floor": 0.0,
+   "median_of_week_medians": -8.226993783068743,
+   "pct_weeks_beat_floor": 0.0,
+   "concentration": {
+    "top_contributors": [
+     [
+      "\u5e01\u5b89\u4eba\u751fUSDT",
+      61.43
+     ],
+     [
+      "BANKUSDT",
+      8.77
+     ],
+     [
+      "GIGGLEUSDT",
+      -12.06
+     ],
+     [
+      "TUTUSDT",
+      -28.43
+     ],
+     [
+      "ALPINEUSDT",
+      -36.64
+     ]
+    ],
+    "drop_top1": {
+     "mean_apy": -23.88,
+     "median_apy": -8.32,
+     "pct_beat_floor": 0.3
+    },
+    "drop_top3": {
+     "mean_apy": -24.01,
+     "median_apy": -8.36,
+     "pct_beat_floor": 0.3
+    },
+    "drop_top5": {
+     "mean_apy": -24.13,
+     "median_apy": -8.41,
+     "pct_beat_floor": 0.2
+    }
+   }
+  },
+  "14": {
+   "n_obs": 120208,
+   "net_apy": {
+    "n": 120208,
+    "mean": -18.01362953654587,
+    "median": -3.1372039682539024,
+    "p25": -11.506653968254156,
+    "p75": 0.44653597883593976
+   },
+   "pct_beat_floor": 0.6480433914548117,
+   "pct_positive": 28.664481565286838,
+   "median_of_symbol_medians": -3.320244708994729,
+   "pct_symbols_beat_floor": 0.0,
+   "median_of_week_medians": -3.2295354497354807,
+   "pct_weeks_beat_floor": 0.0,
+   "concentration": {
+    "top_contributors": [
+     [
+      "\u5e01\u5b89\u4eba\u751fUSDT",
+      194.2
+     ],
+     [
+      "BANKUSDT",
+      127.38
+     ],
+     [
+      "TUTUSDT",
+      48.73
+     ],
+     [
+      "GIGGLEUSDT",
+      44.22
+     ],
+     [
+      "ALPINEUSDT",
+      33.22
+     ]
+    ],
+    "drop_top1": {
+     "mean_apy": -18.09,
+     "median_apy": -3.15,
+     "pct_beat_floor": 0.5
+    },
+    "drop_top3": {
+     "mean_apy": -18.22,
+     "median_apy": -3.2,
+     "pct_beat_floor": 0.5
+    },
+    "drop_top5": {
+     "mean_apy": -18.33,
+     "median_apy": -3.24,
+     "pct_beat_floor": 0.4
+    }
+   }
+  },
+  "30": {
+   "n_obs": 114592,
+   "net_apy": {
+    "n": 114592,
+    "mean": -15.145434944054909,
+    "median": -1.1074415432098925,
+    "p25": -11.180317253086583,
+    "p75": 2.882758734567439
+   },
+   "pct_beat_floor": 0.8892418318905334,
+   "pct_positive": 43.673205808433394,
+   "median_of_symbol_medians": -1.2461911111111115,
+   "pct_symbols_beat_floor": 0.5698005698005698,
+   "median_of_week_medians": -1.856831604938217,
+   "pct_weeks_beat_floor": 0.0,
+   "concentration": {
+    "top_contributors": [
+     [
+      "\u5e01\u5b89\u4eba\u751fUSDT",
+      451.74
+     ],
+     [
+      "BANKUSDT",
+      383.71
+     ],
+     [
+      "TUTUSDT",
+      211.76
+     ],
+     [
+      "BEAMXUSDT",
+      182.73
+     ],
+     [
+      "FORMUSDT",
+      180.36
+     ]
+    ],
+    "drop_top1": {
+     "mean_apy": -15.21,
+     "median_apy": -1.13,
+     "pct_beat_floor": 0.8
+    },
+    "drop_top3": {
+     "mean_apy": -15.35,
+     "median_apy": -1.18,
+     "pct_beat_floor": 0.7
+    },
+    "drop_top5": {
+     "mean_apy": -15.47,
+     "median_apy": -1.24,
+     "pct_beat_floor": 0.6
+    }
+   }
+  }
+ },
+ "gross_buyhold_apy": {
+  "n": 351,
+  "mean": -17.167272642867605,
+  "median": -4.711868076017922,
+  "p25": -23.455333197807416,
+  "p75": 1.9898002205763055
+ },
+ "buyhold_net_apy": {
+  "n": 351,
+  "mean": -12.938720476198226,
+  "median": -3.712494871124386,
+  "p25": -17.596543109486973,
+  "p75": 1.2517038670935592
+ },
+ "buyhold_pct_beat_floor": 2.2792022792022792,
+ "breakeven": {
+  "all": {
+   "pct_cover_45d": 55.0833995234313,
+   "median_be_days": 14.0,
+   "pct_cover_10d": 4.8598924949664735
+  },
+  "high_funding": {
+   "n": 388,
+   "pct_cover_45d": 90.72164948453609,
+   "median_be_days": 4.0,
+   "pct_cover_10d": 80.6701030927835
+  }
+ },
+ "verdict": {
+  "7": {
+   "pass": false,
+   "checks": {
+    "mediana por simbolo > piso": false,
+    "mediana por semana > piso": false,
+    "sobrevive sacar top-3": false
+   }
+  },
+  "14": {
+   "pass": false,
+   "checks": {
+    "mediana por simbolo > piso": false,
+    "mediana por semana > piso": false,
+    "sobrevive sacar top-3": false
+   }
+  },
+  "30": {
+   "pass": false,
+   "checks": {
+    "mediana por simbolo > piso": false,
+    "mediana por semana > piso": false,
+    "sobrevive sacar top-3": false
+   }
+  },
+  "buyhold": {
+   "pass": false
+  }
+ }
+}

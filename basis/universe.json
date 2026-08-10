@@ -1,0 +1,2108 @@
+{
+ "0GUSDT": {
+  "spot": "0GUSDT",
+  "interval_h": 4,
+  "n_settlements": 3256,
+  "span_days": 317.2
+ },
+ "1000BONKUSDT": {
+  "spot": "BONKUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "1000CATUSDT": {
+  "spot": "1000CATUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "1000CHEEMSUSDT": {
+  "spot": "1000CHEEMSUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "1000FLOKIUSDT": {
+  "spot": "FLOKIUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "1000LUNCUSDT": {
+  "spot": "LUNCUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "1000PEPEUSDT": {
+  "spot": "PEPEUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "1000SATSUSDT": {
+  "spot": "1000SATSUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "1000SHIBUSDT": {
+  "spot": "SHIBUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "1000XECUSDT": {
+  "spot": "XECUSDT",
+  "interval_h": 4,
+  "n_settlements": 1323,
+  "span_days": 364.8
+ },
+ "1INCHUSDT": {
+  "spot": "1INCHUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "1MBABYDOGEUSDT": {
+  "spot": "1MBABYDOGEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "2ZUSDT": {
+  "spot": "2ZUSDT",
+  "interval_h": 4,
+  "n_settlements": 1815,
+  "span_days": 302.3
+ },
+ "AAVEUSDT": {
+  "spot": "AAVEUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ACEUSDT": {
+  "spot": "ACEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2396,
+  "span_days": 364.8
+ },
+ "ACHUSDT": {
+  "spot": "ACHUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ACTUSDT": {
+  "spot": "ACTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ADAUSDT": {
+  "spot": "ADAUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "AEROUSDT": {
+  "spot": "AEROUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "AEVOUSDT": {
+  "spot": "AEVOUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "AGLDUSDT": {
+  "spot": "AGLDUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "AIXBTUSDT": {
+  "spot": "AIXBTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ALGOUSDT": {
+  "spot": "ALGOUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ALICEUSDT": {
+  "spot": "ALICEUSDT",
+  "interval_h": 4,
+  "n_settlements": 1616,
+  "span_days": 364.8
+ },
+ "ALLOUSDT": {
+  "spot": "ALLOUSDT",
+  "interval_h": 4,
+  "n_settlements": 1574,
+  "span_days": 262.3
+ },
+ "ALPINEUSDT": {
+  "spot": "ALPINEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ALTUSDT": {
+  "spot": "ALTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ANIMEUSDT": {
+  "spot": "ANIMEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2469,
+  "span_days": 364.8
+ },
+ "ANKRUSDT": {
+  "spot": "ANKRUSDT",
+  "interval_h": 4,
+  "n_settlements": 1533,
+  "span_days": 364.8
+ },
+ "APEUSDT": {
+  "spot": "APEUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "API3USDT": {
+  "spot": "API3USDT",
+  "interval_h": 4,
+  "n_settlements": 2778,
+  "span_days": 364.8
+ },
+ "APTUSDT": {
+  "spot": "APTUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ARBUSDT": {
+  "spot": "ARBUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ARKMUSDT": {
+  "spot": "ARKMUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ARKUSDT": {
+  "spot": "ARKUSDT",
+  "interval_h": 4,
+  "n_settlements": 2203,
+  "span_days": 364.8
+ },
+ "ARPAUSDT": {
+  "spot": "ARPAUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ARUSDT": {
+  "spot": "ARUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ASRUSDT": {
+  "spot": "ASRUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ASTERUSDT": {
+  "spot": "ASTERUSDT",
+  "interval_h": 4,
+  "n_settlements": 1892,
+  "span_days": 315.3
+ },
+ "ASTRUSDT": {
+  "spot": "ASTRUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ATOMUSDT": {
+  "spot": "ATOMUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ATUSDT": {
+  "spot": "ATUSDT",
+  "interval_h": 4,
+  "n_settlements": 1652,
+  "span_days": 275.3
+ },
+ "AUCTIONUSDT": {
+  "spot": "AUCTIONUSDT",
+  "interval_h": 4,
+  "n_settlements": 2251,
+  "span_days": 364.8
+ },
+ "AUSDT": {
+  "spot": "AUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "AVAUSDT": {
+  "spot": "AVAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "AVAXUSDT": {
+  "spot": "AVAXUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "AVNTUSDT": {
+  "spot": "AVNTUSDT",
+  "interval_h": 4,
+  "n_settlements": 1951,
+  "span_days": 325.2
+ },
+ "AWEUSDT": {
+  "spot": "AWEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "AXLUSDT": {
+  "spot": "AXLUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "AXSUSDT": {
+  "spot": "AXSUSDT",
+  "interval_h": 4,
+  "n_settlements": 1836,
+  "span_days": 364.8
+ },
+ "BABYUSDT": {
+  "spot": "BABYUSDT",
+  "interval_h": 4,
+  "n_settlements": 2237,
+  "span_days": 364.8
+ },
+ "BANANAS31USDT": {
+  "spot": "BANANAS31USDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "BANANAUSDT": {
+  "spot": "BANANAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2342,
+  "span_days": 364.8
+ },
+ "BANDUSDT": {
+  "spot": "BANDUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "BANKUSDT": {
+  "spot": "BANKUSDT",
+  "interval_h": 4,
+  "n_settlements": 2216,
+  "span_days": 365.0
+ },
+ "BARDUSDT": {
+  "spot": "BARDUSDT",
+  "interval_h": 4,
+  "n_settlements": 2550,
+  "span_days": 316.5
+ },
+ "BATUSDT": {
+  "spot": "BATUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "BBUSDT": {
+  "spot": "BBUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "BCHUSDT": {
+  "spot": "BCHUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "BEAMXUSDT": {
+  "spot": "BEAMXUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "BELUSDT": {
+  "spot": "BELUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "BERAUSDT": {
+  "spot": "BERAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "BICOUSDT": {
+  "spot": "BICOUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "BIGTIMEUSDT": {
+  "spot": "BIGTIMEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "BIOUSDT": {
+  "spot": "BIOUSDT",
+  "interval_h": 4,
+  "n_settlements": 3001,
+  "span_days": 364.8
+ },
+ "BLURUSDT": {
+  "spot": "BLURUSDT",
+  "interval_h": 4,
+  "n_settlements": 1502,
+  "span_days": 364.8
+ },
+ "BMTUSDT": {
+  "spot": "BMTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "BNBUSDT": {
+  "spot": "BNBUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "BNTUSDT": {
+  "spot": "BNTUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "BOMEUSDT": {
+  "spot": "BOMEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "BREVUSDT": {
+  "spot": "BREVUSDT",
+  "interval_h": 4,
+  "n_settlements": 1280,
+  "span_days": 213.3
+ },
+ "BROCCOLI714USDT": {
+  "spot": "BROCCOLI714USDT",
+  "interval_h": 4,
+  "n_settlements": 2222,
+  "span_days": 364.8
+ },
+ "BTCUSDT": {
+  "spot": "BTCUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "C98USDT": {
+  "spot": "C98USDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "CAKEUSDT": {
+  "spot": "CAKEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "CATIUSDT": {
+  "spot": "CATIUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "CELOUSDT": {
+  "spot": "CELOUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "CELRUSDT": {
+  "spot": "CELRUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "CETUSUSDT": {
+  "spot": "CETUSUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "CFXUSDT": {
+  "spot": "CFXUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "CGPTUSDT": {
+  "spot": "CGPTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "CHRUSDT": {
+  "spot": "CHRUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "CHZUSDT": {
+  "spot": "CHZUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "CKBUSDT": {
+  "spot": "CKBUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "COMPUSDT": {
+  "spot": "COMPUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "COOKIEUSDT": {
+  "spot": "COOKIEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "COTIUSDT": {
+  "spot": "COTIUSDT",
+  "interval_h": 1,
+  "n_settlements": 1179,
+  "span_days": 365.0
+ },
+ "COWUSDT": {
+  "spot": "COWUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "CRVUSDT": {
+  "spot": "CRVUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "CTKUSDT": {
+  "spot": "CTKUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "CTSIUSDT": {
+  "spot": "CTSIUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "CUSDT": {
+  "spot": "CUSDT",
+  "interval_h": 4,
+  "n_settlements": 2317,
+  "span_days": 364.8
+ },
+ "CVCUSDT": {
+  "spot": "CVCUSDT",
+  "interval_h": 4,
+  "n_settlements": 2731,
+  "span_days": 364.8
+ },
+ "CVXUSDT": {
+  "spot": "CVXUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "CYBERUSDT": {
+  "spot": "CYBERUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "DASHUSDT": {
+  "spot": "DASHUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "DEXEUSDT": {
+  "spot": "DEXEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2381,
+  "span_days": 365.0
+ },
+ "DIAUSDT": {
+  "spot": "DIAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "DOGEUSDT": {
+  "spot": "DOGEUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "DOGSUSDT": {
+  "spot": "DOGSUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "DOLOUSDT": {
+  "spot": "DOLOUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "DOTUSDT": {
+  "spot": "DOTUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "DUSKUSDT": {
+  "spot": "DUSKUSDT",
+  "interval_h": 4,
+  "n_settlements": 1759,
+  "span_days": 364.8
+ },
+ "DYDXUSDT": {
+  "spot": "DYDXUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "DYMUSDT": {
+  "spot": "DYMUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "EDENUSDT": {
+  "spot": "EDENUSDT",
+  "interval_h": 4,
+  "n_settlements": 1827,
+  "span_days": 304.5
+ },
+ "EDUUSDT": {
+  "spot": "EDUUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "EGLDUSDT": {
+  "spot": "EGLDUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "EIGENUSDT": {
+  "spot": "EIGENUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ENAUSDT": {
+  "spot": "ENAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ENJUSDT": {
+  "spot": "ENJUSDT",
+  "interval_h": 4,
+  "n_settlements": 1771,
+  "span_days": 364.8
+ },
+ "ENSOUSDT": {
+  "spot": "ENSOUSDT",
+  "interval_h": 4,
+  "n_settlements": 1884,
+  "span_days": 290.5
+ },
+ "ENSUSDT": {
+  "spot": "ENSUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "EPICUSDT": {
+  "spot": "EPICUSDT",
+  "interval_h": 4,
+  "n_settlements": 2233,
+  "span_days": 364.8
+ },
+ "ERAUSDT": {
+  "spot": "ERAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2360,
+  "span_days": 365.0
+ },
+ "ETCUSDT": {
+  "spot": "ETCUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ETHFIUSDT": {
+  "spot": "ETHFIUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ETHUSDT": {
+  "spot": "ETHUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "EULUSDT": {
+  "spot": "EULUSDT",
+  "interval_h": 4,
+  "n_settlements": 1748,
+  "span_days": 291.3
+ },
+ "FETUSDT": {
+  "spot": "FETUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "FFUSDT": {
+  "spot": "FFUSDT",
+  "interval_h": 4,
+  "n_settlements": 1832,
+  "span_days": 305.3
+ },
+ "FIDAUSDT": {
+  "spot": "FIDAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2230,
+  "span_days": 364.8
+ },
+ "FILUSDT": {
+  "spot": "FILUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "FLOWUSDT": {
+  "spot": "FLOWUSDT",
+  "interval_h": 4,
+  "n_settlements": 2114,
+  "span_days": 364.8
+ },
+ "FLUXUSDT": {
+  "spot": "FLUXUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "FOGOUSDT": {
+  "spot": "FOGOUSDT",
+  "interval_h": 4,
+  "n_settlements": 1213,
+  "span_days": 202.2
+ },
+ "FORMUSDT": {
+  "spot": "FORMUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "FRAXUSDT": {
+  "spot": "FRAXUSDT",
+  "interval_h": 4,
+  "n_settlements": 1185,
+  "span_days": 197.5
+ },
+ "FUSDT": {
+  "spot": "FUSDT",
+  "interval_h": 4,
+  "n_settlements": 2474,
+  "span_days": 364.8
+ },
+ "GALAUSDT": {
+  "spot": "GALAUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "GASUSDT": {
+  "spot": "GASUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "GIGGLEUSDT": {
+  "spot": "GIGGLEUSDT",
+  "interval_h": 4,
+  "n_settlements": 1773,
+  "span_days": 295.3
+ },
+ "GLMUSDT": {
+  "spot": "GLMUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "GMTUSDT": {
+  "spot": "GMTUSDT",
+  "interval_h": 4,
+  "n_settlements": 1794,
+  "span_days": 364.8
+ },
+ "GMXUSDT": {
+  "spot": "GMXUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "GPSUSDT": {
+  "spot": "GPSUSDT",
+  "interval_h": 4,
+  "n_settlements": 2692,
+  "span_days": 364.8
+ },
+ "GRTUSDT": {
+  "spot": "GRTUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "GTCUSDT": {
+  "spot": "GTCUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "GUNUSDT": {
+  "spot": "GUNUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "GUSDT": {
+  "spot": "GUSDT",
+  "interval_h": 4,
+  "n_settlements": 2239,
+  "span_days": 364.8
+ },
+ "HAEDALUSDT": {
+  "spot": "HAEDALUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "HBARUSDT": {
+  "spot": "HBARUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "HEIUSDT": {
+  "spot": "HEIUSDT",
+  "interval_h": 4,
+  "n_settlements": 2203,
+  "span_days": 364.8
+ },
+ "HEMIUSDT": {
+  "spot": "HEMIUSDT",
+  "interval_h": 4,
+  "n_settlements": 2022,
+  "span_days": 337.0
+ },
+ "HIVEUSDT": {
+  "spot": "HIVEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2272,
+  "span_days": 364.8
+ },
+ "HMSTRUSDT": {
+  "spot": "HMSTRUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "HOLOUSDT": {
+  "spot": "HOLOUSDT",
+  "interval_h": 4,
+  "n_settlements": 1941,
+  "span_days": 323.5
+ },
+ "HOMEUSDT": {
+  "spot": "HOMEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2534,
+  "span_days": 364.8
+ },
+ "HOTUSDT": {
+  "spot": "HOTUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "HUMAUSDT": {
+  "spot": "HUMAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "HYPERUSDT": {
+  "spot": "HYPERUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ICPUSDT": {
+  "spot": "ICPUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ICXUSDT": {
+  "spot": "ICXUSDT",
+  "interval_h": 4,
+  "n_settlements": 1555,
+  "span_days": 364.8
+ },
+ "IDUSDT": {
+  "spot": "IDUSDT",
+  "interval_h": 4,
+  "n_settlements": 1356,
+  "span_days": 364.8
+ },
+ "ILVUSDT": {
+  "spot": "ILVUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "IMXUSDT": {
+  "spot": "IMXUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "INITUSDT": {
+  "spot": "INITUSDT",
+  "interval_h": 4,
+  "n_settlements": 2247,
+  "span_days": 364.8
+ },
+ "INJUSDT": {
+  "spot": "INJUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "IOSTUSDT": {
+  "spot": "IOSTUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "IOTAUSDT": {
+  "spot": "IOTAUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "IOTXUSDT": {
+  "spot": "IOTXUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "IOUSDT": {
+  "spot": "IOUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "JASMYUSDT": {
+  "spot": "JASMYUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "JOEUSDT": {
+  "spot": "JOEUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "JSTUSDT": {
+  "spot": "JSTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "JTOUSDT": {
+  "spot": "JTOUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "JUPUSDT": {
+  "spot": "JUPUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "KAIAUSDT": {
+  "spot": "KAIAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "KAITOUSDT": {
+  "spot": "KAITOUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "KAVAUSDT": {
+  "spot": "KAVAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2634,
+  "span_days": 364.8
+ },
+ "KERNELUSDT": {
+  "spot": "KERNELUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "KITEUSDT": {
+  "spot": "KITEUSDT",
+  "interval_h": 4,
+  "n_settlements": 1652,
+  "span_days": 275.3
+ },
+ "KMNOUSDT": {
+  "spot": "KMNOUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "KNCUSDT": {
+  "spot": "KNCUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "KSMUSDT": {
+  "spot": "KSMUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "LAUSDT": {
+  "spot": "LAUSDT",
+  "interval_h": 4,
+  "n_settlements": 3165,
+  "span_days": 364.8
+ },
+ "LAYERUSDT": {
+  "spot": "LAYERUSDT",
+  "interval_h": 4,
+  "n_settlements": 2955,
+  "span_days": 364.8
+ },
+ "LDOUSDT": {
+  "spot": "LDOUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "LINEAUSDT": {
+  "spot": "LINEAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2000,
+  "span_days": 333.3
+ },
+ "LINKUSDT": {
+  "spot": "LINKUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "LISTAUSDT": {
+  "spot": "LISTAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "LPTUSDT": {
+  "spot": "LPTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "LQTYUSDT": {
+  "spot": "LQTYUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "LSKUSDT": {
+  "spot": "LSKUSDT",
+  "interval_h": 4,
+  "n_settlements": 3128,
+  "span_days": 364.8
+ },
+ "LTCUSDT": {
+  "spot": "LTCUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "LUMIAUSDT": {
+  "spot": "LUMIAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "MAGICUSDT": {
+  "spot": "MAGICUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "MANAUSDT": {
+  "spot": "MANAUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "MANTAUSDT": {
+  "spot": "MANTAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "MASKUSDT": {
+  "spot": "MASKUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "MAVUSDT": {
+  "spot": "MAVUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "MEGAUSDT": {
+  "spot": "MEGAUSDT",
+  "interval_h": 4,
+  "n_settlements": 1094,
+  "span_days": 182.3
+ },
+ "MEMEUSDT": {
+  "spot": "MEMEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "METISUSDT": {
+  "spot": "METISUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "METUSDT": {
+  "spot": "METUSDT",
+  "interval_h": 4,
+  "n_settlements": 1760,
+  "span_days": 293.3
+ },
+ "MEUSDT": {
+  "spot": "MEUSDT",
+  "interval_h": 4,
+  "n_settlements": 3432,
+  "span_days": 364.8
+ },
+ "MINAUSDT": {
+  "spot": "MINAUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "MIRAUSDT": {
+  "spot": "MIRAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2084,
+  "span_days": 308.3
+ },
+ "MITOUSDT": {
+  "spot": "MITOUSDT",
+  "interval_h": 4,
+  "n_settlements": 2024,
+  "span_days": 337.3
+ },
+ "MMTUSDT": {
+  "spot": "MMTUSDT",
+  "interval_h": 4,
+  "n_settlements": 1616,
+  "span_days": 269.3
+ },
+ "MORPHOUSDT": {
+  "spot": "MORPHOUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "MOVEUSDT": {
+  "spot": "MOVEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2225,
+  "span_days": 364.8
+ },
+ "MOVRUSDT": {
+  "spot": "MOVRUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "MTLUSDT": {
+  "spot": "MTLUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "MUBARAKUSDT": {
+  "spot": "MUBARAKUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "NEARUSDT": {
+  "spot": "NEARUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "NEIROUSDT": {
+  "spot": "NEIROUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "NEOUSDT": {
+  "spot": "NEOUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "NEWTUSDT": {
+  "spot": "NEWTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "NIGHTUSDT": {
+  "spot": "NIGHTUSDT",
+  "interval_h": 4,
+  "n_settlements": 1400,
+  "span_days": 233.3
+ },
+ "NILUSDT": {
+  "spot": "NILUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "NMRUSDT": {
+  "spot": "NMRUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "NOMUSDT": {
+  "spot": "NOMUSDT",
+  "interval_h": 4,
+  "n_settlements": 2024,
+  "span_days": 303.5
+ },
+ "NOTUSDT": {
+  "spot": "NOTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "NXPCUSDT": {
+  "spot": "NXPCUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "OGNUSDT": {
+  "spot": "OGNUSDT",
+  "interval_h": 4,
+  "n_settlements": 1565,
+  "span_days": 364.8
+ },
+ "OGUSDT": {
+  "spot": "OGUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ONDOUSDT": {
+  "spot": "ONDOUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ONEUSDT": {
+  "spot": "ONEUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ONGUSDT": {
+  "spot": "ONGUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ONTUSDT": {
+  "spot": "ONTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2215,
+  "span_days": 364.8
+ },
+ "OPENUSDT": {
+  "spot": "OPENUSDT",
+  "interval_h": 4,
+  "n_settlements": 1981,
+  "span_days": 330.2
+ },
+ "OPUSDT": {
+  "spot": "OPUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ORCAUSDT": {
+  "spot": "ORCAUSDT",
+  "interval_h": 4,
+  "n_settlements": 3164,
+  "span_days": 364.8
+ },
+ "ORDIUSDT": {
+  "spot": "ORDIUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "PARTIUSDT": {
+  "spot": "PARTIUSDT",
+  "interval_h": 4,
+  "n_settlements": 2211,
+  "span_days": 364.8
+ },
+ "PAXGUSDT": {
+  "spot": "PAXGUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "PENDLEUSDT": {
+  "spot": "PENDLEUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "PENGUUSDT": {
+  "spot": "PENGUUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "PEOPLEUSDT": {
+  "spot": "PEOPLEUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "PHAUSDT": {
+  "spot": "PHAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "PIXELUSDT": {
+  "spot": "PIXELUSDT",
+  "interval_h": 4,
+  "n_settlements": 2228,
+  "span_days": 364.8
+ },
+ "PLUMEUSDT": {
+  "spot": "PLUMEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2817,
+  "span_days": 364.8
+ },
+ "PNUTUSDT": {
+  "spot": "PNUTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "POLUSDT": {
+  "spot": "POLUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "POLYXUSDT": {
+  "spot": "POLYXUSDT",
+  "interval_h": 4,
+  "n_settlements": 2288,
+  "span_days": 364.8
+ },
+ "PORTALUSDT": {
+  "spot": "PORTALUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "POWRUSDT": {
+  "spot": "POWRUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "PROMUSDT": {
+  "spot": "PROMUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "PROVEUSDT": {
+  "spot": "PROVEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2194,
+  "span_days": 360.2
+ },
+ "PUMPUSDT": {
+  "spot": "PUMPUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "PUNDIXUSDT": {
+  "spot": "PUNDIXUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "PYTHUSDT": {
+  "spot": "PYTHUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "QNTUSDT": {
+  "spot": "QNTUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "QTUMUSDT": {
+  "spot": "QTUMUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "RAREUSDT": {
+  "spot": "RAREUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "REDUSDT": {
+  "spot": "REDUSDT",
+  "interval_h": 4,
+  "n_settlements": 2588,
+  "span_days": 364.8
+ },
+ "RENDERUSDT": {
+  "spot": "RENDERUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "RESOLVUSDT": {
+  "spot": "RESOLVUSDT",
+  "interval_h": 4,
+  "n_settlements": 2966,
+  "span_days": 364.8
+ },
+ "REZUSDT": {
+  "spot": "REZUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "RIFUSDT": {
+  "spot": "RIFUSDT",
+  "interval_h": 4,
+  "n_settlements": 2219,
+  "span_days": 364.8
+ },
+ "RLCUSDT": {
+  "spot": "RLCUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "RONINUSDT": {
+  "spot": "RONINUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ROSEUSDT": {
+  "spot": "ROSEUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "RPLUSDT": {
+  "spot": "RPLUSDT",
+  "interval_h": 4,
+  "n_settlements": 2292,
+  "span_days": 364.8
+ },
+ "RSRUSDT": {
+  "spot": "RSRUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "RUNEUSDT": {
+  "spot": "RUNEUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "RVNUSDT": {
+  "spot": "RVNUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "SAGAUSDT": {
+  "spot": "SAGAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "SAHARAUSDT": {
+  "spot": "SAHARAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2628,
+  "span_days": 364.8
+ },
+ "SANDUSDT": {
+  "spot": "SANDUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "SANTOSUSDT": {
+  "spot": "SANTOSUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "SAPIENUSDT": {
+  "spot": "SAPIENUSDT",
+  "interval_h": 4,
+  "n_settlements": 2070,
+  "span_days": 345.0
+ },
+ "SCRTUSDT": {
+  "spot": "SCRTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "SCRUSDT": {
+  "spot": "SCRUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "SEIUSDT": {
+  "spot": "SEIUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "SENTUSDT": {
+  "spot": "SENTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2034,
+  "span_days": 259.2
+ },
+ "SFPUSDT": {
+  "spot": "SFPUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "SHELLUSDT": {
+  "spot": "SHELLUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "SIGNUSDT": {
+  "spot": "SIGNUSDT",
+  "interval_h": 4,
+  "n_settlements": 2330,
+  "span_days": 364.8
+ },
+ "SKLUSDT": {
+  "spot": "SKLUSDT",
+  "interval_h": 4,
+  "n_settlements": 2028,
+  "span_days": 364.8
+ },
+ "SKYUSDT": {
+  "spot": "SKYUSDT",
+  "interval_h": 4,
+  "n_settlements": 1953,
+  "span_days": 325.5
+ },
+ "SLPUSDT": {
+  "spot": "SLPUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "SNXUSDT": {
+  "spot": "SNXUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "SOLUSDT": {
+  "spot": "SOLUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "SOLVUSDT": {
+  "spot": "SOLVUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "SOMIUSDT": {
+  "spot": "SOMIUSDT",
+  "interval_h": 4,
+  "n_settlements": 2042,
+  "span_days": 340.3
+ },
+ "SOPHUSDT": {
+  "spot": "SOPHUSDT",
+  "interval_h": 4,
+  "n_settlements": 2435,
+  "span_days": 364.8
+ },
+ "SPELLUSDT": {
+  "spot": "SPELLUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "SPKUSDT": {
+  "spot": "SPKUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "SSVUSDT": {
+  "spot": "SSVUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "STEEMUSDT": {
+  "spot": "STEEMUSDT",
+  "interval_h": 4,
+  "n_settlements": 2355,
+  "span_days": 364.8
+ },
+ "STGUSDT": {
+  "spot": "STGUSDT",
+  "interval_h": 4,
+  "n_settlements": 1323,
+  "span_days": 364.8
+ },
+ "STORJUSDT": {
+  "spot": "STORJUSDT",
+  "interval_h": 4,
+  "n_settlements": 1874,
+  "span_days": 364.8
+ },
+ "STOUSDT": {
+  "spot": "STOUSDT",
+  "interval_h": 4,
+  "n_settlements": 2311,
+  "span_days": 364.8
+ },
+ "STRKUSDT": {
+  "spot": "STRKUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "STXUSDT": {
+  "spot": "STXUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "SUIUSDT": {
+  "spot": "SUIUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "SUNUSDT": {
+  "spot": "SUNUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "SUPERUSDT": {
+  "spot": "SUPERUSDT",
+  "interval_h": 4,
+  "n_settlements": 3515,
+  "span_days": 364.8
+ },
+ "SUSDT": {
+  "spot": "SUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "SUSHIUSDT": {
+  "spot": "SUSHIUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "SXTUSDT": {
+  "spot": "SXTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "SYNUSDT": {
+  "spot": "SYNUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "SYRUPUSDT": {
+  "spot": "SYRUPUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "TAOUSDT": {
+  "spot": "TAOUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "THETAUSDT": {
+  "spot": "THETAUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "THEUSDT": {
+  "spot": "THEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "TIAUSDT": {
+  "spot": "TIAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "TLMUSDT": {
+  "spot": "TLMUSDT",
+  "interval_h": 4,
+  "n_settlements": 1571,
+  "span_days": 364.8
+ },
+ "TNSRUSDT": {
+  "spot": "TNSRUSDT",
+  "interval_h": 4,
+  "n_settlements": 2978,
+  "span_days": 364.8
+ },
+ "TOWNSUSDT": {
+  "spot": "TOWNSUSDT",
+  "interval_h": 4,
+  "n_settlements": 2161,
+  "span_days": 360.2
+ },
+ "TRBUSDT": {
+  "spot": "TRBUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "TREEUSDT": {
+  "spot": "TREEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2248,
+  "span_days": 364.8
+ },
+ "TRUMPUSDT": {
+  "spot": "TRUMPUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "TRXUSDT": {
+  "spot": "TRXUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "TSTUSDT": {
+  "spot": "TSTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "TURBOUSDT": {
+  "spot": "TURBOUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "TURTLEUSDT": {
+  "spot": "TURTLEUSDT",
+  "interval_h": 4,
+  "n_settlements": 1734,
+  "span_days": 282.3
+ },
+ "TUSDT": {
+  "spot": "TUSDT",
+  "interval_h": 4,
+  "n_settlements": 2432,
+  "span_days": 364.8
+ },
+ "TUTUSDT": {
+  "spot": "TUTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "TWTUSDT": {
+  "spot": "TWTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "UMAUSDT": {
+  "spot": "UMAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "UNIUSDT": {
+  "spot": "UNIUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "USDCUSDT": {
+  "spot": "USDCUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "USTCUSDT": {
+  "spot": "USTCUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "USUALUSDT": {
+  "spot": "USUALUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "VANAUSDT": {
+  "spot": "VANAUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "VELODROMEUSDT": {
+  "spot": "VELODROMEUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "VETUSDT": {
+  "spot": "VETUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "VIRTUALUSDT": {
+  "spot": "VIRTUALUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "VTHOUSDT": {
+  "spot": "VTHOUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "WALUSDT": {
+  "spot": "WALUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "WAXPUSDT": {
+  "spot": "WAXPUSDT",
+  "interval_h": 4,
+  "n_settlements": 2231,
+  "span_days": 364.8
+ },
+ "WCTUSDT": {
+  "spot": "WCTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "WIFUSDT": {
+  "spot": "WIFUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "WLDUSDT": {
+  "spot": "WLDUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "WLFIUSDT": {
+  "spot": "WLFIUSDT",
+  "interval_h": 4,
+  "n_settlements": 2054,
+  "span_days": 342.3
+ },
+ "WOOUSDT": {
+  "spot": "WOOUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "WUSDT": {
+  "spot": "WUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "XAIUSDT": {
+  "spot": "XAIUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "XLMUSDT": {
+  "spot": "XLMUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "XPLUSDT": {
+  "spot": "XPLUSDT",
+  "interval_h": 4,
+  "n_settlements": 2060,
+  "span_days": 343.3
+ },
+ "XRPUSDT": {
+  "spot": "XRPUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "XTZUSDT": {
+  "spot": "XTZUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "XVGUSDT": {
+  "spot": "XVGUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "XVSUSDT": {
+  "spot": "XVSUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "YBUSDT": {
+  "spot": "YBUSDT",
+  "interval_h": 4,
+  "n_settlements": 1765,
+  "span_days": 294.2
+ },
+ "YFIUSDT": {
+  "spot": "YFIUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "YGGUSDT": {
+  "spot": "YGGUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ZAMAUSDT": {
+  "spot": "ZAMAUSDT",
+  "interval_h": 4,
+  "n_settlements": 1220,
+  "span_days": 203.3
+ },
+ "ZBTUSDT": {
+  "spot": "ZBTUSDT",
+  "interval_h": 4,
+  "n_settlements": 2108,
+  "span_days": 287.3
+ },
+ "ZECUSDT": {
+  "spot": "ZECUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ZENUSDT": {
+  "spot": "ZENUSDT",
+  "interval_h": 8,
+  "n_settlements": 1095,
+  "span_days": 364.7
+ },
+ "ZILUSDT": {
+  "spot": "ZILUSDT",
+  "interval_h": 4,
+  "n_settlements": 1800,
+  "span_days": 364.8
+ },
+ "ZKCUSDT": {
+  "spot": "ZKCUSDT",
+  "interval_h": 4,
+  "n_settlements": 1917,
+  "span_days": 319.5
+ },
+ "ZKPUSDT": {
+  "spot": "ZKPUSDT",
+  "interval_h": 4,
+  "n_settlements": 1716,
+  "span_days": 222.3
+ },
+ "ZKUSDT": {
+  "spot": "ZKUSDT",
+  "interval_h": 4,
+  "n_settlements": 2234,
+  "span_days": 364.8
+ },
+ "ZROUSDT": {
+  "spot": "ZROUSDT",
+  "interval_h": 4,
+  "n_settlements": 2189,
+  "span_days": 364.8
+ },
+ "ZRXUSDT": {
+  "spot": "ZRXUSDT",
+  "interval_h": 4,
+  "n_settlements": 1867,
+  "span_days": 364.8
+ },
+ "\u5e01\u5b89\u4eba\u751fUSDT": {
+  "spot": "\u5e01\u5b89\u4eba\u751fUSDT",
+  "interval_h": 4,
+  "n_settlements": 1706,
+  "span_days": 284.3
+ }
+}
