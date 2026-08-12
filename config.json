@@ -240,6 +240,15 @@
     "LATE_ENTRY_MAX_DIST": 0.03,
     "LATE_ENTRY_PENALTY": 0
   },
+  "scoring_momentum": {
+    "ENABLED": true,
+    "SIGNALS": ["BREAKOUT", "HOLD", "RIDING", "EXPLOSION"],
+    "ROC_HIGH_MIN": 0.085,
+    "ROC_HIGH_BONUS": 2,
+    "ROC_MID_MIN": 0.04,
+    "ROC_MID_BONUS": 0,
+    "ROC_LOW_PENALTY": -2
+  },
   "derivatives": {
     "ENABLED": false,
     "OI_LOOKBACK_MIN": 30,
