@@ -238,7 +238,11 @@
     "MIN_CLOSE_CHANGE": 0.02,
     "MIN_BB_EXPANSION": 0.43,
     "LATE_ENTRY_MAX_DIST": 0.03,
-    "LATE_ENTRY_PENALTY": 0
+    "LATE_ENTRY_PENALTY": 0,
+    "VOL_CLIMAX_MAX": 12.0,
+    "VOL_CLIMAX_PENALTY": -3,
+    "EFFICIENCY_MIN": 0.3,
+    "EFFICIENCY_BONUS": 2
   },
   "derivatives": {
     "ENABLED": false,

@@ -1330,6 +1330,22 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             if tf5.get("breakout_distance", 0) > ex_late_max:
                 score += ex_late_pen
                 bd["LATE_ENTRY"] = ex_late_pen
+            # ── Volumen: penalty por climax extremo + bonus por eficiencia ──────
+            # Estudio 30d: el pico de volumen MUY alto marca al pump-and-dump; los
+            # movers limpios se mueven lejos con volumen moderado (eficiencia = move/vol).
+            _ex_vr = tf5.get("vol_ratio", 0) or 0
+            _ex_climax_max = cfg.g("scoring_explosion", "VOL_CLIMAX_MAX", default=999.0)
+            _ex_climax_pen = cfg.g("scoring_explosion", "VOL_CLIMAX_PENALTY", default=0)
+            if _ex_climax_pen and _ex_vr >= _ex_climax_max:
+                score += _ex_climax_pen
+                bd["VOL_CLIMAX"] = _ex_climax_pen
+            _ex_eff_bonus = cfg.g("scoring_explosion", "EFFICIENCY_BONUS", default=0)
+            _ex_eff_min   = cfg.g("scoring_explosion", "EFFICIENCY_MIN", default=999.0)
+            if _ex_eff_bonus and _ex_vr > 0:
+                _ex_eff = (tf5.get("close_change_curr", 0) or 0) * 100.0 / _ex_vr
+                if _ex_eff >= _ex_eff_min:
+                    score += _ex_eff_bonus
+                    bd["EFFICIENCY"] = _ex_eff_bonus
             score = min(max(score, 0), SCORE_CAP)
             candidates.append({
                 "label": "EXPLOSION", "history_tf": "EXPLOSION", "score": score,
