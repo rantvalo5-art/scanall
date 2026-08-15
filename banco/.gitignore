@@ -1,0 +1,2 @@
+# velas cacheadas (se regeneran solas desde la API)
+.kline_cache/
