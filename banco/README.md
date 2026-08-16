@@ -70,7 +70,7 @@ signo de la separación se da vuelta según el lookback (+1,95pp a 14d, −4,24p
 from klines import load_panel
 from primer_toque import tabla, evaluar_senal
 
-panel = load_panel("2025-08-01", "2026-08-01", n=200)
+panel = load_panel("2025-08-01", "2026-08-01", n=200, pin="base200")
 T = tabla(panel, target=8, stop=8, horizonte_d=30)
 
 mascara = mi_senal(T, panel)          # booleano por fila de T
@@ -79,6 +79,69 @@ evaluar_senal(T, mascara, "mi señal")
 
 Imprime el win rate con y sin señal, cuántos pp aporta sobre la línea base, y si cruza
 el umbral. **Si no cruza, no sirve** — por interesante que suene la idea.
+
+## `lote.py` — probar 30 ideas de una, con la corrección que eso exige
+
+Probar una idea por sesión es lento **y deshonesto**. Deshonesto porque una hipótesis
+mirada sola siempre parece confirmatoria: el ojo ya recorrió veinte tablas antes de
+elegir cuál reportar. Este repo ya se comió esa — un spread de +6,6pp con p≈1% que era
+*look-elsewhere* sobre una tabla de ~30 celdas.
+
+```
+py -3.13 lote.py                        # batería estándar (30 hipótesis)
+py -3.13 lote.py --cruces               # + cruces de a pares
+py -3.13 lote.py --pares 300 --q 0.05   # más universo, más exigente
+```
+
+Con `features()` una idea nueva es una línea:
+
+```python
+from lote import features, lote
+F = features(panel, T)
+lote(T, {"mi idea": F.roc_168 > 0.3, "otra": F.dd_168 < -0.4})
+```
+
+### Las seis compuertas, cableadas en el código
+
+El veredicto por default es **cerrada**: la carga de la prueba la tiene la señal.
+
+1. **Muestra** — menos de 200 entradas resueltas es `POCA MUESTRA`, que **no es lo mismo
+   que refutada** (ver trampa 6 abajo).
+2. **Umbral** — win rate > el necesario. Aportar pp no alcanza.
+3. **Multiplicidad** — Benjamini-Hochberg sobre el lote entero, q=0,10.
+4. **Selección vs timing** — contra la línea base *del mismo símbolo*, no la global. Si
+   una señal solo elige los pares que iban a andar bien igual, acá se ve.
+5. **Concentración** — sigue arriba del umbral sin el top-3, y sin el mejor par solo.
+6. **Consistencia semanal** — ≥60% de las semanas arriba del umbral.
+
+### El p-valor que importa es el de bloques
+
+El binomial supone entradas independientes y acá **eso es falso**: hay una entrada cada
+12h con horizonte de 30d, o sea ~60 trades vivos a la vez, y el régimen está
+autocorrelacionado. `_p_bloques()` remuestrea tiras de 3 semanas consecutivas, de modo
+que el solapamiento queda dentro del bloque.
+
+La diferencia no es cosmética. En la primera corrida:
+
+| | p independiente | p de bloques |
+|---|---|---|
+| `mkt_vol_168 bajo` (+9,98pp) | 0,0000 | **0,1545** |
+
+Esa hipótesis —volatilidad del mercado baja— tenía el margen más grande del lote,
+sobrevivía concentración y ganaba +12,7pp contra su línea base pareada. Con el p-valor
+ingenuo era un hallazgo redondo. Con el correcto **no se distingue de ruido**: es una
+señal de *timing de mercado*, y las semanas de baja volatilidad vienen en tandas, así que
+el n efectivo es una fracción de las 21.799 entradas contadas.
+
+Esa brecha entre los dos p-valores es, literalmente, el autoengaño.
+
+### Reproducibilidad
+
+`universe()` consulta el ranking de volumen **en vivo**, así que dos corridas separadas
+por horas usan universos distintos y la línea base se mueve sola (se vio: 48,63% → 48,71%
+entre dos corridas del mismo lote). Por eso `load_panel(..., pin="base200")` congela la
+lista en disco. Con el pin puesto, dos corridas dan un CSV byte a byte idéntico — y el
+panel carga en **1 segundo** en vez de 113.
 
 ## Disciplina de medición (por qué está cableada en `evaluar()`)
 

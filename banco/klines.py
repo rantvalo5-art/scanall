@@ -5,6 +5,7 @@ Ventana FIJA con fechas explicitas, nunca relativa a hoy. Dos corridas separadas
 `--weeks` cubren periodos distintos y eso solo ya fabrico artefactos de varios puntos
 porcentuales en este repo. Ver README.
 """
+import json
 import os
 import time
 from datetime import datetime, timezone
@@ -99,12 +100,38 @@ def klines(sym, start_ms, end_ms, tf="1h"):
     return df
 
 
-def load_panel(start, end, n=200, tf="1h", min_bars=2000, verbose=True):
-    """{symbol: df} para toda la ventana. Descarga lo que falte, usa cache si esta."""
-    s_ms, e_ms = to_ms(start), to_ms(end)
+def _universo_fijo(n, pin):
+    """El universo tambien tiene que ser FIJO, no solo la ventana.
+
+    `universe()` consulta el ranking de volumen EN VIVO, asi que dos corridas
+    separadas por horas devuelven listas distintas y la linea base se mueve sola
+    (se vio: 48,63% -> 48,71% entre dos corridas del mismo lote). Con `pin` la
+    lista se congela en disco la primera vez y despues se reusa.
+    """
+    if not pin:
+        return universe(n)
+    path = os.path.join(CACHE, f"universo_{pin}.json")
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
     syms = universe(n)
+    os.makedirs(CACHE, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(syms, f)
+    return syms
+
+
+def load_panel(start, end, n=200, tf="1h", min_bars=2000, verbose=True, pin=None):
+    """{symbol: df} para toda la ventana. Descarga lo que falte, usa cache si esta.
+
+    `pin`: nombre para congelar el universo en disco y que la corrida sea
+    reproducible. Sin pin, el ranking de volumen se re-consulta cada vez.
+    """
+    s_ms, e_ms = to_ms(start), to_ms(end)
+    syms = _universo_fijo(n, pin)
     if verbose:
-        print(f"Ventana FIJA {start} -> {end} | pidiendo {len(syms)} pares ({tf})")
+        print(f"Ventana FIJA {start} -> {end} | pidiendo {len(syms)} pares ({tf})"
+              f"{' | universo FIJO: ' + pin if pin else ' | universo EN VIVO (no reproducible)'}")
     panel, t0 = {}, time.time()
     for i, s in enumerate(syms, 1):
         df = klines(s, s_ms, e_ms, tf)
