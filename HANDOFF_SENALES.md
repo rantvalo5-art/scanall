@@ -3,6 +3,12 @@
 > Abrir en una conversación nueva y empezar por la sección 5.
 > Escrito el **2026-08-15**, después de medir y cerrar cuatro líneas de trabajo.
 > Complementa `HANDOFF_BASIS.md` (basis/funding, cerrado).
+>
+> **Revisado el 2026-08-16.** Apareció el archivo histórico del proyecto (51 memorias de
+> jun-ago-2026, indexadas bajo la ruta vieja del repo, `C--Users-asd-scancrypto-scanall`).
+> Contenía experimentos que este handoff daba por no hechos. **El ítem 4.3 quedó
+> prácticamente cerrado por evidencia previa** — ver ahí. Lo que decidía algo está
+> consolidado en la memoria activa.
 
 ---
 
@@ -39,6 +45,8 @@ no rescate.
 | Reversión de corto plazo | = al costo | edge bruto +0,31% máx contra 0,40% de costo |
 | Perseguir memes que pumpean | negativo | −4,2pp vs azar; tamaño chico no cambia el signo |
 | Entradas a dos puntas (straddle sintético) | imposible estructuralmente | se regala k·ATR por trade |
+| Detectores de régimen (familia convencional) | ninguno gateable | batería de 7 sobre 28w: 0 pasan; el "ganador" no replicó sobre 22 trimestres (+0,09 → −0,08) |
+| Inversión del ranking del day trader | era composición | el score cae −0,576pp/punto a 24h, pero **−0,178pp (t=−0,81) sacando FADING**, que está apagado |
 
 **Contexto que hay que tener presente:** la mediana de los pares USDT cayó **−2,81%
 cada 14 días durante 5 años**. Ninguna estrategia larga-sola sobre alts sobrevive eso.
@@ -78,6 +86,17 @@ ninguna señal y perdés plata igual. Comparar contra el umbral, nunca contra 50
 Y: **un activo sin dirección da ~52%, no 50%** (para recuperarte de −8% necesitás +8,7%;
 la barrera de abajo está más lejos en escala log).
 
+### La línea base pareada — usarla para toda pregunta de timing
+
+Salió midiendo el 4.1 y es mejor control que el azar global. Para cada alerta se sortean
+~10 horas al azar **del mismo símbolo, en la misma ventana**, y se compara contra ellas. Eso
+descuenta de una las tres cosas que ensucian: la selección de moneda, el sesgo de universo y
+la caída general del mercado. Lo que queda es puro *timing*, que es lo único que el screener
+elige. Son ~20 líneas sobre `banco/klines.py` (velas 1h, `c[k:]/c[:-k] − 1`).
+
+Con ese control, **la línea base de azar global del handoff queda como referencia gruesa**:
+la pareada da deltas distintos por señal y es la que decide.
+
 ---
 
 ## 3. Las trampas que ya mordieron — con nombre y apellido
@@ -105,26 +124,48 @@ la barrera de abajo está más lejos en escala log).
 
 ## 4. Lo que queda — ordenado por lo que yo probaría primero
 
-### 4.1 — Fadear el propio screener  ·  esfuerzo: 1 sesión  ·  prior: medio
+### 4.1 — Fadear el propio screener  ·  **CERRADO — era composición (2026-08-16)**
 
-**Hipótesis.** El ranking del day trader está invertido: BEST rinde **peor** que WATCH
-(mediana a 4h: −1,786% contra −0,878%). Si esa inversión es real y persiste, es
-información aprovechable — evitar o fadear lo que el bot marca como mejor.
+**Hipótesis original.** El ranking del day trader está invertido: BEST rinde peor que WATCH
+(mediana a 4h: −1,786% contra −0,878%). Si la inversión es real, es información aprovechable.
 
-**El problema a resolver primero.** Puede ser **composición**, no señal: EXPLOSION es la
-peor señal (−1,996%) y probablemente se concentra en BEST. Hay que separar el efecto del
-score del efecto del tipo de señal.
+**Medido** sobre `daytrader_outcomes` (10.273 filas, 26-jun → 16-ago, 327 símbolos, 8 semanas).
+**La sospecha de composición era correcta, y más fuerte de lo que se pensaba:**
 
-**Qué medir.** `daytrader_outcomes` en Supabase (10.157 filas, ya explorada). Regresión o
-corte cruzado score × signal_type. Comparar contra la línea base de azar de la misma
-ventana (−0,205% a 4h, −0,288% a 24h).
+1. **El bucket ES el tipo de señal.** FADING es el 75,3% de las filas y **el 100% de FADING es
+   WATCH**; el 98,4% de WATCH es FADING. EXPLOSION no tiene ninguna WATCH, RIDING ninguna
+   STRONG, HOLD una sola. Los scores son casi disjuntos por señal (FADING 4-8, RIDING 6-8,
+   EXPLOSION 8-11, HOLD 9-15). "BEST vs WATCH" era "señales activas vs FADING".
+2. **Controlando por señal, el gradiente no es monótono ni invertido.** Spearman(score, retorno)
+   dentro de cada señal, con IC95 bootstrap: a 4h BREAKOUT −0,036 / FADING −0,021 / HOLD −0,013 /
+   PREBREAK −0,081, **todos con el IC cruzando cero**. La única que lo excluye es **RIDING
+   +0,112, con el signo al revés**. Igual a 24h.
+3. **El coeficiente agregado muere al sacar la señal apagada.** Regresión con dummies de señal y
+   timeframe, winsorizada a ±100%: −0,576pp por punto de score a 24h (t = −4,30) — pero
+   **sin FADING queda en −0,178pp (t = −0,81)**. El efecto vivía entero dentro del único tipo de
+   señal que **no corre en producción** (`active_signals.FADING=false`).
+4. Sin FADING, **WATCH son 220 filas = 8,7% del feed real**: el contraste que motivaba el ítem
+   casi no existe en vivo.
 
-> **Regla de parada.** Sigue solo si, **controlando por tipo de señal**, el gradiente por
-> score se mantiene monótono e invertido, con mediana consistente en ≥6 de 8 semanas y
-> sobreviviendo sacar el top-3 de símbolos. Si la inversión desaparece al controlar por
-> señal, era composición: se cierra.
+> **La regla de parada dice cerrar, y se cierra.** No se renegocia.
 
-**Ojo:** la ventana son 50 días. Aunque pase, hace falta forward-test antes de operar.
+**Lo que sí apareció, como hipótesis NUEVA (ver 4.7).** Se construyó una línea base pareada
+—**mismo símbolo, hora al azar** en la misma ventana— que aísla el *timing* de la selección de
+moneda y de la caída del mercado. Las alertas entran en momentos peores que el azar, pero **el
+defecto se concentra en las dos señales que compran extensión**:
+
+| señal | delta media 4h | delta media 24h |
+|---|---|---|
+| EXPLOSION | **−1,94pp** | **−3,17pp** |
+| BREAKOUT | −0,49pp | **−2,52pp** |
+| FADING | −0,32pp | −1,56pp |
+| RIDING | +0,19pp | −0,03pp |
+| HOLD | +0,02pp | +0,67pp |
+| PREBREAK | +0,42pp | +0,98pp |
+
+Es confirmación independiente, sobre datos del day trader, de lo que el swing ya había medido:
+**el defecto de entrada es comprar el techo de la vela de extensión.** HOLD y PREBREAK no lo
+tienen.
 
 ---
 
@@ -146,26 +187,45 @@ percentil 95+ (o 5−). Pasar por `evaluar_senal()`.
 
 ---
 
-### 4.3 — Detectores de régimen alternativos  ·  esfuerzo: 1-2 sesiones  ·  prior: bajo
+### 4.3 — Detectores de régimen alternativos  ·  **CERRADO por evidencia previa (2026-08-16)**
 
-**Por qué sigue vivo.** El régimen **domina** el resultado — el win rate mensual va de
+**Por qué parecía vivo.** El régimen **domina** el resultado — el win rate mensual va de
 34,68% (nov-2025) a 83,30% (jul-2026), casi 50 puntos, contra los ~3 que sumaría una
 señal de selección. Es la variable que decide.
 
-**Por qué es difícil.** Se probó **una** familia (retorno pasado del mercado) y falló
-limpio: ningún bucket cruza el umbral y **el signo se da vuelta según el lookback**
-(+1,95pp a 14d, −4,24pp a 30d, +1,88pp a 60d). Signo inestable = ruido.
+**Por qué se cierra.** Este ítem se escribió creyendo que se había probado **una** familia
+(retorno pasado del mercado). El archivo histórico muestra que se probó una **batería de 7**
+sobre `diag_28w.json` (3.704 alertas, 7 folds mensuales), con barra declarada de antemano —
+signo estable ≥6/7 **y** costo de recall <20% — y **ninguna pasó las dos**:
 
-**Qué falta probar.** Régimen de volatilidad (ATR agregado), amplitud (% de monedas sobre
-su media móvil), estructura de correlación (correlación media entre pares), funding
-agregado como termómetro. **Y el problema del lag:** el detector solo puede usar datos ya
-resueltos; si el régimen dura 2-3 semanas (rachas buenas de mediana **1 semana**) y el
-detector tarda 2 en confirmar, llegás tarde por construcción.
+| detector | resultado |
+|---|---|
+| tendencia BTC (SMA100 / pendiente SMA50 / drawdown60) | 5/7 **negativos** (reversión, al revés del manual) |
+| **volatilidad BTC (percentil de rvol)** | 4/7, inestable |
+| **funding agregado de mercado** | 5/7, mixto |
+| pendiente de amplitud | 4/7 |
+| **correlación cruzada promedio** | única con signo 6/7, pero Spearman +0,09 y tira **31% de los movers** |
+| **amplitud en nivel (% sobre SMA50)** | señal en U, ayuda 3/7 meses, tira 36% de movers = overfit de calendario |
 
-> **Regla de parada.** Sigue solo si algún detector cruza el umbral **con el mismo signo
-> en al menos 3 lookbacks distintos**. Un solo lookback ganador es pesca. Máximo
-> 2 sesiones: si ninguna familia cruza, el régimen queda como "real pero no anticipable"
-> y se cierra.
+Las cuatro en negrita son exactamente las que este ítem proponía como "falta probar".
+
+Y hay confirmación sobre **historia profunda** (2021→2026, 22 trimestres, 9 bull / 9 bear
+incluido el bear 2022 completo, 276 muestras de 7d no solapadas): ningún detector
+deployable. La correlación media, el "6/7 robusto" de la batería, **no replicó**
+(Spearman +0,09 → −0,08). La volatilidad **invierte el signo** entre bull y bear.
+
+**La regla de parada de este ítem ya está disparada**: pedía el mismo signo en ≥3 lookbacks
+y lo que hay es inestabilidad de signo entre regímenes reales, que es la versión fuerte del
+mismo test. Sumado al problema de lag ya escrito acá (si el régimen dura 2-3 semanas y el
+detector tarda 2 en confirmar, llegás tarde por construcción).
+
+**Lo único que sobrevive sin probar:** ATR agregado **del universo** como nivel (se probó
+rvol de BTC, no ATR del universo). Prior muy bajo y mismo problema de lag. **No gastarle una
+sesión** salvo que se agoten los demás ítems. Si se retomara la familia, tendría que ser un
+enfoque **no-gate** (sizing suave, expectativa baja), no otro filtro de entrada.
+
+> **Veredicto: el régimen es real pero no anticipable.** Queda cerrado. Presupuesto
+> liberado: este ítem devuelve 1-2 sesiones a los otros.
 
 ---
 
@@ -203,6 +263,35 @@ geo-bloqueado desde runners cloud (451/403) → hace falta PC propia o VPS.
 
 ---
 
+### 4.7 — Fadear las señales de extensión  ·  esfuerzo: 1 sesión  ·  prior: medio-bajo
+
+**Hipótesis NUEVA** (nace de la medición del 4.1; no es una renegociación de aquella regla).
+No fadear *el ranking* —eso ya murió— sino **las dos señales que compran extensión**, que son
+las únicas con un defecto de timing grande y medido: EXPLOSION (−3,17pp vs azar a 24h) y
+BREAKOUT (−2,52pp). Fadear BEST activas a 24h dio media **+1,19%** (sin top-3: +0,84%),
+mediana +4,18%, 6 de 8 semanas con media positiva.
+
+**Por qué NO se sigue de una:**
+- **Ventana de 51 días, un solo régimen bear.** El repo ya se comió esto varias veces.
+- **Shortear no es spot.** Necesita perpetuos: funding, borrow, y `fapi.binance.com`
+  geo-bloqueado desde runners cloud (hace falta PC propia o VPS).
+- **Sin slippage**, y las alertas apuntan justo a los pares finos donde más duele.
+- **La cola izquierda de un short no tiene piso.** El máximo bruto de la muestra fue **+744%**:
+  un short ahí pierde 7 veces la posición. La brecha media-mediana (+1,19 contra +4,18) es esa
+  asimetría asomando, y **para una cartera el P&L es la media**.
+
+> **Regla de parada.** Sigue solo si, sobre las señales de extensión y **neto de los costos
+> reales de un short en perpetuos** (fee + funding + un supuesto de slippage explícito):
+> (a) la **media** —no la mediana— queda positiva; (b) sobrevive sacar el top-3 de símbolos;
+> (c) es positiva en **≥6 de 8 semanas**; y (d) sigue positiva **restando el peor símbolo
+> individual de la ventana**, que es el test que importa cuando la cola es ilimitada.
+> Si falla cualquiera de las cuatro, se cierra sin construir nada.
+
+**Antes de codear nada:** hacer la cuenta de la cola, al estilo de la sección 3 del handoff de
+basis. Si un solo +744% borra el acumulado de la ventana, no hace falta backtest.
+
+---
+
 ### 4.6 — Descartados de entrada (para no volver a proponerlos)
 
 - **Libro de órdenes / microestructura:** compite en latencia contra infraestructura
@@ -217,15 +306,19 @@ geo-bloqueado desde runners cloud (451/403) → hace falta PC propia o VPS.
 
 1. Leer la sección 3 (las trampas). **Cinco de los seis hallazgos falsos de este repo
    salieron de ahí.**
-2. Elegir **un** ítem de la sección 4 y releer su regla de parada antes de correr nada.
-3. Correr la línea base de `banco/` para tener contra qué comparar.
-4. Medir. Contrastar contra la regla escrita. Seguir o cerrar — sin renegociar.
+2. **Chequear el archivo histórico antes de proponer nada.** 51 memorias de jun-ago-2026 en
+   `~/.claude/projects/C--Users-asd-scancrypto-scanall/memory/`; su `MEMORY.md` es un índice
+   de una línea por experimento. Ya pasó una vez que este handoff diera por no-probado algo
+   probado y enterrado (el ítem 4.3).
+3. Elegir **un** ítem de la sección 4 y releer su regla de parada antes de correr nada.
+4. Correr la línea base de `banco/` para tener contra qué comparar.
+5. Medir. Contrastar contra la regla escrita. Seguir o cerrar — sin renegociar.
 
 **Prompt sugerido:**
 
-> Leé `HANDOFF_SENALES.md` en la raíz. Arranquemos por el ítem 4.1 (fadear el propio
-> screener): separar el efecto del score del efecto del tipo de señal en
-> `daytrader_outcomes`, y contrastar contra la regla de parada escrita en ese ítem.
+> Leé `HANDOFF_SENALES.md` en la raíz. Arranquemos por el ítem 4.2 (funding extremo como
+> señal contraria): los datos ya están en `basis/.funding_cache/`, no hay que bajar nada.
+> Contrastar contra la regla de parada escrita en ese ítem.
 
 ---
 
