@@ -47,6 +47,7 @@ no rescate.
 | Entradas a dos puntas (straddle sintético) | imposible estructuralmente | se regala k·ATR por trade |
 | Detectores de régimen (familia convencional) | ninguno gateable | batería de 7 sobre 28w: 0 pasan; el "ganador" no replicó sobre 22 trimestres (+0,09 → −0,08) |
 | Inversión del ranking del day trader | era composición | el score cae −0,576pp/punto a 24h, pero **−0,178pp (t=−0,81) sacando FADING**, que está apagado |
+| Vender volatilidad (BTC/ETH, 5,3 años) | el premio se compitió | BTC de +16,6% a +9,9% de la prima → +7,33%/año reciente, dentro del piso; ETH a +0,5% |
 
 **Contexto que hay que tener presente:** la mediana de los pares USDT cayó **−2,81%
 cada 14 días durante 5 años**. Ninguna estrategia larga-sola sobre alts sobrevive eso.
@@ -229,22 +230,58 @@ enfoque **no-gate** (sizing suave, expectativa baja), no otro filtro de entrada.
 
 ---
 
-### 4.4 — Vender volatilidad con opciones  ·  esfuerzo: 2+ sesiones  ·  prior: incierto
+### 4.4 — Vender volatilidad con opciones  ·  **CERRADO — el premio se compitió (2026-08-16)**
 
-**Por qué es distinto de todo lo anterior.** Es el único lugar donde la habilidad
-*demostrada* del screener tiene comprador natural. Está medido que predice **cuánto** se
-mueve una moneda (el score duplica las dos colas) y que no predice **para qué lado**. Las
-opciones pagan exactamente por lo primero.
+**Por qué era distinto.** Era el único lugar donde la habilidad *demostrada* del screener
+tiene comprador natural: está medido que predice **cuánto** se mueve una moneda y que no
+predice **para qué lado**, y las opciones pagan exactamente por lo primero.
 
-**Las contras, sin maquillar.** Liquidez real solo en BTC y ETH. Vender opciones sin
-cubrir puede costar en un día lo de un año. Es otra infraestructura (Deribit o Binance
-Options), otro modelo de riesgo, y no se prueba con `banco/`.
+**Medido** con DVOL de Deribit (implícita a 30d) contra la realizada de los 30 días
+**siguientes**, 2021-03 → 2026-07 = **5,3 años, 65 meses no solapados**. Reproducible con
+`opciones/iv_rv.py`.
 
-> **Regla de parada.** Antes de escribir una línea de código: comparar la volatilidad
-> implícita contra la realizada en BTC/ETH sobre 2 años. Si la implícita no supera a la
-> realizada por un margen que cubra comisiones **y** el riesgo de cola, se cierra ahí. Es
-> el equivalente al cálculo de la sección 3 del handoff de basis: **hacer la cuenta antes
-> de construir.**
+**El premio existió y era grande.** Vendiendo una straddle ATM por mes, neto de 5% de la
+prima en costos: BTC **+20,96%/año** sobre toda la muestra, drawdown máximo −11,3%,
+retorno/DD 10,05, y aguanta sacar los 3 mejores meses (+15,03%/año). Es el mejor número
+que produjo este repo, y a diferencia de todo lo demás **tiene mecanismo**: el premio de
+varianza es una prima de seguro, no un patrón encontrado buscando.
+
+**Y se compitió.** Ésta es la parte que decide, y hubo que separarla del efecto nivel:
+
+| año | implícita | realizada | IV/RV | % de la prima | neto BTC |
+|---|---|---|---|---|---|
+| 2021 | 91,8% | 73,7% | 1,312 | **+19,1%** | +53,94% |
+| 2022 | 73,6% | 61,4% | 1,238 | +14,7% | +33,36% |
+| 2023 | 49,6% | 43,0% | 1,185 | +12,1% | +8,49% |
+| 2024 | 57,7% | 50,5% | 1,222 | +11,6% | +13,59% |
+| 2025 | 46,0% | 39,6% | 1,273 | +13,6% | +9,03% |
+| 2026 | 45,2% | 44,4% | 1,201 | **−0,0%** | −4,85% |
+
+El nivel de implícita bajó 38% (82% → 50%), **pero el premio relativo también se
+comprimió**: IV/RV de 1,289 a 1,241, y el premio de **+16,6% a +9,9% de la prima**. Que se
+comprima lo *relativo* es lo que importa — si fuera solo nivel se arreglaría con tamaño.
+
+**El número que dispara la regla: en el régimen reciente (2023→) BTC da +7,33%/año neto**,
+que cae **dentro** del piso de stablecoins (5-10%), con drawdown de 11% y la cola abierta.
+
+**ETH está muerto sin ambigüedad:** el premio relativo pasó de +8,4% a **+0,5% de la
+prima** (IV/RV 1,077), régimen reciente **−4,56%/año**, drawdown −37,2%, y **sin los 3
+mejores meses el rendimiento de 5 años completo es +0,17%/año** — o sea que el resultado
+entero eran tres meses. Es la trampa de concentración disparando de manual.
+
+**Y todo lo que falta contar empuja para abajo:** el delta hedging (~30 rebalanceos por
+trade, no contados, y la fórmula modela captura de varianza que *requiere* cubrir); vender
+al bid y no al medio; que el −11% del peor mes es mark-to-market y con margen un spike te
+liquida al peor precio, que no tiene piso; y todo el capital en un solo venue offshore
+—FTX está adentro de la muestra—.
+
+> **La regla de parada dispara. Se cierra sin construir nada.** Que era exactamente para
+> lo que estaba escrita: hacer la cuenta antes.
+
+**Lo único que lo reabriría** es que el premio relativo se vuelva a abrir. `iv_rv.py` queda
+para re-chequear en un año: si IV/RV vuelve sostenido por encima de ~1,30 con el premio
+arriba del 15% de la prima, vale mirarlo de nuevo. **Pero apostar a que eso pase es apostar
+a un régimen, y este repo ya midió que el régimen no se anticipa.**
 
 ---
 

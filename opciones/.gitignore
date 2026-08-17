@@ -1,0 +1,2 @@
+# DVOL y precios cacheados (se regeneran solos desde las APIs)
+.dvol_cache/
