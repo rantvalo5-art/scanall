@@ -30,6 +30,11 @@ Y un límite que no existía antes:
 **No hay capital operando hoy.** Nada sangra mientras se decide. Esto es investigación,
 no rescate.
 
+> **Actualización 2026-08-17.** El presupuesto se agotó: 4.1, 4.2, 4.3 y 4.4 cerrados.
+> Pero **4.7 cruzó su umbral**, así que la cláusula de cierre total no se activa. Lo que
+> sigue no es buscar otra hipótesis: es **esperar el forward test de 4.7**. Nada de capital
+> hasta que aguante un tramo alcista.
+
 ---
 
 ## 1. Lo que ya está medido y muerto — NO volver a probar
@@ -170,23 +175,44 @@ tienen.
 
 ---
 
-### 4.2 — Funding extremo como señal contraria  ·  esfuerzo: 1 sesión  ·  prior: medio-bajo
+### 4.2 — Funding extremo como señal contraria  ·  **CERRADO (2026-08-17)**
 
 **Hipótesis.** La Fase 1 midió el funding como *ingreso a cobrar* y murió porque el nivel
-es chico. Nunca se midió como **sentimiento**: funding muy positivo = longs apalancados
+es chico. Acá se midió como **sentimiento**: funding muy positivo = longs apalancados
 amontonados = posible reversión.
 
-**Ventaja práctica.** Los datos **ya están cacheados** en `basis/.funding_cache/`
-(351 símbolos, ago-2025 → ago-2026). No hay que bajar nada.
+**Ojo con la dirección.** La primera corrida probó el lado **largo** y dio 0 de 26 — pero
+eso era medir la dirección equivocada. La hipótesis contraria dice *shortear*. Con las
+barreras simétricas de `banco/`, el short gana exactamente donde el largo pierde, así que
+alcanza con dar vuelta el signo de `res` y el umbral (51,25%) es el mismo.
 
-**Qué medir.** Máscara sobre el banco: entradas donde el funding trailing está en el
-percentil 95+ (o 5−). Pasar por `evaluar_senal()`.
+**El lado correcto sí mostró el patrón.** Shorteando donde el funding trailing está en el
+percentil 95: **55,11% de aciertos, +3,86pp sobre el umbral**, +4,6pp contra su línea base
+pareada, y **dosis-respuesta monótona** — cuanto más extremo el funding y más larga la
+ventana trailing, mejor el short (f_7d > f_3d > f_1d > f_8h). Eso es lo que parece una
+señal de verdad.
 
-> **Regla de parada.** Sigue solo si cruza el umbral de rentabilidad (no basta con sumar
-> pp), con mediana por semana positiva y sobreviviendo el top-3. Y **el sesgo de un año
-> bear hay que declararlo**: el funding extremo positivo es raro en bear.
+**Y muere igual, en tres lugares:**
+- **Bootstrap de bloques: p = 0,1550** (contra p = 0,0000 suponiendo independencia). Los
+  episodios de funding extremo se amontonan en el tiempo, así que el n efectivo es una
+  fracción de las 5.284 entradas. Es exactamente donde murió `mkt_vol_168` del banco.
+- **Concentración:** de +3,86pp queda **+1,8pp** sacando el top-3, y en p99 se da vuelta a
+  −1,8pp.
+- **Consistencia semanal 60%**, justo en la compuerta, no por encima.
 
----
+**El carry no salva nada:** el short cobra el funding, pero son **+0,09% por trade** de
+~3 días contra barreras de 8%. Es ruido.
+
+**Sesgo declarado, como pedía la regla:** la ventana es un bear brutal (mediana de alts
+−69,8%) donde **la línea base del short ya es 51,35%** — o sea que shortear cualquier cosa
+era ~gratis. El +3,86pp se mide encima de eso; en un tramo alcista la base es mucho peor.
+
+> **La regla de parada dispara: 0 de 15 hipótesis del lado short cruzan. Se cierra.**
+
+**Read-across importante:** esto es el mismo trade que 4.7 (shortear lo amontonado) medido
+sobre el universo entero en vez de sobre las alertas del bot. Que acá muera por
+concentración y por bloques era el motivo para exigirle a 4.7 exactamente esas dos pruebas.
+
 
 ### 4.3 — Detectores de régimen alternativos  ·  **CERRADO por evidencia previa (2026-08-16)**
 
@@ -300,34 +326,64 @@ geo-bloqueado desde runners cloud (451/403) → hace falta PC propia o VPS.
 
 ---
 
-### 4.7 — Fadear las señales de extensión  ·  esfuerzo: 1 sesión  ·  prior: medio-bajo
+### 4.7 — Fadear las señales de extensión  ·  **SOBREVIVE — falta el forward test**
 
-**Hipótesis NUEVA** (nace de la medición del 4.1; no es una renegociación de aquella regla).
-No fadear *el ranking* —eso ya murió— sino **las dos señales que compran extensión**, que son
-las únicas con un defecto de timing grande y medido: EXPLOSION (−3,17pp vs azar a 24h) y
-BREAKOUT (−2,52pp). Fadear BEST activas a 24h dio media **+1,19%** (sin top-3: +0,84%),
-mediana +4,18%, 6 de 8 semanas con media positiva.
+**Es lo único de este repo que cruzó su regla de parada escrita.** Y después sobrevivió a
+todo lo que se le tiró encima, incluidas las dos pruebas que mataron a sus hermanas.
 
-**Por qué NO se sigue de una:**
-- **Ventana de 51 días, un solo régimen bear.** El repo ya se comió esto varias veces.
-- **Shortear no es spot.** Necesita perpetuos: funding, borrow, y `fapi.binance.com`
-  geo-bloqueado desde runners cloud (hace falta PC propia o VPS).
-- **Sin slippage**, y las alertas apuntan justo a los pares finos donde más duele.
-- **La cola izquierda de un short no tiene piso.** El máximo bruto de la muestra fue **+744%**:
-  un short ahí pierde 7 veces la posición. La brecha media-mediana (+1,19 contra +4,18) es esa
-  asimetría asomando, y **para una cartera el P&L es la media**.
+**Hipótesis.** No fadear *el ranking* —eso murió en 4.1— sino las dos señales que compran
+extensión, que son las únicas con defecto de timing medido: **EXPLOSION** (−3,17pp contra
+azar a 24h) y **BREAKOUT** (−2,52pp).
 
-> **Regla de parada.** Sigue solo si, sobre las señales de extensión y **neto de los costos
-> reales de un short en perpetuos** (fee + funding + un supuesto de slippage explícito):
-> (a) la **media** —no la mediana— queda positiva; (b) sobrevive sacar el top-3 de símbolos;
-> (c) es positiva en **≥6 de 8 semanas**; y (d) sigue positiva **restando el peor símbolo
-> individual de la ventana**, que es el test que importa cuando la cola es ilimitada.
-> Si falla cualquiera de las cuatro, se cierra sin construir nada.
+**Las cuatro compuertas de la regla, con costos de short en perpetuos explícitos**
+(0,09% de fee ida y vuelta + 0,30% de slippage asumido = 0,40%), 1.357 alertas:
 
-**Antes de codear nada:** hacer la cuenta de la cola, al estilo de la sección 3 del handoff de
-basis. Si un solo +744% borra el acumulado de la ventana, no hace falta backtest.
+| | 4h | 24h |
+|---|---|---|
+| (a) media | +0,855% | +1,944% |
+| (b) sin top-3 | +0,694% | +1,666% |
+| (c) semanas positivas | 7/8 | 6/8 |
+| (d) sin el peor símbolo | +0,971% | +2,265% |
 
----
+Pasa las cuatro **a los tres niveles de costo probados** (0,20% / 0,40% / 0,60%). Y (d)
+*mejora* al sacar el peor símbolo, o sea que la cola no lo sostiene: lo perjudica.
+
+**Después de pasar, se le aplicaron cuatro pruebas más:**
+1. **Bootstrap de bloques** (el que mató a `mkt_vol_168` y a 4.2): **p = 0,0000**, IC95
+   [+0,92%, +2,56%] a 24h. **No cruza cero.**
+2. **Partir la ventana al medio:** las dos mitades positivas, y la segunda **mejor**
+   (+2,19% contra +1,68%). No decae.
+3. **¿Hay perpetuo para shortear?** 77% de las alertas (221 de 280 símbolos). Sin perp no
+   hay trade.
+4. **Fill realista:** reemplazar `entry_price` por `price_15m` —el precio 15 minutos
+   después, que aproxima la latencia entre el cron, el Telegram y la orden— cuesta solo
+   **5-9% del edge**. El edge no vivía en esos 15 minutos.
+
+**Con las dos condiciones realistas juntas (fill a 15m + solo símbolos con perp):**
++0,550% a 4h y **+1,435% a 24h**, las cinco compuertas OK. Pero el IC de bloques queda
+**[+0,15%, +2,32%]** a 24h y **[+0,06%, +0,97%]** a 4h: **apenas despega de cero.** Sobrevive,
+no con holgura.
+
+**El contraste que descarta "es solo shortear en un bear":** fadear extensión da +1,944%
+contra +0,411% de fadear el resto de las alertas = **+1,53pp de diferencia**. Y contra la
+línea base pareada (mismo símbolo, hora al azar) EXPLOSION entra −3,17pp peor que el azar.
+Es timing, no dirección de mercado.
+
+> **LO QUE FALTA NO ES OTRO TEST ESTADÍSTICO.** Son **51 días de un solo régimen bear**, y
+> la historia entera de este repo es que lo que brilla en una ventana corta bajista se
+> muere después. Las dos mitades son el mismo bear: eso no es out-of-sample de régimen.
+
+**Cómo seguir:** `fade/evaluar.py` re-corre la evaluación completa sobre datos frescos.
+Correrlo cuando haya **4+ semanas nuevas, y sobre todo si el mercado se dio vuelta**. El
+day trader ya está corriendo y logueando: el forward test no cuesta trabajo, cuesta
+esperar. **Nada de capital hasta que aguante un tramo alcista.**
+
+**Riesgos no medidos, que siguen abiertos:** el slippage de 0,30% es un supuesto sin libro
+de órdenes que lo respalde, y las EXPLOSION apuntan a alts finas justo después de un pump,
+que es el peor momento para entrar corto; la capacidad es baja (26 alertas por día sobre
+pares chicos); y un short en perp se liquida antes de llegar a −100% — en la ventana hubo
+un +142%.
+
 
 ### 4.6 — Descartados de entrada (para no volver a proponerlos)
 
@@ -353,22 +409,43 @@ basis. Si un solo +744% borra el acumulado de la ventana, no hace falta backtest
 
 **Prompt sugerido:**
 
-> Leé `HANDOFF_SENALES.md` en la raíz. Arranquemos por el ítem 4.2 (funding extremo como
-> señal contraria): los datos ya están en `basis/.funding_cache/`, no hay que bajar nada.
-> Contrastar contra la regla de parada escrita en ese ítem.
+> Leé `HANDOFF_SENALES.md` en la raíz. El ítem 4.7 sobrevivió su regla de parada y está
+> esperando forward test: corré `fade/evaluar.py` y fijate si aguantó las semanas nuevas,
+> sobre todo si el mercado se dio vuelta. Si no hay datos nuevos suficientes, no forzarlo.
 
 ---
 
 ## 6. Expectativa honesta
 
-Cuatro líneas medidas, cuatro cerradas. Eso es evidencia real de que **el rincón
-explorado está vacío**: reglas de umbral sobre velas públicas, solo largo, horizontes de
-minutos a 30 días. Pero es un rincón, no la habitación — lo de la sección 4 son familias
-distintas, no variantes de lo mismo.
+**Actualizado el 2026-08-17, después de medir todo el presupuesto.**
 
-Lo más probable sigue siendo que ninguna cruce. Si eso pasa, el resultado no es el
-fracaso: es haber comprado certeza barata. Cuatro proyectos cerrados en días, con la
-regla escrita antes de mirar, es más disciplina de la que aplica la mayoría de la gente
-que opera con plata real durante años.
+Ocho líneas medidas, siete cerradas, **una viva**. El rincón que se creía vacío casi lo
+estaba, pero no del todo — y lo que sobrevivió no es ninguna de las que tenían mejor prior.
 
-**El piso de stablecoins no es el premio consuelo. Es el rival, y hasta hoy va ganando.**
+Lo que enseñó cada cierre:
+
+- **4.1** murió por composición: el bucket era el tipo de señal disfrazado.
+- **4.3** ya estaba muerto y el handoff no lo sabía. La lección no es sobre régimen, es
+  sobre **leer el archivo antes de gastar una sesión**.
+- **4.4** es el cierre más interesante: el premio de varianza **existía y era grande**
+  (+20,96%/año en BTC sobre 5,3 años) y se compitió hasta quedar dentro del piso. **No era
+  falso, era tarde.**
+- **4.2** llegó a mostrar dosis-respuesta monótona y murió en el bootstrap de bloques y en
+  concentración.
+
+Y **4.7 está vivo**: fadear EXPLOSION y BREAKOUT pasó sus cuatro compuertas a tres niveles
+de costo, sobrevivió el bootstrap de bloques (p = 0,0000), el corte de la ventana al medio,
+el filtro de "¿hay perpetuo?" y el fill realista a 15 minutos. Bajo las dos condiciones
+realistas juntas da **+1,435% a 24h** — pero con el IC de bloques en [+0,15%, +2,32%],
+o sea que **despega de cero apenas**.
+
+**Lo que hay que tener clarísimo:** son 51 días de un solo régimen bear, y la historia
+completa de este repo es que lo que brilla en una ventana corta bajista se muere después.
+Las dos mitades de la ventana son el mismo bear. **No es out-of-sample de régimen.**
+
+Lo honesto es que esta vez la disciplina cortó para los dos lados: mató cuatro hipótesis
+que parecían buenas —incluida una con p = 0,0000 aparente— y dejó pasar una que no era la
+favorita de nadie. Eso es lo que tiene que hacer un criterio escrito de antemano.
+
+**El piso de stablecoins sigue siendo el rival, y sigue ganando hasta que 4.7 sobreviva un
+mercado que sube.**
