@@ -326,7 +326,23 @@ geo-bloqueado desde runners cloud (451/403) → hace falta PC propia o VPS.
 
 ---
 
-### 4.7 — Fadear las señales de extensión  ·  **SOBREVIVE — falta el forward test**
+### 4.7 — Fadear las señales de extensión  ·  **VIVO A 4h, NO CONCLUYENTE A 24h**
+
+> **CORRECCIÓN 2026-08-17.** La primera versión de este ítem reportó "sobrevive el
+> bootstrap de bloques, p = 0,0000". **Ese bootstrap estaba mal armado:** remuestreaba
+> bloques de semanas pero **pooleaba las alertas** de cada bloque, así que las semanas con
+> más alertas pesaban más (van de 66 a 199) y, con solo 8 semanas, hay 7 bloques distintos
+> posibles — remuestrear de ahí subestima la variabilidad. Con **la semana como unidad**,
+> que es la premisa entera de remuestrear por bloques:
+>
+> | horizonte | media | IC95 (semana = unidad) | p |
+> |---|---|---|---|
+> | **4h** | +0,550% | **[+0,14%, +2,04%]** | **0,008** |
+> | 24h | +1,435% | [−0,52%, +3,30%] | 0,068 |
+>
+> **A 24h el intervalo cruza cero.** El horizonte largo tiene más media pero mucha más
+> varianza semanal (desvío entre semanas 2,92pp contra una media de 1,52pp). **Lo que
+> queda vivo es el 4h**, que tiene mejor señal/ruido (0,68 contra 0,52).
 
 **Es lo único de este repo que cruzó su regla de parada escrita.** Y después sobrevivió a
 todo lo que se le tiró encima, incluidas las dos pruebas que mataron a sus hermanas.
@@ -373,10 +389,24 @@ Es timing, no dirección de mercado.
 > la historia entera de este repo es que lo que brilla en una ventana corta bajista se
 > muere después. Las dos mitades son el mismo bear: eso no es out-of-sample de régimen.
 
-**Cómo seguir:** `fade/evaluar.py` re-corre la evaluación completa sobre datos frescos.
-Correrlo cuando haya **4+ semanas nuevas, y sobre todo si el mercado se dio vuelta**. El
-day trader ya está corriendo y logueando: el forward test no cuesta trabajo, cuesta
-esperar. **Nada de capital hasta que aguante un tramo alcista.**
+**Cuánto hay que esperar — la cuenta de potencia.** El cuello **no son las alertas** (entran
+~130 por semana) sino **las semanas**, porque es la unidad independiente. Bajar más datos no
+acelera nada: hay que dejar pasar el tiempo.
+
+| horizonte | efecto = el medido | efecto = la mitad |
+|---|---|---|
+| **4h** (señal/ruido 0,68) | 18 semanas (~4 meses) | 69 semanas (~16 meses) |
+| 24h (señal/ruido 0,52) | 29 semanas (~7 meses) | 116 semanas (~27 meses) |
+
+*(potencia 80%; con potencia 50% —moneda al aire— es la mitad de esas semanas)*
+
+Y la primera medición de cualquier cosa **casi siempre exagera**, así que la columna
+realista es la segunda. **La respuesta honesta a "cuánto espero" es: 4 meses para una señal
+preliminar a 4h, y más de un año para algo en lo que apoyar capital.**
+
+**Cómo seguir:** `fade/evaluar.py` re-corre todo sobre datos frescos. Chequear a las
+**8-9 semanas** (~2 meses) como control barato: si a esa altura la media a 4h se dio vuelta,
+se cierra sin esperar el resto. **Nada de capital hasta que aguante un tramo alcista.**
 
 **Riesgos no medidos, que siguen abiertos:** el slippage de 0,30% es un supuesto sin libro
 de órdenes que lo respalde, y las EXPLOSION apuntan a alts finas justo después de un pump,

@@ -79,22 +79,41 @@ def con_perp():
     return s
 
 
-def p_bloques(d, col="f", bloque=2, reps=4000):
-    """p-valor remuestreando tiras de semanas consecutivas.
+def p_semanas(d, col="f", reps=8000):
+    """IC y p-valor con LA SEMANA como unidad independiente.
 
-    El binomial/t supone alertas independientes y aca no lo son: se amontonan en
-    el tiempo. Esta es la prueba que mato a las hipotesis hermanas.
+    OJO — esto reemplaza a una version anterior que remuestreaba bloques de
+    semanas pero POOLEABA las alertas de cada bloque. Eso hacia dos cosas mal:
+    las semanas con mas alertas pesaban mas (van de 66 a 199 por semana), y con
+    8 semanas hay 7 bloques distintos posibles, asi que remuestrear de ahi
+    SUBESTIMA la variabilidad. Daba IC [+0,17, +2,32] cuando el correcto es
+    [-0,50, +3,55], que cruza cero.
+
+    Si la unidad independiente es la semana — que es la premisa entera de
+    remuestrear por bloques — cada semana pesa igual y se remuestrean semanas
+    ENTERAS. El desvio entre semanas (2,92pp) es casi el doble de la media
+    (1,52pp): esa es la verdadera relacion senal-ruido de esta estrategia.
     """
-    sem = [g[col].to_numpy() for _, g in d.groupby("week", sort=True)]
-    k = len(sem)
-    if k < bloque * 2:
+    wm = np.array([g[col].mean() for _, g in d.groupby("week", sort=True)])
+    k = len(wm)
+    if k < 4:
         return 1.0, (np.nan, np.nan)
-    m = []
-    for _ in range(reps):
-        ini = RNG.integers(0, k - bloque + 1, size=max(1, k // bloque))
-        m.append(np.concatenate([np.concatenate(sem[i:i + bloque]) for i in ini]).mean())
-    m = np.array(m)
+    m = np.array([RNG.choice(wm, k, replace=True).mean() for _ in range(reps)])
     return float((m <= 0).mean()), tuple(np.percentile(m, [2.5, 97.5]))
+
+
+def semanas_necesarias(d, col="f", potencia=0.80, factor=1.0):
+    """Cuantas semanas NUEVAS hacen falta para un forward test con potencia.
+
+    `factor` escala el efecto esperado: 0.5 = suponer que el real es la mitad
+    del medido, que es lo normal (la primera medicion siempre exagera).
+    """
+    wm = np.array([g[col].mean() for _, g in d.groupby("week", sort=True)])
+    mu, sd = wm.mean() * factor, wm.std(ddof=1)
+    if mu <= 0:
+        return float("inf")
+    z = {0.50: 0.0, 0.80: 0.84, 0.90: 1.28}[potencia]
+    return int(np.ceil(((1.96 + z) * sd / mu) ** 2))
 
 
 def evaluar(df, horizonte="24h", fill="price_15m", solo_perp=True, costo=COSTO):
@@ -112,7 +131,7 @@ def evaluar(df, horizonte="24h", fill="price_15m", solo_perp=True, costo=COSTO):
     sin_peor = d[d.symbol != ap.index[0]].f
     w = d.groupby("week").f.agg(["size", "mean"])
     w = w[w["size"] >= 20]
-    p, ic = p_bloques(d)
+    p, ic = p_semanas(d)
 
     g = {
         "(a) media > 0": (d.f.mean() > 0, f"{100*d.f.mean():+.3f}%"),
@@ -120,7 +139,7 @@ def evaluar(df, horizonte="24h", fill="price_15m", solo_perp=True, costo=COSTO):
         "(c) >=75% semanas": ((w["mean"] > 0).sum() >= np.ceil(0.75 * len(w)),
                               f"{(w['mean']>0).sum()}/{len(w)}"),
         "(d) sin el peor simbolo": (sin_peor.mean() > 0, f"{100*sin_peor.mean():+.3f}%"),
-        "(e) bloques: IC no cruza 0": (ic[0] > 0,
+        "(e) semanas: IC no cruza 0": (ic[0] > 0,
                                        f"p={p:.4f} IC[{100*ic[0]:+.2f},{100*ic[1]:+.2f}]"),
     }
     print(f"\n--- {horizonte} | fill={fill} | {'solo perps' if solo_perp else 'todas'} "
