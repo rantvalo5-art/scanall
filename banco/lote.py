@@ -136,27 +136,31 @@ def _p_binomial(k, n, p0):
 
 
 def _p_bloques(S, nec, bloque=3, reps=2000, seed=0):
-    """p-valor por bootstrap de BLOQUES DE SEMANAS.
+    """p-valor remuestreando SEMANAS ENTERAS, cada una pesando igual.
 
-    Remuestrea tiras de `bloque` semanas consecutivas en vez de trades sueltos.
-    Asi el solapamiento y la autocorrelacion del regimen quedan DENTRO del
-    bloque, que es la unica forma de no contar cien veces la misma semana.
-    Una senal de timing de mercado suele tener p binomial ~0 y p de bloques alto:
-    esa brecha es justamente el autoengano que se quiere evitar.
+    La semana es la unidad independiente: las entradas se solapan (una cada 12h
+    con horizonte de 30d = ~60 trades vivos a la vez) y el regimen esta
+    autocorrelacionado.
+
+    OJO — una version anterior remuestreaba bloques de semanas pero POOLEABA las
+    entradas de cada bloque. Eso hace que las semanas con mas entradas pesen mas
+    y, si hay pocas semanas, subestima la variabilidad. En `fade/evaluar.py`
+    (8 semanas) la diferencia dio vuelta un veredicto: IC [+0,17, +2,32] contra
+    el correcto [-0,52, +3,30]. Aca hay ~52 semanas y el sesgo es menor, pero se
+    corrige igual: cada semana entra con su propio win rate, pesando uno.
+
+    Una senal de timing de mercado suele tener p ingenuo ~0 y p de semanas alto:
+    esa brecha es el autoengano que se quiere evitar.
     """
-    sem = [g["res"].to_numpy() for _, g in S.groupby("semana", sort=True)]
-    k = len(sem)
-    if k < bloque * 3:
+    wr = np.array([(g["res"] > 0).mean() * 100
+                   for _, g in S.groupby("semana", sort=True)
+                   if len(g) >= 20])
+    k = len(wr)
+    if k < 8:
         return 1.0
     rng = np.random.default_rng(seed)
-    n_bloques = max(1, k // bloque)
-    arriba = 0
-    for _ in range(reps):
-        ini = rng.integers(0, k - bloque + 1, size=n_bloques)
-        tira = np.concatenate([np.concatenate(sem[i:i + bloque]) for i in ini])
-        if tira.size and (tira > 0).mean() * 100 > nec:
-            arriba += 1
-    return 1.0 - arriba / reps
+    m = np.array([rng.choice(wr, k, replace=True).mean() for _ in range(reps)])
+    return float((m <= nec).mean())
 
 
 def _bh(ps, q):

@@ -114,18 +114,48 @@ El veredicto por default es **cerrada**: la carga de la prueba la tiene la seña
 5. **Concentración** — sigue arriba del umbral sin el top-3, y sin el mejor par solo.
 6. **Consistencia semanal** — ≥60% de las semanas arriba del umbral.
 
-### El p-valor que importa es el de bloques
+### La corrida grande: 450 hipótesis, 0 sobreviven
+
+`--cruces` cruza de a pares todas las colas de todas las features: **450 hipótesis en una
+corrida de ~20 minutos**. Resultado sobre ago-2025 → ago-2026:
+
+| | |
+|---|---|
+| no cruzan el umbral | 335 |
+| mueren en la corrección | 91 |
+| poca muestra | 24 |
+| **sobreviven** | **0** |
+
+Y el número que justifica todo el aparato:
+
+| | |
+|---|---|
+| hipótesis con p < 0,05 **suponiendo independencia** | **68** |
+| hipótesis con p < 0,05 con el remuestreo por semanas | **0** |
+
+Probadas de a una y por sesión, esas 68 habrían sido 68 "hallazgos" con p < 0,05, cada uno
+consumiendo una sesión antes de morir. Corridas juntas y con la corrección puesta, quedan
+cero. Además las 12 mejores son todas cruces de **`mkt_vol_168 bajo`** con otra cosa: no
+son 12 hallazgos, es **uno solo disfrazado doce veces**.
+
+### El p-valor que importa es el de semanas
 
 El binomial supone entradas independientes y acá **eso es falso**: hay una entrada cada
 12h con horizonte de 30d, o sea ~60 trades vivos a la vez, y el régimen está
-autocorrelacionado. `_p_bloques()` remuestrea tiras de 3 semanas consecutivas, de modo
-que el solapamiento queda dentro del bloque.
+autocorrelacionado. `_p_bloques()` remuestrea **semanas enteras, cada una pesando igual**.
+
+> **Corrección 2026-08-17.** La primera versión remuestreaba bloques de semanas pero
+> **pooleaba las entradas** de cada bloque, así que las semanas con más entradas pesaban
+> más y, con pocas semanas, subestimaba la variabilidad. En `fade/evaluar.py` (8 semanas)
+> eso dio vuelta un veredicto: IC [+0,17%, +2,32%] contra el correcto [−0,52%, +3,30%].
+> Acá, con ~52 semanas, el sesgo era menor pero real: `rango_168 bajo` pasó de p=0,32 a
+> **p=0,60**.
 
 La diferencia no es cosmética. En la primera corrida:
 
 | | p independiente | p de bloques |
 |---|---|---|
-| `mkt_vol_168 bajo` (+9,98pp) | 0,0000 | **0,1545** |
+| `mkt_vol_168 bajo` (+9,98pp) | 0,0000 | **0,1415** |
 
 Esa hipótesis —volatilidad del mercado baja— tenía el margen más grande del lote,
 sobrevivía concentración y ganaba +12,7pp contra su línea base pareada. Con el p-valor
