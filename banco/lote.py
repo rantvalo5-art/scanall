@@ -45,6 +45,15 @@ N_MIN = 200          # menos que esto es SUBPOTENCIADO, que no es lo mismo que r
 Q_FDR = 0.10         # tasa de falsos descubrimientos tolerada en el lote
 SEM_MIN = 0.60       # fraccion de semanas que tiene que estar arriba del umbral
 TOP_N = 3            # cuantos simbolos se sacan en el chequeo de concentracion
+SEM_N_MIN = 20       # senales minimas para que una semana cuente en las compuertas 3 y 7
+
+# OJO con SEM_N_MIN. Estaba hardcodeado en dos lugares y NO es neutral cuando la actividad
+# correlaciona con el resultado. En la hipotesis de OI shock (auditoria 2026-08-22,
+# `PREREGISTRO_OI.md`) descartaba el 82% de las semanas y el 55% de los trades; las que
+# quedaban ganaban 68,68% contra 46,40% las descartadas, y el veredicto se daba vuelta
+# entre n>=5 y n>=10. Existe por una razon real —el win rate de una semana de 2 trades es
+# ruido— pero cuando se usa hay que reportar `semanas_todas` al lado y mirar si el filtro
+# se esta comiendo la parte que pierde.
 
 
 # ------------------------------------------------------------------ features
@@ -135,7 +144,7 @@ def _p_binomial(k, n, p0):
     return 0.5 * math.erfc(z / math.sqrt(2))
 
 
-def _p_bloques(S, nec, bloque=3, reps=2000, seed=0):
+def _p_bloques(S, nec, bloque=3, reps=2000, seed=0, n_min=SEM_N_MIN):
     """p-valor remuestreando SEMANAS ENTERAS, cada una pesando igual.
 
     La semana es la unidad independiente: las entradas se solapan (una cada 12h
@@ -151,10 +160,14 @@ def _p_bloques(S, nec, bloque=3, reps=2000, seed=0):
 
     Una senal de timing de mercado suele tener p ingenuo ~0 y p de semanas alto:
     esa brecha es el autoengano que se quiere evitar.
+
+    `n_min` descarta las semanas flacas, cuyo win rate es ruido. Es una compuerta con
+    filo: si la actividad correlaciona con el resultado, filtrar por actividad filtra
+    por resultado. Ver el comentario de SEM_N_MIN arriba antes de confiar en este p.
     """
     wr = np.array([(g["res"] > 0).mean() * 100
                    for _, g in S.groupby("semana", sort=True)
-                   if len(g) >= 20])
+                   if len(g) >= n_min])
     k = len(wr)
     if k < 8:
         return 1.0
@@ -198,7 +211,7 @@ def wr_pareado(T, mascara):
 
 
 # ------------------------------------------------------------------ el lote
-def _una(T, mascara, nombre, nec, costo):
+def _una(T, mascara, nombre, nec, costo, sem_n_min=SEM_N_MIN):
     R = T[T["resuelto"]]
     m = mascara.reindex(R.index, fill_value=False).fillna(False).astype(bool)
     S = R[m]
@@ -213,7 +226,7 @@ def _una(T, mascara, nombre, nec, costo):
     fila["wr"] = wr
     fila["margen"] = wr - nec
     fila["p_indep"] = _p_binomial(wins, n, nec / 100)   # inflado, referencia
-    fila["p"] = _p_bloques(S, nec) if wr > nec else 1.0  # el que decide
+    fila["p"] = _p_bloques(S, nec, n_min=sem_n_min) if wr > nec else 1.0  # el que decide
 
     # compuerta de seleccion-de-moneda
     fila["wr_pareado"] = wr_pareado(T, mascara)
@@ -229,23 +242,24 @@ def _una(T, mascara, nombre, nec, costo):
 
     # compuerta semanal
     sem = S.groupby("semana")["res"].agg(wr=lambda s: (s > 0).mean() * 100, n="size")
-    sem = sem[sem["n"] >= 20]
+    fila["semanas_todas"] = len(sem)     # diagnostico: cuantas hay ANTES de filtrar
+    sem = sem[sem["n"] >= sem_n_min]
     fila["semanas"] = len(sem)
     fila["sem_ok"] = float((sem["wr"] > nec).mean()) if len(sem) else np.nan
     return fila
 
 
-def lote(T, hipotesis, costo=COSTO_PCT, q=Q_FDR, mostrar=True):
+def lote(T, hipotesis, costo=COSTO_PCT, q=Q_FDR, mostrar=True, sem_n_min=SEM_N_MIN):
     """Corre TODAS las hipotesis y aplica las compuertas. Devuelve el DataFrame.
 
     `hipotesis`: {nombre: mascara booleana alineada al indice de T}.
     """
     tgt, stp = T.attrs["target"], T.attrs["stop"]
     nec = winrate_necesario(tgt, stp, costo)
-    base = _una(T, pd.Series(True, index=T.index), "LINEA BASE", nec, costo)
+    base = _una(T, pd.Series(True, index=T.index), "LINEA BASE", nec, costo, sem_n_min)
 
     filas = [_una(T, pd.Series(m, index=T.index) if not isinstance(m, pd.Series) else m,
-                  k, nec, costo)
+                  k, nec, costo, sem_n_min)
              for k, m in hipotesis.items()]
     D = pd.DataFrame(filas)
 
@@ -341,6 +355,8 @@ def main():
     ap.add_argument("--fin", default="2026-08-01")
     ap.add_argument("--costo", type=float, default=COSTO_PCT)
     ap.add_argument("--q", type=float, default=Q_FDR, help="tasa de falsos descubrimientos")
+    ap.add_argument("--sem-n-min", type=int, default=SEM_N_MIN,
+                    help="senales minimas para que una semana cuente (compuertas 3 y 7)")
     ap.add_argument("--cruces", action="store_true", help="agregar cruces de a pares")
     ap.add_argument("--out", default=None, help="guardar la tabla a csv")
     ap.add_argument("--pin", default="base200",
@@ -356,7 +372,7 @@ def main():
     H = hipotesis_estandar(F, cruces=a.cruces)
     print(f"\n{len(T):,} entradas  |  {F.shape[1]} features  |  {len(H)} hipotesis")
 
-    D = lote(T, H, costo=a.costo, q=a.q)
+    D = lote(T, H, costo=a.costo, q=a.q, sem_n_min=a.sem_n_min)
     if a.out:
         D.to_csv(a.out, index=False)
         print(f"\ntabla -> {a.out}")
