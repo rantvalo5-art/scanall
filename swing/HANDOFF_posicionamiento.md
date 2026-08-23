@@ -254,10 +254,10 @@ faltan `53d0112`, `1c0a00f`, `be4cef3`, y los últimos dos siguen sólo en
 `swing/screener.py` difiere entre las dos ramas y un `git checkout` directo choca.
 
 ```
-<<HASH4>>  handoff: la Fase 1 tumbo tt_pos
-<<HASH3>>  Fase 1 — tt_pos NO cruza. Se da vuelta el signo fuera de su ventana
-<<HASH2>>  chequeos del panel — 14, sin red
-<<HASH1>>  Fase 1 — panel historico de tt_pos sin alertas
+e9edc7d  handoff: la Fase 1 tumbo tt_pos
+461d026  Fase 1 — tt_pos NO cruza. Se da vuelta el signo fuera de su ventana
+ace6709  chequeos del panel — 14, sin red
+51564b3  Fase 1 — panel historico de tt_pos sin alertas
 41cb2a2  tt_pos — lo primero que cruza los seis filtros. Es una regla de EVITAR
 f38a659  la pileta y el corto — la mediana es real y estable, y no se puede cobrar
 19cccbc  de donde sale la perdida — beta / universo / habilidad, y el eje mediana-cola
