@@ -1035,6 +1035,80 @@ def final_bucket(score, signal_type, cfg):
     return "WATCH"
 
 
+PLAN_ENTRY_SIGNALS = ("COILING", "PREBREAK")   # las que TODAVÍA no rompieron
+
+
+def _build_plan(c, tf_data, cfg):
+    """Plan de la alerta: dónde entrar, dónde deja de existir el setup, dónde stopea
+    el tracker y qué resistencia hay arriba. None si no hay nada honesto que decir.
+
+    Es PRESENTACIÓN, no detección: no toca score ni bucket, y cada nivel sale de un
+    campo que el motor ya computa (ref_price, dist_to_res, major_struct_dist).
+
+    Qué NO devuelve, y por qué. No hay `objetivo` ni `R:B`. Fase 0 (swing/fase0_plan.py)
+    midió el objetivo propuesto sobre 1.062 alertas BEST reales contra un dardo pareado
+    —la misma moneda a horas al azar, misma geometría relativa— y dio −8,4pp con
+    major_max y −6,4pp con one_h_resist: no cruza en ninguno de los tres ejes (todo,
+    sin top-3 símbolos, sin top-3 semanas) y la expectativa queda debajo del dardo
+    (−0,022R vs +0,061R). Aparte, el R:B teórico mediano es 0,49 y 0,17: con stop 10%
+    y la resistencia a 2-5%, la geometría ya es mala antes de la estadística. Por eso
+    el nivel se llama `resistencia cercana` y va SIN R:B. No re-etiquetarlo como
+    objetivo sin volver a correr Fase 0.
+    """
+    price = float(c.get("price") or 0)
+    if price <= 0:
+        return None
+    ref = float(c.get("ref_price") or 0)
+    # Sólo las que no rompieron llevan zona de entrada y resistencia. Mostrar "zona de
+    # entrada" en una señal ya rota es operacionalizar el defecto medido de BREAKOUT
+    # (−4,2pp vs azar a 48h; Fase 0 lo reconfirmó: −11,3pp BREAKOUT, −15,5pp HOLD).
+    full = c.get("history_tf") in PLAN_ENTRY_SIGNALS
+
+    plan = {"entry_low": None, "entry_high": None, "invalidation": None,
+            "stop": None, "resistencia": None, "resistencia_src": None}
+
+    # Invalidación estructural: el nivel que define el setup. Es el número factual del
+    # plan —contesta "¿dónde deja de existir esto?"— y no afirma ninguna probabilidad.
+    if ref > 0:
+        plan["invalidation"] = ref
+
+    # Zona de entrada = [nivel, nivel+buffer], entrada AL ROMPER. El buffer es
+    # PREBREAK_NEAR_MAX, la constante que el motor ya usa para "cerca del máximo".
+    if full and 0 < price < ref:
+        buf = float(cfg.g("prebreak", "PREBREAK_NEAR_MAX", default=0.012))
+        plan["entry_low"] = ref
+        plan["entry_high"] = ref * (1 + buf)
+
+    # Stop: el que aplica exit_tracker, que lo calcula sobre entry_price (= este price).
+    # Se expone SÓLO si el tracker realmente lo va a aplicar a esta alerta; si no,
+    # imprimirlo le daría al operador dos verdades sobre el mismo trade.
+    ex = cfg.raw.get("exit_mgmt", {}) or {}
+    stop_pct = float(ex.get("STOP_PCT", 0.0) or 0.0)
+    if ex.get("ENABLED") and stop_pct > 0 and c.get("bucket") in (ex.get("BUCKETS") or []):
+        plan["stop"] = price * (1 - stop_pct)
+
+    # Resistencia cercana: la primera POR ENCIMA de la zona de entrada. one_h_resist
+    # (24 barras) ≤ major_max (60) por construcción, así que se prueban en ese orden.
+    # Se reconstruyen desde el dict de features, que ya las trae como distancia
+    # relativa: no hace falta tocar analyze() ni analyze_at_time().
+    if full:
+        feats = tf_data.get(c.get("timeframe")) or {}
+        entry_ref = plan["entry_high"] or price
+        for src, key in (("1h", "dist_to_res"), ("major", "major_struct_dist")):
+            d = feats.get(key)
+            if d is None:
+                continue
+            lvl = price * (1 + float(d))
+            if lvl > entry_ref:
+                plan["resistencia"] = lvl
+                plan["resistencia_src"] = src
+                break
+
+    if all(plan[k] is None for k in ("entry_low", "invalidation", "stop", "resistencia")):
+        return None
+    return plan
+
+
 def classify(symbol, tf_data, cfg, counts_history=None):
     """Replica classify_symbol del screener con scoring totalmente parametrizado.
     tf_data = {'1h': dict, '4h': dict, '1d': dict}
@@ -1658,6 +1732,13 @@ def classify(symbol, tf_data, cfg, counts_history=None):
             if "breakdown" in c:
                 c["breakdown"]["BUCKET_ATR_BAND"] = (
                     f"atr1d={_atr1d_v:.2f} {'in' if _inband else 'out'} [{_band_min},{_band_max}]")
+
+    # ── Plan de trading (presentación pura, ver _build_plan) ────────────────────
+    # Va acá y no arriba junto a atr_pct_1d a propósito: el plan expone el stop sólo si
+    # el bucket FINAL está en exit_mgmt.BUCKETS, y el bucket lo siguen pisando los
+    # bloques de arriba (EMA/struct soft, cap, gates ATR per-señal, banda ATR).
+    for c in candidates:
+        c["plan"] = _build_plan(c, tf_data, cfg)
 
     candidates.sort(
         key=lambda x: (_normalize_score(x["score"], x["history_tf"], _cal_cfg, SCORE_CAP), x["priority"], x["score"]),
