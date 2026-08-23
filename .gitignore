@@ -46,3 +46,4 @@ CLAUDEconfig - activande derivatives.json
 
 # Cache de klines de fase0_plan.py (Fase 0 del plan de trading)
 .fase0_cache/
+.metrics_cache/
