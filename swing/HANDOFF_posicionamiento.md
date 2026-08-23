@@ -1,10 +1,9 @@
-# HANDOFF — posicionamiento de futuros (`tt_pos`): estresarlo antes de operarlo
+# HANDOFF — posicionamiento de futuros (`tt_pos`): **tumbado por la Fase 1**
 
 > **Solo `swing/`.** El day trader de la raíz no se toca. Leer primero `swing/CLAUDE.md`.
-> Escrito 2026-08-23, al cierre de la sesión que hizo el plan de trading en la alerta y
-> después desarmó de dónde sale la pérdida.
-> Rama: **`swing/plan-trading`**, 8 commits sobre `origin/main`.
-
+> Escrito 2026-08-23 al cerrar el plan de trading; **actualizado el mismo día** con el
+> resultado de la Fase 1, que dio negativo.
+> Rama: **`swing/plan-trading`**, 11 commits sobre `origin/main`.
 ---
 
 ## 0. Lo que esta sesión dejó cerrado — no rehacer
@@ -74,7 +73,10 @@ Por eso conviven el techo oráculo (×966, la detección está bien) y la fuga d
 
 ---
 
-## 2. Lo único vivo: `tt_pos`
+## 2. Qué era `tt_pos` y qué se midió sobre alertas
+
+> Todo lo de esta sección **sigue siendo cierto como medición** — y sigue sin
+> servir, porque vive en 12 semanas. El §3 explica por qué.
 
 `swing/posicionamiento.py`. Ratio long/short **por posición** de los top traders de
 Binance Futures — de qué lado está el dinero grande.
@@ -112,75 +114,94 @@ todos. Es el primero del swing. El peor grupo es **HOLD** (−16,85%, mediana �
 
 ---
 
-## 3. La decisión ya tomada
+## 3. Fase 1 — **CORRIDA, y NO CRUZA**
 
-**Estresar la familia antes de deployar.** El hallazgo sale de 1.028 alertas de 12
-semanas y una sola variable a la vez. La fuente tiene datos **desde 2020** y se usaron
-tres meses. Deployar ahora repetiría el error del vender-volatilidad: un número real
-medido en la ventana equivocada.
+`swing/panel_tt.py` (tres pasos reanudables) + `swing/diag_panel_tt.py` +
+`swing/test_panel.py` (14 chequeos sin red). Resultados en `panel_tt.txt` /
+`panel_tt.json` / `diag_panel_tt.txt`.
 
----
+**El panel.** 154.476 filas · 804 perps · grilla cada 3 días · 2023-01 → 2026-08 ·
+forward 7d neto · contra dardo pareado del mismo símbolo a ±30 días saltando ±7.
+Universo tomado del **listado S3 del bucket de Binance**, no del feed de hoy: 847 perps
+USDT históricos, **98 de ellos ya delisteados**. El precio sale de las klines del propio
+perp, que es el único que existe para un delisteado.
 
-## 4. Fase 1 — profundidad histórica. **Es la que decide todo.**
+**El veredicto: 0 de 4 bloques.** Y no queda en nada — **el signo se invierte**:
 
-**La pregunta:** ¿el efecto de `tt_pos` aguanta 2 años, o era esta ventana?
+| bloque | margen q1 (`tt_pos` bajo) | q5 (alto) | q1 − q5 |
+|---|---|---|---|
+| 2023-01 → 2023-11 | +0,65pp | −4,14pp | **+4,79pp** |
+| 2023-11 → 2024-10 | +1,51pp | −2,41pp | **+3,93pp** |
+| 2024-10 → 2025-09 | +0,94pp | −0,87pp | **+1,82pp** |
+| 2025-09 → 2026-08 | −0,41pp | −0,03pp | −0,38pp ← contiene la ventana del hallazgo |
 
-**El problema a resolver primero:** `screener_outcomes` sólo tiene 3 meses de alertas
-reales, y el replay del backtest **no las reproduce** (memoria:
-`project-replay-no-reemplaza-vivo`). O sea que no hay alertas reales de 2024-2025.
+Tres años enteros dicen lo contrario de la hipótesis, y el único bloque con el signo del
+hallazgo es el que solapa may-ago 2026. Ningún margen tiene el IC95 fuera del cero, en
+ninguna dirección. **Eso es la definición de régimen, y la regla preescrita decía
+archivar.**
 
-**Salida:** medir el efecto **sin alertas**, sobre el universo. Si `tt_pos` bajo predice
-retorno negativo a 7d en una grilla diaria de símbolos × fechas (2022-2026), el mecanismo
-existe con independencia del screener, y entonces la versión sobre alertas es un caso
-particular. Si no aparece en el panel largo, lo de acá fue la ventana.
+**Por qué no reproduce el −9,30%** (`diag_panel_tt.py`):
+- En la ventana del hallazgo el panel **sí** ve el signo correcto, pero −0,59pp con IC
+  [−2,67 , +1,49]: quince veces más chico y dentro del ruido.
+- Restringido a los 285 símbolos que el swing alertó en BEST: **+0,68pp** sobre
+  2023-2026. No era la población de monedas.
+- El escalón crudo (q1 +0,44% → q5 −1,73%) es **mitad moneda**: el dardo pareado baja con
+  él (−0,03% → −0,97%).
 
-- Panel: los ~250 símbolos con perp, grilla diaria, forward 7d neto, 2022-2026.
-- Benchmark: **el mismo símbolo a fechas al azar** (dardo pareado, igual que siempre) y
-  el quintil superior de `tt_pos`.
-- Bootstrap por **semana**, concentración por símbolo y por semana, y **por año**.
+### La traducción de la regla, y por qué hubo que hacerla
 
-**Regla de parada (preescrita, no aflojar después de ver el número):** el margen del
-quintil bajo contra el dardo tiene que ser negativo con IC95 sin cero **en al menos 3 de
-los 4 años por separado**. Si vive en 1 o 2 años, es régimen y se archiva.
+El handoff pedía "3 de los 4 años, 2022-2025". **2022 no existe en la fuente**:
+`sum_toptrader_long_short_ratio` viene *presente pero vacía* casi todo el año (BTCUSDT
+87% NaN, ETHUSDT igual; verificado mes a mes). La columna está en el header, así que un
+`if c in df.columns` no lo detecta. Tramos limpios: 2020-09→2021-12 y 2023-01→hoy.
 
-**Costo:** la descarga es lo caro — ~250 símbolos × ~1.500 días ≈ 375k zips. Bajar por
-tandas; `frame_simbolo()` cachea por símbolo y es **reanudable**, y el harness mata a los
-10 min (ya pasó: se relanza y sigue). Presupuestar 2-3 sesiones sólo de descarga.
+Se conservó el 3-de-4 partiendo el tramo limpio en cuatro bloques contiguos de igual
+duración, **fijado antes de mirar ningún efecto** (está en el docstring de `panel_tt.py`
+y en el commit `51564b3`, anterior a los resultados). Los años calendario se imprimen
+como control y dan lo mismo.
 
----
+### Lo único que la Fase 1 no puede testear
 
-## 5. Fase 2 — sólo si Fase 1 cruza
-
-1. **Horizontes.** Se midió 7d. Probar 24h / 3d / 14d / 21d. El payoff del swing madura
-   >7d, así que 14/21d importa.
-2. **Cruces.** `tt_pos` bajo **+ OI subiendo** es la hipótesis con mecanismo: multitud
-   cargada y grande del otro lado = cascada de liquidaciones. `oi` solo no dio; el cruce
-   no se probó.
-3. **Por señal.** HOLD es el peor grupo (−16,85%). Puede ser que la regla sea
-   *HOLD + tt_pos bajo* y no `tt_pos` a secas. Ojo con n: HOLD dentro del grupo son 51.
-4. **Continuo, no quintil.** El umbral 1,28 es un p20 de esta muestra. Ver si el efecto
-   es monótono en el nivel crudo, que es lo que haría deployable un umbral fijo.
-
----
-
-## 6. Fase 3 — a vivo, sólo si Fase 1 y 2 cruzan
-
-**Esto NO es presentación: cambia qué se alerta.** Distinto del plan de trading, que era
-inerte por construcción.
-
-- Endpoint en vivo: `/futures/data/topLongShortPositionRatio` (la REST con 30d alcanza
-  para vivo; los dumps diarios son para backtest).
-- El swing **no tiene sección `derivatives` a propósito** (`swing/CLAUDE.md`). Agregarla
-  es una decisión de identidad del fork: confirmarla con el usuario.
-- Implementar como **filtro de bucket**, no de detección: la alerta se sigue calculando y
-  baja de BEST a WATCH. Así el efecto es medible y reversible con un knob.
-- `config.json` → sección nueva con `ENABLED: false` por default, para que la rama sea
-  segura de mergear (mismo patrón que `exit_mgmt` en `17e6d03`).
-- Preregistrar la métrica de éxito **antes** de encender, y dejar correr ≥8 semanas.
+La interacción **alerta × `tt_pos`**. No hay alertas históricas y el replay no las
+reproduce ([[project-replay-no-reemplaza-vivo]]). Es el resquicio honesto, y no hay forma
+barata de cerrarlo: haría falta ≥6 meses de feed en vivo con `tt_pos` guardado.
 
 ---
 
-## 7. Lo que NO hay que hacer
+## 4. Lo que dejó de estar en pie
+
+Las Fases 2 y 3 del plan original (horizontes, cruce con OI, por señal, continuo vs
+quintil; y después el deploy como filtro de bucket) **estaban condicionadas a que la
+Fase 1 cruzara**. No cruzó. No hay que correrlas: buscar un horizonte o un cruce que sí
+dé, sobre un efecto que ya se sabe que vive en un solo bloque, es exactamente el
+autoengaño que el handoff venía evitando.
+
+**La tentación específica a no seguir:** el bloque B4 tiene el signo "correcto". Mirar
+sólo B4 y decir "en el régimen actual funciona" es elegir la ventana después de ver los
+datos.
+
+---
+
+## 5. La sonda que quedó suelta — n chico, NO es un hallazgo
+
+Cayó de costado en `diag_panel_tt.py`. Las 263 filas del panel que coinciden con un
+día-símbolo **con alerta BEST real** dan margen **+10,01pp**, IC [+4,36 , +18,23] para el
+grupo no-bajo. La diferencia con la medición sobre alertas es **dónde se entra**: acá la
+entrada es 00:00 UTC del día de la alerta, no la vela de la alerta.
+
+Si eso aguanta con más n, apunta a lo mismo que [[project-swing-entrada-breakout]] y
+[[project-swing-mediana-vs-cola]] — el bot elige bien la moneda y mal el momento — y la
+palanca sería **demorar hasta el corte del día**.
+
+**Antes de emocionarse:** n=263 sale de que la grilla es cada 3 días; los dardos salen de
+±30 días alrededor de un tramo de momentum; y "demorar la entrada" ya fue medido sobre
+alertas y **subía la mediana hundiendo la media** (§1). O sea que el prior está en contra.
+Si se prueba, se prueba con la grilla diaria (`--stride 1`, lo bajado no se tira) y con
+regla de parada escrita antes.
+
+---
+
+## 6. Lo que NO hay que hacer
 
 - **No tunear scoring, buckets ni exits.** Ese pozo está medido: mueve mediana↔cola y
   conserva la media. ~450 hipótesis.
@@ -188,13 +209,16 @@ inerte por construcción.
 - **No shortear.** Medido dos veces (genérico y sobre el subconjunto bueno): muere en el
   modelo de relleno y OOS queda plano. La mediana es real y no se cosecha porque un stop
   no acota un salto.
-- **No deployar `tt_pos` sin Fase 1.** Es la tentación obvia y es exactamente el error de
-  vender-volatilidad.
+- **No deployar `tt_pos`, punto.** La Fase 1 lo tumbó (§3). Y no re-correrlo con otro
+  horizonte, otro umbral o otro cruce a ver si alguno da: el efecto vive en un bloque
+  de cuatro y en tres tiene el signo al revés.
+- **No mirar sólo el bloque 2025-09 → 2026-08** porque ahí el signo cierra. Es elegir
+  la ventana después de ver los datos.
 - **No re-etiquetar `resistencia cercana` como `objetivo`** sin volver a correr Fase 0.
 
 ---
 
-## 8. Herramientas — reusar, no reescribir
+## 7. Herramientas — reusar, no reescribir
 
 | script | qué hace |
 |---|---|
@@ -205,19 +229,35 @@ inerte por construcción.
 | `corto.py` | corto con los 3 modelos de relleno |
 | `posicionamiento.py` | `frame_simbolo()` (métricas de futuros, cacheado y reanudable), Fases A y B |
 | `test_plan.py` | 40 chequeos de `_build_plan` / `_plan_lines`, sin red |
+| `panel_tt.py` | **Fase 1.** `universo` (listado S3, incluye delisteados) / `bajar` (metrics diarias + klines por REST de futuros, reanudable por símbolo-año) / `panel` |
+| `diag_panel_tt.py` | por qué el panel no reproduce el hallazgo sobre alertas |
+| `test_panel.py` | 14 chequeos del panel, sin red |
 
 Caches (gitignored): `swing/.fase0_cache/` (klines 1h, OHLC y con volumen),
-`swing/.metrics_cache/` (métricas de futuros, 251 símbolos × 94 días).
+`swing/.metrics_cache/` (métricas de futuros, 251 símbolos × 94 días),
+`swing/.panel_cache/` (**167 MB**: 2.196 símbolo-año de métricas + 847 series de
+klines diarias + el panel armado). Densificar a grilla diaria es sólo `--stride 1`:
+no tira nada de lo bajado, y cuesta ~2h más de descarga.
+
+Dos cosas de operación que costaron tiempo: **96 workers rinden menos que 48**
+(throttling; 48 req/s es el techo del bucket), y las klines conviene bajarlas por la
+**REST de futuros** — 2 requests por símbolo en vez de ~70 zips, y sirve igual para
+los delisteados (verificado al centavo contra los dumps).
 
 ---
 
-## 9. Estado de la rama
+## 8. Estado de la rama
 
 `swing/plan-trading`, sacada de `origin/main` (**ojo:** el `main` local está atrasado; le
 faltan `53d0112`, `1c0a00f`, `be4cef3`, y los últimos dos siguen sólo en
-`banco/primer-toque`). Sin pushear.
+`banco/primer-toque`). Sin pushear. Vive en un worktree aparte porque
+`swing/screener.py` difiere entre las dos ramas y un `git checkout` directo choca.
 
 ```
+<<HASH4>>  handoff: la Fase 1 tumbo tt_pos
+<<HASH3>>  Fase 1 — tt_pos NO cruza. Se da vuelta el signo fuera de su ventana
+<<HASH2>>  chequeos del panel — 14, sin red
+<<HASH1>>  Fase 1 — panel historico de tt_pos sin alertas
 41cb2a2  tt_pos — lo primero que cruza los seis filtros. Es una regla de EVITAR
 f38a659  la pileta y el corto — la mediana es real y estable, y no se puede cobrar
 19cccbc  de donde sale la perdida — beta / universo / habilidad, y el eje mediana-cola
@@ -230,5 +270,3 @@ d195107  el stop duro validado es 10% — el comentario del tracker mentia
 
 El working tree del usuario quedó intacto en `banco/primer-toque`, con el fix del token
 de Telegram sin commitear (ya está aparte en `sec/telegram-token-leak`, `ca106ac`).
-`swing/screener.py` difiere entre las dos ramas, así que un `git checkout` directo choca:
-la rama vive en un worktree aparte.
