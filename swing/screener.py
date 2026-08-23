@@ -90,6 +90,11 @@ SNAPSHOT_RETENTION_DAYS = _g("history", "SNAPSHOT_RETENTION_DAYS", default=30)
 # o sea gated-pero-no-🔥, que es la historia correcta).
 ATR_BADGE_HIGH = _g("history", "ATR_BADGE_HIGH", default=8.0)
 
+# Sólo para rotular el stop en el mensaje. El nivel lo calcula _build_plan() en
+# backtest.py leyendo la MISMA clave, así que no hay dos fuentes de verdad: acá se
+# usa únicamente para escribir "-10%" al lado del precio.
+STOP_PCT_PLAN = float((CFG.raw.get("exit_mgmt") or {}).get("STOP_PCT", 0.0) or 0.0)
+
 # Racha cross-señal (Idea 2): ventana multi-día para detectar reincidencia/convicción.
 # counts_history (24h) está acoplado a LATE_REPEAT (scoring) y no se puede ensanchar; en
 # cambio screener_outcomes retiene RETENTION_DAYS y trae signal_type, así que la racha se
@@ -530,6 +535,40 @@ def _hold_candidate_line(alert, prev, streak):
     return "  🪢 candidata a hold — correa larga (seguir 14/21d)"
 
 
+def _plan_lines(alert):
+    """Líneas del plan (niveles). Lista vacía si no hay plan que mostrar.
+
+    El plan lo arma `_build_plan()` en backtest.py — acá SÓLO se formatea, igual que
+    con el resto de los campos del dict. Ojo con dos cosas al tocar esto:
+
+    1. No hay objetivo ni R:B, y no es un olvido: Fase 0 (swing/fase0_plan.py) midió el
+       objetivo contra el dardo pareado sobre 1.062 alertas BEST reales y no cruzó en
+       ninguno de los tres ejes. Por eso dice `resistencia cercana` y no `objetivo`.
+       Cambiar la etiqueta = afirmar algo que está medido y no da.
+    2. El mensaje va como caption de sendPhoto cuando el chart está ENABLED, y ese
+       límite es 1024 chars, no 4096. Estas líneas suman ~110.
+    """
+    p = alert.get("plan")
+    if not p:
+        return []
+    out = []
+    lo, hi = p.get("entry_low"), p.get("entry_high")
+    inval, stop, res = p.get("invalidation"), p.get("stop"), p.get("resistencia")
+
+    partes = []
+    if lo and hi:
+        partes.append(f"entrada {lo:.6g}-{hi:.6g}")
+    if inval:
+        partes.append(f"inval <{inval:.6g} (cierre 4h)")
+    if partes:
+        out.append("  🎯 " + " · ".join(partes))
+    if stop:
+        out.append(f"     stop tracker -{STOP_PCT_PLAN:.0%} → {stop:.6g}")
+    if res:
+        out.append(f"  📈 resistencia cercana {res:.6g}")
+    return out
+
+
 def format_alert(alert, counts_history, with_reasons=True, streak=None):
     prev = counts_history.get((alert["symbol"], alert["history_tf"]), 0)
 
@@ -582,6 +621,7 @@ def format_alert(alert, counts_history, with_reasons=True, streak=None):
     reasons = alert.get("reasons") or _reasons_from_alert(alert)
     body = "\n".join(f"  - {r}" for r in reasons[:3])
     lines = [header, price_line, candle_line]
+    lines.extend(_plan_lines(alert))
     streak_line = _streak_line(streak)
     if streak_line:
         lines.append(streak_line)
