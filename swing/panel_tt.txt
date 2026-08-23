@@ -1,0 +1,53 @@
+Construyendo panel...
+
+PANEL CRUDO: 156,531 filas · 808 simbolos · 2022-05-28 -> 2026-08-16 · horizonte 7d neto
+  por anio: 2022:2,055  2023:22,639  2024:33,393  2025:53,987  2026:44,457
+
+TRAMO LIMPIO (>= 2023-01-01): 154,476 filas · 804 simbolos · 2023-01-01 -> 2026-08-16
+  tt_pos: p20=1.077  mediana=1.452  p80=2.104
+
+==================================================================================================================================================
+ESCALERA — quintiles de tt_pos (q1 = el dinero grande mas corto). Si el efecto es real, baja monotono.
+==================================================================================================================================================
+  q1                         n= 30896  ret   +0.44%  dardo   -0.03%  margen   +0.47pp  IC95 [  -0.61,  +1.55]  sin15sim  +0.25  sin3sem  +0.10  -
+  q2                         n= 30895  ret   +0.18%  dardo   -0.13%  margen   +0.31pp  IC95 [  -0.72,  +1.39]  sin15sim  +0.09  sin3sem  -0.08  -
+  q3                         n= 30895  ret   -0.07%  dardo   -0.33%  margen   +0.26pp  IC95 [  -0.96,  +1.54]  sin15sim  -0.11  sin3sem  -0.21  -
+  q4                         n= 30895  ret   -0.76%  dardo   -0.70%  margen   -0.06pp  IC95 [  -1.42,  +1.35]  sin14sim  -0.43  sin3sem  -0.49  -
+  q5                         n= 30895  ret   -1.73%  dardo   -0.97%  margen   -0.76pp  IC95 [  -2.42,  +0.96]  sin13sim  -1.13  sin3sem  -1.47  -
+
+==================================================================================================================================================
+MISMO CORTE, PERO DENTRO DE CADA SIMBOLO — separa 'que moneda' de 'que momento'
+==================================================================================================================================================
+  q1 intra-simbolo           n= 31264  ret   +0.56%  dardo   +0.23%  margen   +0.33pp  IC95 [  -0.85,  +1.46]  sin16sim  +0.08  sin3sem  -0.10  -
+  q2 intra-simbolo           n= 30719  ret   +0.33%  dardo   -0.03%  margen   +0.36pp  IC95 [  -0.80,  +1.51]  sin16sim  +0.10  sin3sem  -0.03  -
+  q3 intra-simbolo           n= 30753  ret   +0.08%  dardo   -0.56%  margen   +0.64pp  IC95 [  -0.65,  +1.94]  sin16sim  +0.11  sin3sem  +0.10  -
+  q4 intra-simbolo           n= 30720  ret   -0.72%  dardo   -0.84%  margen   +0.13pp  IC95 [  -1.21,  +1.42]  sin16sim  -0.22  sin3sem  -0.31  -
+  q5 intra-simbolo           n= 31016  ret   -2.19%  dardo   -0.95%  margen   -1.24pp  IC95 [  -2.92,  +0.52]  sin16sim  -1.46  sin3sem  -1.94  -
+
+==================================================================================================================================================
+REGLA A PRIORI — tt_pos < 1.28 (umbral heredado de las alertas; NO se re-ajusta aca)
+==================================================================================================================================================
+  cubre 37.5% del panel limpio
+  bajo (global)              n= 57852  ret   +0.30%  dardo   -0.07%  margen   +0.37pp  IC95 [  -0.61,  +1.40]  sin15sim  +0.24  sin3sem  +0.01  -
+  resto                      n= 96624  ret   -0.80%  dardo   -0.65%  margen   -0.15pp  IC95 [  -1.49,  +1.19]  sin15sim  -0.29  sin3sem  -0.57  -
+
+==================================================================================================================================================
+REGLA DE PARADA (preescrita, traducida por el agujero de 2022) — margen NEGATIVO con IC95 sin cero en >= 3 de 4 bloques
+==================================================================================================================================================
+  B1 2023-01-01→2023-11-27   n= 16087  ret   +1.02%  dardo   +0.63%  margen   +0.39pp  IC95 [  -1.54,  +2.39]  sin4sim  +0.34  sin3sem  -0.46  -
+  B2 2023-11-27→2024-10-23   n= 10790  ret   +1.80%  dardo   +0.81%  margen   +1.00pp  IC95 [  -1.44,  +3.41]  sin6sim  +0.82  sin3sem  -0.23  -
+  B3 2024-10-23→2025-09-19   n= 10800  ret   +0.79%  dardo   -0.01%  margen   +0.80pp  IC95 [  -2.04,  +3.73]  sin9sim  +0.44  sin3sem  -0.91  -
+  B4 2025-09-19→2026-08-16 * n= 20175  ret   -1.35%  dardo   -1.12%  margen   -0.22pp  IC95 [  -1.75,  +1.24]  sin14sim  -0.42  sin3sem  -0.95  -
+  * = el bloque solapa la ventana donde se descubrio el efecto (may-ago 2026): no es independiente
+
+  ── control de lectura: los mismos datos por anio calendario ──
+  2023 (cubre 77.4%)         n= 17514  ret   +1.38%  dardo   +0.77%  margen   +0.62pp  IC95 [  -1.29,  +2.49]  sin4sim  +0.57  sin3sem  -0.15  -
+  2024 (cubre 31.7%)         n= 10575  ret   +1.78%  dardo   +0.85%  margen   +0.92pp  IC95 [  -1.46,  +3.38]  sin6sim  +0.79  sin3sem  -0.29  -
+  2025 (cubre 27.7%)         n= 14978  ret   -0.94%  dardo   -1.32%  margen   +0.38pp  IC95 [  -1.92,  +2.68]  sin11sim  +0.04  sin3sem  -0.85  -
+  2026 (cubre 33.3%)         n= 14785  ret   -0.79%  dardo   -0.45%  margen   -0.34pp  IC95 [  -2.12,  +1.30]  sin13sim  -0.55  sin3sem  -1.17  -
+
+  bloques con margen negativo e IC95 sin cero: []  (0/4)
+
+  >>> NO CRUZA — es regimen, se archiva <<<
+
+Guardado: panel_tt.json

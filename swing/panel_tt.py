@@ -178,7 +178,7 @@ def paso_universo(workers, desde, hasta):
 # ════════════════════════════════════════════════════════════════════════════
 # PASO 2 — descarga (reanudable por simbolo-anio; el harness mata a los 10 min)
 # ════════════════════════════════════════════════════════════════════════════
-def _zip_csv(url, header):
+def _zip_csv(url, header, cols=None):
     """Descarga un zip de data.binance.vision y devuelve su unico CSV, o None."""
     for intento in range(3):
         try:
@@ -193,10 +193,21 @@ def _zip_csv(url, header):
             continue
         try:
             with zipfile.ZipFile(io.BytesIO(r.content)) as z:
-                with z.open(z.namelist()[0]) as f:
-                    return pd.read_csv(f, header=0 if header else None)
+                crudo = z.open(z.namelist()[0]).read()
         except Exception:
             return None
+        # Los dumps viejos de klines vienen SIN encabezado: leer con header=0 se
+        # comeria la primera vela y dejaria nombres de columna numericos.
+        primera = crudo.split(b"\n", 1)[0].split(b",")[0].strip()
+        tiene = not primera.replace(b"-", b"").isdigit()
+        try:
+            d = pd.read_csv(io.BytesIO(crudo), header=0 if tiene else None)
+        except Exception:
+            return None
+        if not tiene and cols:
+            d = d.iloc[:, :len(cols)]
+            d.columns = cols
+        return d
     return None
 
 
@@ -232,43 +243,105 @@ def bajar_metrics(sym, anio, dias, workers):
     return "ok"
 
 
-def bajar_klines(sym, meses, workers):
-    """OHLC diario del PROPIO perp (dumps mensuales + diarios del mes en curso)."""
-    p = PCACHE / "kl" / f"{sym}.pkl"
-    if p.exists():
-        return "cache"
+KL_COLS = ["open_time", "open", "high", "low", "close", "volume",
+           "close_time", "quote_volume", "count", "taker_buy_volume",
+           "taker_buy_quote_volume", "ignore"]
+
+
+FAPI = "https://fapi.binance.com/fapi/v1/klines"
+
+
+def _kl_rest(sym, desde_ms, hasta_ms):
+    """OHLC diario por REST de futuros: 1.500 velas por request en vez de ~70 zips.
+
+    Sirve tambien para los perps DELISTEADOS (verificado contra los dumps: identico
+    al centavo en HNTUSDT y SRMUSDT). El limite de peso de fapi es 2.400/min y una
+    request de 1.500 velas pesa 10, o sea ~4 req/s: por eso pocos workers.
+    """
+    filas, cursor = [], desde_ms
+    for _ in range(8):
+        d = None
+        for intento in range(4):
+            try:
+                r = ses().get(FAPI, params={"symbol": sym, "interval": "1d",
+                                            "startTime": cursor, "limit": 1500},
+                              timeout=25)
+            except requests.exceptions.RequestException:
+                time.sleep(1 + intento)
+                continue
+            if r.status_code == 200:
+                d = r.json()
+                break
+            if r.status_code in (429, 418):
+                time.sleep(3 * (intento + 1))
+                continue
+            return None          # simbolo desconocido para la REST -> al zip
+        if not d:
+            break
+        filas += d
+        if len(d) < 1500 or d[-1][0] >= hasta_ms:
+            break
+        cursor = d[-1][0] + 1
+    if not filas:
+        return None
+    return pd.DataFrame({
+        "open_time": [int(x[0]) for x in filas],
+        "open": [float(x[1]) for x in filas],
+        "high": [float(x[2]) for x in filas],
+        "low": [float(x[3]) for x in filas],
+        "close": [float(x[4]) for x in filas]})
+
+
+def _kl_zips(sym, meses, workers):
+    """Camino de respaldo: dumps mensuales, y diarios para el mes en curso."""
     KM = f"{BASE}/monthly/klines/{sym}/1d/{sym}-1d-%s.zip"
     KD = f"{BASE}/daily/klines/{sym}/1d/{sym}-1d-%s.zip"
     with ThreadPoolExecutor(workers) as ex:
-        ds = list(ex.map(lambda m: _zip_csv(KM % m, True), meses))
+        ds = list(ex.map(lambda m: _zip_csv(KM % m, True, KL_COLS), meses))
     faltan = [m for m, d in zip(meses, ds) if d is None or d.empty]
     ds = [d for d in ds if d is not None and not d.empty]
-    # los meses sin dump mensual (el mes en curso) se completan por dia
     if faltan:
         dias = []
         for m in faltan:
-            ini = pd.Timestamp(m + "-01", tz="UTC")
+            i0 = pd.Timestamp(m + "-01")
             dias += [d.strftime("%Y-%m-%d")
-                     for d in pd.date_range(ini, ini + pd.offsets.MonthEnd(1),
-                                            freq="D", tz="UTC")]
+                     for d in pd.date_range(i0, i0 + pd.offsets.MonthEnd(1), freq="D")]
         with ThreadPoolExecutor(workers) as ex:
-            ds += [d for d in ex.map(lambda x: _zip_csv(KD % x, True), dias)
+            ds += [d for d in ex.map(lambda x: _zip_csv(KD % x, True, KL_COLS), dias)
                    if d is not None and not d.empty]
     if not ds:
+        return None
+    d = pd.concat(ds, ignore_index=True)
+    return d[["open_time", "open", "high", "low", "close"]].copy()
+
+
+def bajar_klines(sym, meses, workers, desde_ms, hasta_ms):
+    """OHLC diario del PROPIO perp — el unico precio que existe para un delisteado."""
+    p = PCACHE / "kl" / f"{sym}.pkl"
+    if p.exists():
+        return "cache"
+    d = _kl_rest(sym, desde_ms, hasta_ms)
+    via = "rest"
+    if d is None or d.empty:
+        d = _kl_zips(sym, meses, workers)
+        via = "zip"
+    if d is None or d.empty:
         pd.DataFrame(columns=["open_time"]).to_pickle(p)
         return "vacio"
-    d = pd.concat(ds, ignore_index=True)
-    d = d[["open_time", "open", "high", "low", "close"]].copy()
-    # algunos dumps viejos traen open_time en microsegundos
-    d["open_time"] = pd.to_numeric(d["open_time"], errors="coerce").astype("int64")
-    if d["open_time"].max() > 10**14:
+    d["open_time"] = pd.to_numeric(d["open_time"], errors="coerce")
+    d = d[d["open_time"].notna()].copy()
+    if d.empty:
+        pd.DataFrame(columns=["open_time"]).to_pickle(p)
+        return "vacio"
+    d["open_time"] = d["open_time"].astype("int64")
+    if d["open_time"].max() > 10**14:        # algun dump viejo viene en microsegundos
         d["open_time"] //= 1000
     for c in ("open", "high", "low", "close"):
         d[c] = pd.to_numeric(d[c], errors="coerce").astype("float64")
     d = (d.dropna().sort_values("open_time")
          .drop_duplicates("open_time").reset_index(drop=True))
     d.to_pickle(p)
-    return "ok"
+    return via
 
 
 def paso_bajar(args):
@@ -308,18 +381,32 @@ def paso_bajar(args):
 
     # klines del perp: mensuales, mucho mas baratos
     falta_kl = [s for s in syms if not (PCACHE / "kl" / f"{s}.pkl").exists()]
-    print(f"\nklines: {len(falta_kl)} simbolos pendientes", flush=True)
+    print(f"\nklines: {len(falta_kl)} simbolos pendientes (REST, ~4 req/s por peso)",
+          flush=True)
     fin = (pd.Timestamp(args.hasta) + pd.Timedelta(days=10)).strftime("%Y-%m-%d")
-    for n, s in enumerate(falta_kl, 1):
+    d_ms = int(pd.Timestamp(args.desde, tz="UTC").value // 10**6)
+    h_ms = int(pd.Timestamp(fin, tz="UTC").value // 10**6)
+    vias = {}
+    t0 = time.time()
+
+    def _una(s):
         fs = [d for d in U[s] if args.desde <= d <= fin]
         if not fs:
-            continue
-        ini = pd.Timestamp(min(fs))
-        meses = [d.strftime("%Y-%m") for d in
-                 pd.date_range(ini.replace(day=1), pd.Timestamp(fin), freq="MS")]
-        bajar_klines(s, meses, args.workers)
-        if n % 50 == 0 or n == len(falta_kl):
-            print(f"  kl {n}/{len(falta_kl)}", flush=True)
+            return s, "sin-fechas"
+        i0 = pd.Timestamp(min(fs)).replace(day=1)
+        meses = [d.strftime("%Y-%m")
+                 for d in pd.date_range(i0, pd.Timestamp(fin), freq="MS")]
+        try:
+            return s, bajar_klines(s, meses, 8, d_ms, h_ms)
+        except Exception as e:
+            return s, f"ERROR {type(e).__name__}"
+
+    with ThreadPoolExecutor(6) as ex:
+        for n, (s, via) in enumerate(ex.map(_una, falta_kl), 1):
+            vias[via] = vias.get(via, 0) + 1
+            if n % 50 == 0 or n == len(falta_kl):
+                print(f"  kl {n}/{len(falta_kl)}  {n / max(time.time() - t0, 1):.1f}/s  "
+                      f"{vias}", flush=True)
     print("\nDESCARGA COMPLETA")
 
 

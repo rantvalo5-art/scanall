@@ -1,0 +1,32 @@
+panel limpio 154,476 filas · 804 simbolos · 2023-01-01 -> 2026-08-16
+  ret medio -0.39%  mediana -1.75%  dardo -0.43%
+
+Q1 — la ventana del descubrimiento (2026-05-31 -> fin), vista por el panel
+  16,719 filas · 676 simbolos
+  tt_pos < 1.28                            n=  5731  ret   -0.97%  margen  -0.59pp  IC95 [ -2.67, +1.49]
+  resto                                    n= 10988  ret   +0.13%  margen  +0.72pp  IC95 [ -1.52, +2.93]
+
+Q2 — solo los simbolos que el swing alerto en BEST
+  285 simbolos alertados · 265 en el panel · 73,372 filas
+  tt_pos < 1.28  (2023 -> hoy)             n= 23513  ret   +0.48%  margen  +0.68pp  IC95 [ -0.45, +1.82]
+  resto          (2023 -> hoy)             n= 49859  ret   -1.18%  margen  -0.24pp  IC95 [ -1.51, +1.06]
+  tt_pos < 1.28  (ventana del hallazgo)    n=  1238  ret   -1.79%  margen  -0.40pp  IC95 [ -3.84, +2.93]
+  resto          (ventana del hallazgo)    n=  5486  ret   -0.42%  margen  +0.44pp  IC95 [ -2.27, +3.01]
+
+  sonda: filas del panel que caen en un dia-simbolo CON alerta BEST (263)
+  tt_pos < 1.28  (dias con alerta)         n=    38  ret   +1.15%  margen  +2.51pp  IC95 [ -4.20, +8.12]
+  resto          (dias con alerta)         n=   225  ret   +8.06%  margen +10.01pp  IC95 [ +4.36,+18.23]
+
+Q3 — signo del efecto bloque por bloque: margen(q1) - margen(q5)
+  B1 2023-01->2023-11   q1  +0.65pp   q5  -4.14pp   q1-q5  +4.79pp
+  B2 2023-11->2024-10   q1  +1.51pp   q5  -2.41pp   q1-q5  +3.93pp
+  B3 2024-10->2025-09   q1  +0.94pp   q5  -0.87pp   q1-q5  +1.82pp
+  B4 2025-09->2026-08   q1  -0.41pp   q5  -0.03pp   q1-q5  -0.38pp
+
+Q4 — el escalon crudo, ¿es tt_pos o es que moneda es?
+  (el dardo pareado ya controla la moneda: si el dardo baja igual, es la moneda)
+  q1  ret  +0.44%  dardo  -0.03%  px mediano $   0.3160  simbolos  776
+  q2  ret  +0.18%  dardo  -0.13%  px mediano $   0.2256  simbolos  776
+  q3  ret  -0.07%  dardo  -0.33%  px mediano $   0.1743  simbolos  771
+  q4  ret  -0.76%  dardo  -0.70%  px mediano $   0.1637  simbolos  745
+  q5  ret  -1.73%  dardo  -0.97%  px mediano $   0.1884  simbolos  669
