@@ -1,0 +1,200 @@
+{
+  "n_alertas": 1062,
+  "stop_pct": 0.1,
+  "window_days": 7,
+  "trigger_hours": 48,
+  "darts": 10,
+  "dart_window_dias": 21,
+  "dart_exclude_dias": 7.0,
+  "ambiguedad_1h": 1,
+  "ambiguedad_irresuelta": 1,
+  "cobertura_objetivo": {
+    "COILING|res": {
+      "con_objetivo": 143,
+      "total": 280
+    },
+    "COILING|major": {
+      "con_objetivo": 244,
+      "total": 280
+    },
+    "BREAKOUT|res": {
+      "con_objetivo": 49,
+      "total": 306
+    },
+    "BREAKOUT|major": {
+      "con_objetivo": 142,
+      "total": 306
+    },
+    "PREBREAK|res": {
+      "con_objetivo": 112,
+      "total": 178
+    },
+    "PREBREAK|major": {
+      "con_objetivo": 155,
+      "total": 178
+    },
+    "HOLD|res": {
+      "con_objetivo": 58,
+      "total": 283
+    },
+    "HOLD|major": {
+      "con_objetivo": 116,
+      "total": 283
+    },
+    "RIDING|res": {
+      "con_objetivo": 12,
+      "total": 15
+    },
+    "RIDING|major": {
+      "con_objetivo": 13,
+      "total": 15
+    }
+  },
+  "control_indexado": 1.0,
+  "targets": {
+    "major": {
+      "n": 660,
+      "rb_teorico_mediana": 0.49183468930550717,
+      "hit_alerta": 0.43636363636363634,
+      "hit_dardo": 0.4690909090909091,
+      "outcomes": {
+        "target": 288,
+        "abierto": 143,
+        "stop": 131,
+        "sin_entrada": 98
+      },
+      "margen": {
+        "n": 660,
+        "mean": -0.03272727272727274,
+        "ci_lo": -0.12677760968229954,
+        "ci_hi": 0.05304054054054054,
+        "cruza": false
+      },
+      "margen_sin_top3_simbolos": {
+        "n": 645,
+        "mean": -0.04480620155038761,
+        "ci_lo": -0.13517241379310346,
+        "ci_hi": 0.040490081680280045,
+        "cruza": false
+      },
+      "margen_sin_top3_semanas": {
+        "n": 403,
+        "mean": -0.1218362282878412,
+        "ci_lo": -0.1583955223880597,
+        "ci_hi": -0.06761133603238867,
+        "cruza": false
+      },
+      "R_alerta": -0.021772403730918266,
+      "R_dardo": -0.026720338363092358,
+      "margen_R": {
+        "n": 660,
+        "mean": 0.004947934632174092,
+        "ci_lo": -0.14329092711943126,
+        "ci_hi": 0.130543495531595,
+        "cruza": false
+      },
+      "rb_teorico_vs_realizado": {
+        "teorico": 0.49183468930550717,
+        "realizado_R": -0.021772403730918266
+      },
+      "por_senal": {
+        "BREAKOUT": {
+          "n": 142,
+          "hit": 0.5,
+          "hit_dart": 0.5521126760563381,
+          "margen": -0.05211267605633805
+        },
+        "COILING": {
+          "n": 238,
+          "hit": 0.2184873949579832,
+          "hit_dart": 0.2533613445378151,
+          "margen": -0.03487394957983192
+        },
+        "HOLD": {
+          "n": 116,
+          "hit": 0.5086206896551724,
+          "hit_dart": 0.553448275862069,
+          "margen": -0.044827586206896544
+        },
+        "PREBREAK": {
+          "n": 151,
+          "hit": 0.6423841059602649,
+          "hit_dart": 0.6357615894039735,
+          "margen": 0.006622516556291382
+        }
+      }
+    },
+    "res": {
+      "n": 347,
+      "rb_teorico_mediana": 0.16777041942604723,
+      "hit_alerta": 0.6340057636887608,
+      "hit_dardo": 0.6365994236311239,
+      "outcomes": {
+        "target": 220,
+        "sin_entrada": 58,
+        "stop": 46,
+        "abierto": 23
+      },
+      "margen": {
+        "n": 347,
+        "mean": -0.0025936599423631236,
+        "ci_lo": -0.1,
+        "ci_hi": 0.09305993690851734,
+        "cruza": false
+      },
+      "margen_sin_top3_simbolos": {
+        "n": 335,
+        "mean": -0.019104477611940316,
+        "ci_lo": -0.11747572815533983,
+        "ci_hi": 0.07811816192560174,
+        "cruza": false
+      },
+      "margen_sin_top3_semanas": {
+        "n": 220,
+        "mean": -0.09454545454545454,
+        "ci_lo": -0.13155080213903744,
+        "ci_hi": -0.04057971014492754,
+        "cruza": false
+      },
+      "R_alerta": -0.03200444594838241,
+      "R_dardo": 0.003257333726452561,
+      "margen_R": {
+        "n": 347,
+        "mean": -0.03526177967483496,
+        "ci_lo": -0.10340416728383273,
+        "ci_hi": 0.020202900521208083,
+        "cruza": false
+      },
+      "rb_teorico_vs_realizado": {
+        "teorico": 0.16777041942604723,
+        "realizado_R": -0.03200444594838241
+      },
+      "por_senal": {
+        "BREAKOUT": {
+          "n": 49,
+          "hit": 0.6938775510204082,
+          "hit_dart": 0.7306122448979592,
+          "margen": -0.03673469387755104
+        },
+        "COILING": {
+          "n": 134,
+          "hit": 0.44776119402985076,
+          "hit_dart": 0.4492537313432836,
+          "margen": -0.0014925373134328371
+        },
+        "HOLD": {
+          "n": 58,
+          "hit": 0.7413793103448276,
+          "hit_dart": 0.786206896551724,
+          "margen": -0.04482758620689657
+        },
+        "PREBREAK": {
+          "n": 94,
+          "hit": 0.7978723404255319,
+          "hit_dart": 0.7404255319148937,
+          "margen": 0.05744680851063829
+        }
+      }
+    }
+  }
+}
