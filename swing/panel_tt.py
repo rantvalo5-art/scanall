@@ -450,6 +450,9 @@ def construir_panel(args):
         if n % 100 == 0:
             print(f"    {n}/{len(syms)}  ({len(filas)} con panel)", flush=True)
 
+    if not filas:
+        return pd.DataFrame(columns=["symbol", "t", "r", "px", "dardo",
+                                    "fecha", "anio", "week"] + VARS)
     P = pd.concat(filas, ignore_index=True)
     ts = pd.to_datetime(P["t"], unit="ms", utc=True)
     P["fecha"] = ts.dt.strftime("%Y-%m-%d")
