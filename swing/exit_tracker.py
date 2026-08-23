@@ -50,7 +50,12 @@ ENABLED      = _EX.get("ENABLED", False)
 BUCKETS      = _EX.get("BUCKETS", ["BEST"])      # qué buckets gestionar (el score no discrimina outcome)
 ARM_PCT      = _EX.get("ARM_PCT", 0.12)
 TRAIL_PCT    = _EX.get("TRAIL_PCT", 0.08)
-STOP_PCT     = _EX.get("STOP_PCT", 0.0)          # 0 = sin stop duro (config validada)
+# La config validada es STOP_PCT = 0.10, activada el 2026-07-06 (550dd7b): 28w
+# multi-regimen, EV-neutral (+0.40 -> +0.42) y p1 de -25% a -10%; solo el 11% de las
+# stopeadas habria cerrado verde. El default 0.0 quedo de 17e6d03, cuando el stop nacio
+# apagado — es el fallback si falta la clave, NO la decision. No leer este default como
+# "sin stop duro": el tracker aplica lo que diga config.json.
+STOP_PCT     = _EX.get("STOP_PCT", 0.0)
 RECENT_HOURS = _EX.get("RECENT_HOURS", 6)        # solo avisa cruces de las últimas N h
 WINDOW_DAYS  = _EX.get("WINDOW_DAYS", 7)
 BATCH_SIZE   = _EX.get("BATCH_SIZE", 100)
