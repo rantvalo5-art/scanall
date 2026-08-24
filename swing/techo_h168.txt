@@ -1,0 +1,101 @@
+====================================================================================================================================
+TECHO CONDICIONAL — horizonte 168h · objetivo = margen contra dardo pareado
+====================================================================================================================================
+
+2,829 alertas · 317 simbolos · 13 semanas · 36 features
+  margen global +0.07pp  (ret -0.34%  dardo -0.41%)
+  por senal: BREAKOUT:570/-0.2pp  COILING:823/-0.9pp  HOLD:728/+1.2pp  PREBREAK:687/+1.1pp  RIDING:21/-26.0pp
+
+  walk-forward expandido: cada semana se predice con TODO lo anterior...
+  6 semanas retenidas (2026-W28 -> 2026-W33) en 15s
+
+------------------------------------------------------------------------------------------------------------------------------------
+REFERENCIAS (sin modelo), sobre las mismas semanas retenidas
+------------------------------------------------------------------------------------------------------------------------------------
+  todo el retenido         n= 1789 (6 sem)  margen   +1.22pp  IC95 [  -1.65,  +4.59]  sin13sim  -2.87  sin3sem  -1.80  ret  +1.58%  -
+  decil de score           n=  179 (6 sem)  margen  +11.93pp  IC95 [  -2.02, +33.00]  sin5sim  -5.66  sin3sem  -2.36  ret +13.00%  -
+  decil al azar            n=  179 (6 sem)  margen   +1.24pp  IC95 [  -1.81,  +4.52]  sin5sim  -3.01  sin3sem  -1.92  ret  +0.75%  -
+
+------------------------------------------------------------------------------------------------------------------------------------
+MODELOS — top 10% de CADA semana retenida
+------------------------------------------------------------------------------------------------------------------------------------
+  ridge                    n=  179 (6 sem)  margen   -1.28pp  IC95 [  -4.08,  +2.78]  sin5sim  -3.92  sin3sem  -4.28  ret  -1.24%  -
+                           spearman(pred, margen) en retenido: +0.1343
+  boost                    n=  179 (6 sem)  margen  +17.23pp  IC95 [  -3.68, +48.85]  sin5sim  -3.22  sin3sem  -3.86  ret +17.45%  -
+                           spearman(pred, margen) en retenido: -0.0451
+
+------------------------------------------------------------------------------------------------------------------------------------
+NULL DE PERMUTACION — 150 corridas del pipeline COMPLETO (walk-forward incluido) con el objetivo desplazado
+------------------------------------------------------------------------------------------------------------------------------------
+  el desplazamiento circular preserva la autocorrelacion del retorno y rompe
+  el vinculo con las features. El null corre sin el refit final (mitad de
+  costo); eso lo hace algo CONSERVADOR, o sea que favorece al observado.
+  el vinculo con las features: dice cuanto produce ESTE pipeline con ruido
+    5/150 nuevos (5 en total) · 13.7s cada uno · faltan 33 min
+    10/150 nuevos (10 en total) · 13.5s cada uno · faltan 31 min
+    15/150 nuevos (15 en total) · 13.3s cada uno · faltan 30 min
+    20/150 nuevos (20 en total) · 12.7s cada uno · faltan 27 min
+    25/150 nuevos (25 en total) · 11.2s cada uno · faltan 23 min
+    30/150 nuevos (30 en total) · 10.1s cada uno · faltan 20 min
+    35/150 nuevos (35 en total) · 10.0s cada uno · faltan 19 min
+    40/150 nuevos (40 en total) · 9.8s cada uno · faltan 18 min
+    45/150 nuevos (45 en total) · 9.9s cada uno · faltan 17 min
+    50/150 nuevos (50 en total) · 9.9s cada uno · faltan 17 min
+    55/150 nuevos (55 en total) · 9.8s cada uno · faltan 15 min
+    60/150 nuevos (60 en total) · 10.0s cada uno · faltan 15 min
+    65/150 nuevos (65 en total) · 10.2s cada uno · faltan 15 min
+    70/150 nuevos (70 en total) · 10.4s cada uno · faltan 14 min
+    75/150 nuevos (75 en total) · 10.4s cada uno · faltan 13 min
+    80/150 nuevos (80 en total) · 10.4s cada uno · faltan 12 min
+    85/150 nuevos (85 en total) · 10.3s cada uno · faltan 11 min
+    90/150 nuevos (90 en total) · 10.3s cada uno · faltan 10 min
+    95/150 nuevos (95 en total) · 10.1s cada uno · faltan 9 min
+    100/150 nuevos (100 en total) · 10.3s cada uno · faltan 9 min
+    105/150 nuevos (105 en total) · 10.4s cada uno · faltan 8 min
+    110/150 nuevos (110 en total) · 10.3s cada uno · faltan 7 min
+    115/150 nuevos (115 en total) · 10.3s cada uno · faltan 6 min
+    120/150 nuevos (120 en total) · 10.3s cada uno · faltan 5 min
+    125/150 nuevos (125 en total) · 10.3s cada uno · faltan 4 min
+    130/150 nuevos (130 en total) · 10.3s cada uno · faltan 3 min
+    135/150 nuevos (135 en total) · 10.3s cada uno · faltan 3 min
+    140/150 nuevos (140 en total) · 10.2s cada uno · faltan 2 min
+    145/150 nuevos (145 en total) · 10.2s cada uno · faltan 1 min
+    150/150 nuevos (150 en total) · 10.1s cada uno · faltan 0 min
+  ridge      observado   -1.28pp   null: mediana  -0.66  p95  +8.47  max +12.46   p=0.593  no supera
+  boost      observado  +17.23pp   null: mediana  -0.76  p95  +8.09  max +13.63   p=0.000  SUPERA
+
+====================================================================================================================================
+REGLA DE PARADA (preescrita): margen del decil positivo con IC95 sin cero Y por encima del p95 del null
+====================================================================================================================================
+  ridge      IC95 sin cero: NO    supera el null: NO
+  boost      IC95 sin cero: NO    supera el null: SI
+
+  >>> NO HAY INFORMACION CONDICIONAL APROVECHABLE EN ESTE FEED <<<
+
+------------------------------------------------------------------------------------------------------------------------------------
+A QUE LE PRESTO ATENCION EL LINEAL (coef estandarizado, top 12) — descriptivo
+------------------------------------------------------------------------------------------------------------------------------------
+  f_ret_24h                    -8.978pp por desvio
+  f_edad_barras                +4.718pp por desvio
+  f_ret_30d                    -3.892pp por desvio
+  f_dd_90                      -3.655pp por desvio
+  f_ret_168h                   +3.454pp por desvio
+  f_cvd                        +2.563pp por desvio
+  f_volatilidad                +2.457pp por desvio
+  f_alertas_prev_7d            -2.282pp por desvio
+  f_extension                  +2.200pp por desvio
+  f_btc_vol                    +2.178pp por desvio
+  f_sig_RIDING                 -2.083pp por desvio
+  f_funding                    +1.903pp por desvio
+
+------------------------------------------------------------------------------------------------------------------------------------
+BACKTRACK DESCRIPTIVO — quienes fueron los ganadores
+------------------------------------------------------------------------------------------------------------------------------------
+  decil ganador: 282 alertas · 116 simbolos distintos (de 317)
+  top-8 simbolos = 21% del decil:  LDOUSDT:10  TUTUSDT:8  DEXEUSDT:8  AAVEUSDT:7  ETHFIUSDT:7  SHIBUSDT:7  WLDUSDT:7  ZAMAUSDT:5
+  margen medio global sacando el top-1  aportante:  -1.31pp   (global +0.07pp)
+  margen medio global sacando el top-3  aportante:  -1.88pp   (global +0.07pp)
+  margen medio global sacando el top-10 aportante:  -2.53pp   (global +0.07pp)
+  los 8 simbolos mas frecuentes del decil ganador, en sus OTRAS 105 alertas: -8.50pp
+
+Guardado: techo_h168.json

@@ -48,3 +48,6 @@ CLAUDEconfig - activande derivatives.json
 .fase0_cache/
 .metrics_cache/
 .panel_cache/
+.techo_cache/
+techo_nulls_h*.json
+/archivo_outcomes
