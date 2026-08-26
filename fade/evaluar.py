@@ -35,6 +35,7 @@ KEY = os.environ.get("SUPABASE_KEY") or (
     "N_qJsJWTJaqRHpugzlnRTpoZI84mUoctt3RKmUshIrU")
 
 EXTENSION = ["EXPLOSION", "BREAKOUT"]
+MIN_ALERTAS_SEMANA = 20   # una semana con menos que esto no es una semana
 COSTO = 0.0040      # 0,09% fee perp ida+vuelta + 0,30% slippage asumido
 RNG = np.random.default_rng(11)
 
@@ -94,7 +95,14 @@ def p_semanas(d, col="f", reps=8000):
     ENTERAS. El desvio entre semanas (2,92pp) es casi el doble de la media
     (1,52pp): esa es la verdadera relacion senal-ruido de esta estrategia.
     """
-    wm = np.array([g[col].mean() for _, g in d.groupby("week", sort=True)])
+    # Una semana con 3 alertas NO es una semana. Como aca cada semana pesa igual,
+    # dejarla entrar le da el mismo peso que a una de 199 -> el resultado lo decide
+    # el ruido de un punado de alertas. Paso de verdad: la corrida publicada tenia
+    # una semana parcial de UNA alerta (+3,91%) y era lo unico que sostenia la
+    # compuerta (e) del 4h. Sacandola, p pasa de 0,008 a 0,032 y el IC cruza cero.
+    # Se usa el mismo minimo que la compuerta (c), que si lo filtraba.
+    tam = d.groupby("week", sort=True)[col].agg(["size", "mean"])
+    wm = tam[tam["size"] >= MIN_ALERTAS_SEMANA]["mean"].values
     k = len(wm)
     if k < 4:
         return 1.0, (np.nan, np.nan)
@@ -130,7 +138,7 @@ def evaluar(df, horizonte="24h", fill="price_15m", solo_perp=True, costo=COSTO):
     sin3 = d[~d.symbol.isin(ap.tail(3).index)].f
     sin_peor = d[d.symbol != ap.index[0]].f
     w = d.groupby("week").f.agg(["size", "mean"])
-    w = w[w["size"] >= 20]
+    w = w[w["size"] >= MIN_ALERTAS_SEMANA]
     p, ic = p_semanas(d)
 
     g = {

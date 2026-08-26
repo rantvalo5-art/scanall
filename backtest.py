@@ -261,6 +261,8 @@ def download_all_klines(symbols, start_dt, end_dt):
     def fetch(sym, tf):
         p = _cache_path("klines", sym, tf, start_ms, end_ms)
         cached = _cache_get(p)
+        if cached is None:
+            cached = _cache_slice("klines", sym, tf, start_ms, end_ms)
         if cached is not None:
             return sym, tf, cached
         result = get_klines_range(sym, tf, start_ms, end_ms)
@@ -295,6 +297,8 @@ def download_1m_klines(symbols, start_dt, end_dt):
     def fetch(sym):
         p = _cache_path("klines", sym, "1m", start_ms, end_ms)
         cached = _cache_get(p)
+        if cached is None:
+            cached = _cache_slice("klines", sym, "1m", start_ms, end_ms)
         if cached is not None:
             return sym, cached
         result = get_klines_range(sym, "1m", start_ms, end_ms)
@@ -495,6 +499,44 @@ def _cache_get(p):
             return pickle.load(f)
     except Exception:
         return None
+
+
+def _cache_slice(kind, symbol, tf_or_tag, start_ms, end_ms):
+    """Fallback de caché: si no existe el archivo con el rango EXACTO pedido, busca uno
+    ya descargado del mismo (kind, symbol, tf) cuyo rango CONTENGA al pedido y lo recorta.
+
+    Las klines históricas son inmutables, así que recortar un superconjunto es idéntico a
+    volver a pedirle el subrango a Binance — pero gratis. Sin esto, partir la ventana en
+    trozos (cada trozo cambia start_ms/end_ms) invalida TODO el caché y vuelve a bajar
+    200 pares × 1m por trozo.
+
+    El filtro es open_time ∈ [start_ms, end_ms], que es lo que devuelve el endpoint con
+    startTime/endTime — verificado numéricamente contra archivos ya cacheados.
+    """
+    if _NO_CACHE or not CACHE_DIR.exists():
+        return None
+    prefix = f"{kind}_{symbol}_{tf_or_tag}_"
+    best = None
+    best_span = None
+    for f in CACHE_DIR.glob(f"{prefix}*.pkl"):
+        tail = f.name[len(prefix):-4]
+        try:
+            c_start, c_end = (int(x) for x in tail.split("_"))
+        except ValueError:
+            continue
+        if c_start <= start_ms and c_end >= end_ms:
+            span = c_end - c_start
+            if best_span is None or span < best_span:   # el superconjunto más ajustado
+                best, best_span = f, span
+    if best is None:
+        return None
+    df = _cache_get(best)
+    if df is None or "open_time" not in df:
+        return None
+    out = df[(df["open_time"] >= start_ms) & (df["open_time"] <= end_ms)]
+    if out.empty:
+        return None
+    return out.reset_index(drop=True)
 
 
 def _cache_put(p, obj):
@@ -825,6 +867,10 @@ def _analyze_key(cfg):
         "FADING_BELOW_ZONE":       cfg.g("fading", "FADING_BELOW_ZONE"),
         "DERIV_ENABLED":           cfg.g("derivatives", "ENABLED", default=False),
         "DERIV_OI_LOOKBACK_MIN":   cfg.g("derivatives", "OI_LOOKBACK_MIN", default=30),
+        # EXPLOSION_FORMING cambia el PRIMER pase: el worker inyecta tf5["_forming"] solo
+        # si esta activo. Sin esta clave, un --compare entre un cfg con forming y otro sin
+        # el reutilizaria los mismos candidatos y la comparacion seria falsa en silencio.
+        "EXPLOSION_FORMING":       cfg.g("active_signals", "EXPLOSION_FORMING", default=False),
         "ATR_MIN_PCT":             cfg.g("indicators", "ATR_MIN_PCT"),
         "ATR_MODE":                cfg.g("indicators", "ATR_MODE", default="fixed"),
         "ATR_PERCENTILE_RANK":     cfg.g("indicators", "ATR_PERCENTILE_RANK", default=30),
@@ -1341,6 +1387,54 @@ def classify(symbol, tf_data, cfg, counts_history=None):
                 "recent_long_ok": tf15.get("recent_long_ok"),
                 "htf_1h_up": bool(tf1h.get("ema_trend_up")),
                 "htf_4h_up": bool(tf4h.get("ema_trend_up")),
+                "breakdown": bd,
+            })
+
+    # ── EXPLOSION sobre vela FORMING ──────────────────────────────────────
+    # Espejo del bloque "EXPLOSION (vela forming)" de screener.py. El worker inyecta
+    # tf5["_forming"] cuando hay data de 1m; sin eso este bloque no existe y el replay
+    # se comporta como antes (compatible hacia atras).
+    #
+    # DOS asimetrias deliberadas respecto del EXPLOSION cerrado de arriba, porque el
+    # screener las tiene y el objetivo es simular lo que el bot HACE:
+    #   1. no aplica los bonus de OBV — solo BASE y LATE_ENTRY;
+    #   2. el bucket sale de _final_bucket_forming (umbrales propios), que el bloque de
+    #      FORMING_CANDLE_PENALTY mas abajo recalcula al restar el penalty.
+    # El cooldown no se chequea aca: en el screener corta antes de crear el candidato,
+    # en el backtest lo aplica el worker por (sym, history_tf) despues de classify().
+    # Misma poblacion final de alertas — una por simbolo por scan, con cooldown EXPLOSION.
+    tf5_forming = tf5.get("_forming")
+    if cfg.g("active_signals", "EXPLOSION_FORMING", default=False) and tf5_forming:
+        exf_min_vol  = cfg.g("scoring_explosion", "MIN_VOL_RATIO", default=5.0)
+        exf_min_body = cfg.g("scoring_explosion", "MIN_BODY_PCT", default=0.85)
+        exf_min_chg  = cfg.g("scoring_explosion", "MIN_CLOSE_CHANGE", default=0.025)
+        exf_min_bb   = cfg.g("scoring_explosion", "MIN_BB_EXPANSION", default=0.5)
+        if (tf5_forming.get("vol_ratio", 0)          >= exf_min_vol
+            and tf5_forming.get("candle_body_pct", 0)   >= exf_min_body
+            and tf5_forming.get("close_change_curr", 0) >= exf_min_chg
+            and tf5_forming.get("width_expansion", 0)   >= exf_min_bb):
+            exf_base     = cfg.g("scoring_explosion", "BASE_SCORE", default=12)
+            exf_late_max = cfg.g("scoring_explosion", "LATE_ENTRY_MAX_DIST", default=0.03)
+            exf_late_pen = cfg.g("scoring_explosion", "LATE_ENTRY_PENALTY", default=-3)
+            score = exf_base
+            bd = {"BASE": exf_base}
+            if tf5_forming.get("breakout_distance", 0) > exf_late_max:
+                score += exf_late_pen
+                bd["LATE_ENTRY"] = exf_late_pen
+            score = min(max(score, 0), SCORE_CAP)
+            _pen = cfg.g("scoring", "FORMING_CANDLE_PENALTY", default=3)
+            candidates.append({
+                "label": "EXPLOSION", "history_tf": "EXPLOSION", "score": score,
+                "priority": 5, "bucket": final_bucket(score, "EXPLOSION", cfg),
+                "timeframe": "5m", "price": tf5_forming["price"],
+                "ref_price": tf5_forming.get("recent_max") or tf5.get("recent_max", tf5_forming["price"]),
+                "obv_slope": tf15.get("obv_slope"),
+                "cvd_ratio": tf15.get("cvd_ratio"),
+                "recent_long_ok": tf15.get("recent_long_ok"),
+                "htf_1h_up": bool(tf1h.get("ema_trend_up")),
+                "htf_4h_up": bool(tf4h.get("ema_trend_up")),
+                "immediate": (score - _pen) >= cfg.g("scoring", "IMMEDIATE_MIN_SCORE_FORMING", default=9),
+                "_is_forming": True,
                 "breakdown": bd,
             })
 
@@ -1945,8 +2039,113 @@ def calculate_outcomes(df_15m, alert_idx, alert_price):
 
 
 # ════════════════════════════════════════════════════════════════════════════
-# ANÁLISIS FORMING — lateness y fakeout sobre alertas EXPLOSION
+# FORMING — detector en el loop de simulación + análisis de lateness/fakeout
+#
+# Dos usuarios distintos de las mismas piezas:
+#   1. `build_forming_features()` → lo consume classify() en CADA scan. Hace que el
+#      replay vea la vela de 5m en progreso, que es lo que el vivo ve y el backtest no.
+#   2. `analyze_forming_lateness()` → post-proceso sobre alertas EXPLOSION ya emitidas
+#      ("¿en qué minuto habría disparado?"). Es otra pregunta y sigue igual.
 # ════════════════════════════════════════════════════════════════════════════
+
+FIVE_MIN_MS = 5 * 60 * 1000
+
+
+def _cfg_wants_forming(path):
+    """True si ese config activa EXPLOSION_FORMING. Tolerante a configs rotos."""
+    try:
+        return bool(Config(path).g("active_signals", "EXPLOSION_FORMING", default=False))
+    except Exception:
+        return False
+
+
+def _build_forming_params(cfg):
+    """Constantes del detector forming, leidas UNA vez por worker.
+
+    Mismo motivo que _build_analyze_params: un cfg.g() por scan y por par son millones de
+    lookups en un run grande."""
+    return {
+        "enabled":  bool(cfg.g("active_signals", "EXPLOSION_FORMING", default=False)),
+        "lookback": cfg.g("indicators", "RECENT_LOOKBACK"),
+    }
+
+
+def _bb_width(vals):
+    """Ancho de Bollinger (20,2) normalizado: (hband - lband) / mavg = 4*sd / mavg.
+
+    OJO con el ddof. `ta.volatility.BollingerBands` usa desvio POBLACIONAL (ddof=0), no
+    el muestral que pandas trae por default. Verificado contra ta: con ddof=0 la
+    diferencia maxima es 2,7e-15 y con ddof=1 es 7,2e-3 — un sesgo del 2,6%
+    (sqrt(20/19)) constante y en una sola direccion, que habria desalineado este
+    detector del screener sin que nada fallara."""
+    m = float(np.mean(vals))
+    if m == 0:
+        return 0.0
+    return 4.0 * float(np.std(vals)) / m
+
+
+def build_forming_features(df5, df_1m, idx_closed, ts_ms, fp):
+    """Features de la vela 5m EN CURSO en el instante `ts_ms`. Espejo del bloque
+    `_forming_data` de `screener.py:analyze()`.
+
+    ESTE es el detector que le faltaba al replay. El backtest solo veia velas CERRADAS,
+    asi que EXPLOSION_FORMING —que en vivo dispara sobre la vela de 5m en progreso— no
+    existia en la simulacion. Era la mitad de la brecha replay-vivo diagnosticada en
+    `fade/PUENTE2.md`: EXPLOSION/BREAKOUT daba 1,39 en vivo contra 0,81 en el replay.
+
+    NO hay lookahead. `open_ms` se deriva de `ts_ms` (el bucket de 5m que lo contiene),
+    nunca de la fila siguiente de df5; el OHLCV parcial se arma SOLO con velas de 1m ya
+    cerradas a `ts_ms`; y de `df5` se leen unicamente filas <= idx_closed.
+
+    Devuelve el mismo dict que `_forming_data` del screener, o None si no se puede armar.
+    """
+    if df_1m is None or idx_closed < 21:
+        return None
+    open_ms = (ts_ms // FIVE_MIN_MS) * FIVE_MIN_MS
+    elapsed_min = int((ts_ms - open_ms) // 60_000)
+    if elapsed_min < 1:
+        return None                      # no cerro ni un minuto: no hay nada que mirar
+    partial = _build_partial_bar(df_1m, open_ms, elapsed_min)
+    if partial is None:
+        return None
+
+    closes = df5["close"].values.astype(float)
+    highs  = df5["high"].values.astype(float)
+    vols   = df5["volume"].values.astype(float)
+    pc = partial["close"]
+
+    # elapsed_frac por RELOJ, como el screener — no por cuantas velas de 1m llegaron.
+    # Si faltan velas de 1m el pace queda subestimado, que es el lado conservador.
+    elapsed_frac = max(min(elapsed_min / 5.0, 1.0), 0.01)
+    vol_mean = float(vols[idx_closed - 19: idx_closed + 1].mean())   # 20 cerradas previas
+    vol_ratio = (partial["volume"] / elapsed_frac) / vol_mean if vol_mean > 0 else 0.0
+
+    rng  = max(partial["high"] - partial["low"], 1e-12)
+    body = abs(pc - partial["open"]) / rng
+    chg  = safe_pct(pc, float(closes[idx_closed]))
+
+    # BB con la vela forming incluida, contra la ventana inmediatamente anterior.
+    # 19 cerradas + el parcial = 20; la previa son las 20 cerradas.
+    w_curr = _bb_width(np.append(closes[idx_closed - 18: idx_closed + 1], pc))
+    w_prev = _bb_width(closes[idx_closed - 19: idx_closed + 1])
+    bbx = safe_pct(w_curr, w_prev) if w_prev else 0.0
+
+    # recent_max sobre velas CERRADAS excluyendo la ultima, igual que el screener
+    # (`_f_closed_h.iloc[-(RECENT_LOOKBACK+1):-1]`).
+    rl = fp["lookback"]
+    rm_slice = highs[max(0, idx_closed - rl): idx_closed]
+    recent_max = float(rm_slice.max()) if len(rm_slice) else 0.0
+    return {
+        "price":             pc,
+        "vol_ratio":         vol_ratio,
+        "candle_body_pct":   body,
+        "close_change_curr": chg,
+        "width_expansion":   bbx,
+        "breakout_distance": safe_pct(pc, recent_max) if recent_max > 0 else 0.0,
+        "elapsed_frac":      elapsed_frac,
+        "recent_max":        recent_max,
+    }
+
 
 def _build_partial_bar(df_1m, open_5m_ms, elapsed_min):
     """Agrega los primeros elapsed_min minutos de una vela 5m desde 1m bars.
@@ -2236,6 +2435,9 @@ def _extract_symbol_worker(sym, by_tf, sym_prepared, sym_klines, sym_deriv,
     i en active_idxs. Módulo-nivel (no closure) para que loky pueda pickearlo en Windows."""
     sym_prepared = sym_prepared or {}
     sym_klines = sym_klines or {}
+    fparams = _build_forming_params(cfg)
+    df5_raw = sym_prepared.get("5m") if sym_prepared.get("5m") is not None else sym_klines.get("5m")
+    df_1m = sym_klines.get("1m")
     out = []
     for i in active_idxs:
         tf_data = {}
@@ -2275,6 +2477,12 @@ def _extract_symbol_worker(sym, by_tf, sym_prepared, sym_klines, sym_deriv,
                 sym_deriv, ts_ms, oi_lookback_min=deriv_lookback)
             tf_data["15m"]["oi_delta_30m"] = oi_delta
             tf_data["15m"]["funding_rate"] = funding_rate
+        # Vela 5m en progreso: lo que el vivo ve y el replay no veia. Ver
+        # build_forming_features(). Sin data de 1m no se inyecta nada y todo sigue igual.
+        if fparams["enabled"] and df_1m is not None:
+            _f = build_forming_features(df5_raw, df_1m, int(by_tf["5m"][i]), ts_ms, fparams)
+            if _f is not None:
+                tf_data["5m"]["_forming"] = _f
         idx_15m = int(by_tf["15m"][i])
         out.append((i, ts_ms, sym, tf_data, idx_15m))
     return out
@@ -2378,6 +2586,9 @@ def _simulate_symbol_worker(sym, by_tf, sym_prepared, sym_klines, sym_deriv,
     por (sym, history_tf), así que los símbolos son independientes entre sí."""
     sym_prepared = sym_prepared or {}
     sym_klines = sym_klines or {}
+    fparams = _build_forming_params(cfg)
+    df5_raw = sym_prepared.get("5m") if sym_prepared.get("5m") is not None else sym_klines.get("5m")
+    df_1m = sym_klines.get("1m")
     last_alert_ts = {}
     sim_alert_history = []  # sólo alertas de este símbolo (LATE_REPEAT)
     alerts = []
@@ -2419,6 +2630,12 @@ def _simulate_symbol_worker(sym, by_tf, sym_prepared, sym_klines, sym_deriv,
                 sym_deriv, ts_ms, oi_lookback_min=deriv_lookback)
             tf_data["15m"]["oi_delta_30m"] = oi_delta
             tf_data["15m"]["funding_rate"] = funding_rate
+        # Vela 5m en progreso: lo que el vivo ve y el replay no veia. Ver
+        # build_forming_features(). Sin data de 1m no se inyecta nada y todo sigue igual.
+        if fparams["enabled"] and df_1m is not None:
+            _f = build_forming_features(df5_raw, df_1m, int(by_tf["5m"][i]), ts_ms, fparams)
+            if _f is not None:
+                tf_data["5m"]["_forming"] = _f
         idx_15m = int(by_tf["15m"][i])
 
         # ── classify + cooldown + historia simulada (LATE_REPEAT) ──
@@ -2880,6 +3097,10 @@ def main():
     parser.add_argument("--cache-dir", default=None,
                         help="Directorio para caché de klines (default: I:\\.backtest_cache). "
                              "Pasar ruta alternativa si se quiere otro disco/ubicación.")
+    parser.add_argument("--no-forming-1m", action="store_true",
+                        help="No bajar 1m aunque el config active EXPLOSION_FORMING. "
+                             "Apaga el detector forming en el replay (comportamiento "
+                             "previo al cableado). Útil para medir la brecha A/B.")
     parser.add_argument("--forming-analysis", action="store_true",
                         help="Post-análisis de lateness forming sobre alertas EXPLOSION: "
                              "descarga 1m klines y mide en qué minuto habrían disparado.")
@@ -2953,6 +3174,47 @@ def main():
         cfg_paths_for_run = list(args.variants)
     elif args.compare:
         cfg_paths_for_run = list(args.compare)
+
+    # ── 1m para el detector forming ────────────────────────────────────────────
+    # EXPLOSION_FORMING corre sobre la vela de 5m en progreso, así que necesita 1m.
+    # Sin esta data el detector no se activa y el replay queda como antes (compatible),
+    # pero entonces sigue faltándole lo que el vivo sí ve — por eso se avisa fuerte.
+    need_forming = any(_cfg_wants_forming(p) for p in cfg_paths_for_run)
+    if need_forming and args.scan_interval_min % 5 == 0:
+        # Trampa silenciosa: si el scan cae siempre en el borde de la vela de 5m, no hay
+        # NADA transcurrido y el detector forming no dispara jamas. Con 15 o 5 min todos
+        # los scans caen en el borde. Produccion corre cada 2,00 min (ver fade/PUENTE2.md)
+        # y por eso el vivo si ve velas vivas. Sin este aviso, cablear el detector "no
+        # cambia nada" y la conclusion seria falsa.
+        print(f"\n  *** AVISO: --scan-interval-min {args.scan_interval_min} es multiplo de 5:")
+        print(f"      todos los scans caen en el borde de la vela de 5m y el detector")
+        print(f"      FORMING no va a disparar NUNCA (0 minutos transcurridos).")
+        print(f"      Produccion corre cada 2 min. Usar --scan-interval-min 2 o 3.")
+    if need_forming and not args.no_forming_1m:
+        print(f"\n[2c/4] EXPLOSION_FORMING activo — descargando 1m para {len(klines)} pares...")
+        print("       (5× el volumen de 5m; es lo que cuesta que el replay vea la vela viva)")
+        klines_1m = download_1m_klines(list(klines.keys()), start_dt, end_dt)
+        n_ok = 0
+        for sym, df1 in klines_1m.items():
+            if sym in klines and df1 is not None:
+                # RECORTE OBLIGATORIO, no es una optimizacion opcional.
+                # El df crudo trae 12 columnas y dos de ellas (`quote_vol`, `ignore`) son
+                # dtype OBJECT, o sea strings de Python: 13 MB por par y 2,6 GB para 200
+                # pares SOLO en 1m, en el proceso padre, ademas de lo que loky pickea a
+                # cada worker. Con 8 semanas eso mata la corrida en el dispatch paralelo
+                # (medido: murio ahi dos veces con 12,1 GB libres y 12 cores).
+                # `_build_partial_bar` solo lee estas 6 columnas — el resto es lastre.
+                cols = ["open_time", "open", "high", "low", "close", "volume"]
+                klines[sym]["1m"] = df1[cols].copy()   # dentro de klines: sin cambiar firmas
+                n_ok += 1
+        print(f"  1m cableado en {n_ok}/{len(klines)} pares "
+              f"→ el detector forming corre en esos {n_ok}")
+        if n_ok == 0:
+            print("  AVISO: 0 pares con 1m. El detector forming NO va a disparar.")
+    elif need_forming:
+        print("\n[2c/4] EXPLOSION_FORMING activo pero --no-forming-1m: el detector "
+              "queda APAGADO (replay sin vela viva, como antes del cableado).")
+
     need_deriv = False
     for p in cfg_paths_for_run:
         try:
