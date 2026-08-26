@@ -377,9 +377,36 @@ Heredadas y confirmadas. Estas no se negocian:
 
 ## 4. Lo que queda sin explorar
 
+> **4.1 quedo CERRADO el 2026-08-26** (ver abajo). Quedan **4.2** y **4.3**.
+
 Ninguna comparte causa de muerte con lo cerrado. En orden de lo que yo haría:
 
-### 4.1 Lead-lag entre monedas
+### 4.1 ~~Lead-lag entre monedas~~ — **CERRADO el 2026-08-26**
+
+> **0 de 384**, con la barra de la nula circular en >= 1. Ver `banco/PREREGISTRO_LEADLAG.md`,
+> `banco/leadlag.py`, `banco/leadlag.csv` (rama `banco/primer-toque`, commit a21740c).
+> **Subpotenciadas: 0** — fueron juzgadas, no omitidas.
+>
+> Se esquivo la matriz 200x200 midiendo lead-lag **por grupo** (Lo-MacKinlay): 4
+> caracteristicas x 4 lags x 3 grupos = 48 features -> 384 hipotesis, con leave-one-out
+> obligatorio. Sin lookahead (48/48 features identicas corrompiendo toda la data posterior).
+>
+> **Lo que hace fuerte al negativo:** las 149 que cruzan el umbral son **todas del lado
+> corto** (149 a 0) y estan repartidas **uniformemente** entre las 4 caracteristicas
+> (41/38/36/34) y los 4 lags (34/38/40/37). Si el desfase fuera real se concentraria en
+> celdas concretas; que aparezca por igual en todas dice que no depende de la feature.
+> Es **deriva del periodo**: el largo base (48,65%) esta 3,35 pp debajo del "sin deriva"
+> (52,00% — las barreras +-8% son asimetricas en log), asi que el corto arranca en
+> +0,10 pp sobre el break-even y el largo en -2,60 pp.
+>
+> Y otra vez la firma de siempre: **110 con p_indep < 0,001, solo 12 con p_bloques < 0,05**
+> (la mejor: 2,3e-44 contra 0,1735). Igual que microestructura.
+>
+> **Queda sin descartar:** lead-lag mas fino que 1h, por pares especificos, y fuera del
+> top-200.
+
+<details><summary>Planteo original</summary>
+
 
 ¿Unas se mueven sistemáticamente antes que otras? **Todo lo probado en este repo es serie
 de tiempo por símbolo o transversal contemporáneo** — nunca se miró el desfase.
@@ -391,6 +418,8 @@ de tiempo por símbolo o transversal contemporáneo** — nunca se miró el desf
   **entre alts**, que es una matriz de 200×200 lags: eso es look-elsewhere puro y necesita
   la nula por desplazamiento circular de entrada, no como chequeo posterior.
 - **Costo:** bajo en datos, medio en diseño. La trampa es la multiplicidad.
+
+</details>
 
 ### 4.2 Eventos de listado en Binance
 
