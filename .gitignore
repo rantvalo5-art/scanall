@@ -43,3 +43,9 @@ tests.txt
 results/
 CLAUDECONFIGCFG0020.json
 CLAUDEconfig - activande derivatives.json
+
+# --- Caches del banco de hipotesis (pesados, regenerables) ---
+banco/.kline_cache/
+banco/.metrics_cache/
+banco/.funding_cache/
+banco/.unlock_cache/

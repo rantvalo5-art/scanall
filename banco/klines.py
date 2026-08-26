@@ -57,15 +57,24 @@ def universe(n=200):
     return [s for s, _ in rows[:n]]
 
 
-def _paths(sym, start_ms, end_ms, tf):
-    base = os.path.join(CACHE, f"{sym}_{tf}_{start_ms}_{end_ms}")
+def _paths(sym, start_ms, end_ms, tf, full=False):
+    # el sufijo _v2 separa el cache ANCHO del angosto: los parquet ya bajados tienen
+    # solo [t,h,l,c] y si compartieran nombre devolverian un frame sin volumen.
+    suf = "_v2" if full else ""
+    base = os.path.join(CACHE, f"{sym}_{tf}_{start_ms}_{end_ms}{suf}")
     return base + ".parquet", base + ".csv"
 
 
-def klines(sym, start_ms, end_ms, tf="1h"):
-    """Velas de un par, cacheadas. Devuelve DataFrame [t, h, l, c] o None."""
+def klines(sym, start_ms, end_ms, tf="1h", full=False):
+    """Velas de un par, cacheadas. Devuelve DataFrame [t, h, l, c] o None.
+
+    `full=True` conserva ademas lo que la version angosta tiraba y que por eso el banco
+    nunca pudo probar: apertura, volumen, volumen en USD, numero de trades y **volumen
+    taker comprador** (lo mas parecido a order flow que hay en una vela). Usa un cache
+    aparte, asi que no invalida lo ya bajado.
+    """
     os.makedirs(CACHE, exist_ok=True)
-    p_pq, p_csv = _paths(sym, start_ms, end_ms, tf)
+    p_pq, p_csv = _paths(sym, start_ms, end_ms, tf, full)
     # Mirar LAS DOS extensiones: si el write de parquet falla se guarda csv, y si
     # solo se chequea parquet el cache nunca pega y se re-descarga todo cada corrida.
     for path, reader in ((p_pq, pd.read_parquet), (p_csv, pd.read_csv)):
@@ -90,8 +99,16 @@ def klines(sym, start_ms, end_ms, tf="1h"):
     if not rows:
         return None
 
-    df = pd.DataFrame([{"t": int(r[0]), "h": float(r[2]),
-                        "l": float(r[3]), "c": float(r[4])} for r in rows])
+    if full:
+        # indices del array de Binance: 1 open, 5 volumen base, 7 volumen quote (USD),
+        # 8 numero de trades, 9 volumen taker comprador en base.
+        df = pd.DataFrame([{"t": int(r[0]), "o": float(r[1]), "h": float(r[2]),
+                            "l": float(r[3]), "c": float(r[4]), "v": float(r[5]),
+                            "qv": float(r[7]), "n": int(r[8]),
+                            "vb": float(r[9])} for r in rows])
+    else:
+        df = pd.DataFrame([{"t": int(r[0]), "h": float(r[2]),
+                            "l": float(r[3]), "c": float(r[4])} for r in rows])
     df = df.drop_duplicates("t").sort_values("t").reset_index(drop=True)
     try:
         df.to_parquet(p_pq, index=False)
@@ -121,24 +138,51 @@ def _universo_fijo(n, pin):
     return syms
 
 
-def load_panel(start, end, n=200, tf="1h", min_bars=2000, verbose=True, pin=None):
+def load_panel(start, end, n=200, tf="1h", min_bars=2000, verbose=True, pin=None,
+               full=False, workers=1):
     """{symbol: df} para toda la ventana. Descarga lo que falte, usa cache si esta.
 
     `pin`: nombre para congelar el universo en disco y que la corrida sea
     reproducible. Sin pin, el ranking de volumen se re-consulta cada vez.
+    `full`: traer tambien apertura/volumen/trades/taker (ver `klines`).
+    `workers`: descarga en paralelo POR PAR (los chunks de un mismo par siguen siendo
+    secuenciales por el cursor). Con `tf` fino esto no es un lujo: un ano de 5m son ~106
+    requests por par a ~2,5s de latencia = 4,5 min/par, o sea 15 horas para 200 pares en
+    serie. Con 12 workers baja a ~75 min. Default 1 = el comportamiento de siempre.
     """
     s_ms, e_ms = to_ms(start), to_ms(end)
     syms = _universo_fijo(n, pin)
     if verbose:
         print(f"Ventana FIJA {start} -> {end} | pidiendo {len(syms)} pares ({tf})"
+              f"{' | ANCHO' if full else ''}{f' | {workers} workers' if workers > 1 else ''}"
               f"{' | universo FIJO: ' + pin if pin else ' | universo EN VIVO (no reproducible)'}")
-    panel, t0 = {}, time.time()
-    for i, s in enumerate(syms, 1):
-        df = klines(s, s_ms, e_ms, tf)
+    panel, t0, hechos = {}, time.time(), [0]
+
+    def _uno(s):
+        try:
+            return s, klines(s, s_ms, e_ms, tf, full=full)
+        except Exception as ex:
+            print(f"  {s}: {type(ex).__name__} {ex}", flush=True)
+            return s, None
+
+    def _guardar(s, df):
         if df is not None and len(df) >= min_bars:
             panel[s] = df
-        if verbose and i % 50 == 0:
-            print(f"  {i}/{len(syms)}...", flush=True)
+        hechos[0] += 1
+        if verbose and hechos[0] % 25 == 0:
+            print(f"  {hechos[0]}/{len(syms)}  ({time.time()-t0:.0f}s)", flush=True)
+
+    if workers > 1:
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        with ThreadPoolExecutor(workers) as ex:
+            for f in as_completed([ex.submit(_uno, s) for s in syms]):
+                _guardar(*f.result())
+        # el orden de as_completed es arbitrario; el panel se reordena como el universo
+        panel = {s: panel[s] for s in syms if s in panel}
+    else:
+        for s in syms:
+            _guardar(*_uno(s))
+
     if verbose:
         print(f"  {len(panel)} pares con >= {min_bars} velas | {time.time()-t0:.0f}s")
     return panel
