@@ -1,3 +1,3 @@
 # velas cacheadas (se regeneran solas desde la API)
 .kline_cache/
-banco/.leadlag_T.csv
+.leadlag_T.csv
