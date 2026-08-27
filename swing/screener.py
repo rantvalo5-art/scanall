@@ -19,6 +19,7 @@ Configuración en swing/config.json.
 """
 
 import os
+import re
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
@@ -120,6 +121,32 @@ CHART_STYLE   = _g("chart", "STYLE", default="nightclouds")
 OUTCOMES_ENABLED = _g("outcomes", "ENABLED", default=False)
 
 _CAL_CFG = CFG.raw.get("scoring_calibration") or {}
+_REGIME_CFG = CFG.raw.get("regime_filter") or {}
+
+
+def market_regime_up():
+    """Estado risk-on/risk-off del mercado para este scan (global, no per-símbolo).
+
+    Espejo en vivo de backtest.MarketRegime: close 1d del símbolo de referencia sobre su
+    SMA. Devuelve None si el filtro está off o si falla el fetch → classify no aplica nada
+    (fail-safe: ante duda no bloqueamos señales).
+    """
+    if not _REGIME_CFG.get("ENABLED", False):
+        return None
+    sym = _REGIME_CFG.get("SYMBOL", "BTCUSDT")
+    bars = int(_REGIME_CFG.get("MA_BARS_1D", 20))
+    try:
+        df = get_klines(sym, "1d")
+    except Exception as e:
+        print(f"  regime: fetch {sym} 1d falló ({e}) → filtro inerte este run")
+        return None
+    # Descartar la vela diaria en formación: el régimen se evalúa sobre la última CERRADA.
+    df = df.iloc[:-1]
+    if len(df) < bars + 1:
+        print(f"  regime: {len(df)} barras 1d < {bars + 1} → filtro inerte este run")
+        return None
+    close = df["close"].astype(float)
+    return bool(close.iloc[-1] > close.rolling(bars).mean().iloc[-1])
 
 
 def _norm(raw_score, signal_type):
@@ -260,25 +287,24 @@ def insert_pairs_snapshot(pairs):
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
     purge_before = (now - timedelta(days=SNAPSHOT_RETENTION_DAYS)).isoformat()
-    rows = [{"run_at": now_iso, "symbol": s} for s in pairs]
+    row = {"run_at": now_iso, "symbols": sorted(pairs)}
     try:
-        BATCH = 500
-        for i in range(0, len(rows), BATCH):
-            r = SESSION.post(
-                f"{SUPABASE_URL}/rest/v1/screener_pairs_snapshot",
-                headers=_sb_headers(),
-                json=rows[i:i + BATCH],
-                timeout=15,
-            )
-            r.raise_for_status()
+        r = SESSION.post(
+            f"{SUPABASE_URL}/rest/v1/screener_runs",
+            headers=_sb_headers(),
+            json=row,
+            timeout=15,
+        )
+        r.raise_for_status()
+        # Auto-purge
         r2 = SESSION.delete(
-            f"{SUPABASE_URL}/rest/v1/screener_pairs_snapshot",
+            f"{SUPABASE_URL}/rest/v1/screener_runs",
             headers=_sb_headers(),
             params={"run_at": f"lt.{purge_before}"},
             timeout=15,
         )
         r2.raise_for_status()
-        print(f"  snapshot: {len(rows)} pares guardados (purge >{SNAPSHOT_RETENTION_DAYS}d)")
+        print(f"  snapshot: {len(row['symbols'])} pares guardados (purge >{SNAPSHOT_RETENTION_DAYS}d)")
     except Exception as e:
         print(f"Supabase insert_pairs_snapshot error: {e}")
 
@@ -381,6 +407,18 @@ def in_cooldown(symbol, history_tf, last_seen):
 
 
 # ── Telegram ─────────────────────────────────────────────────────────────────
+def _sin_token(e):
+    """Saca el token del mensaje de error antes de imprimirlo.
+
+    El mensaje de una excepcion de requests incluye la URL completa, y la URL de la
+    API de Telegram lleva el token adentro (`/bot<TOKEN>/sendMessage`). Imprimir la
+    excepcion cruda lo escribe en el log de Actions, que en un repo publico lee
+    cualquiera: fue el vector por el que se filtro el token el 2026-08-22.
+    Nunca imprimir `e` directo en un except que envuelva una llamada a Telegram.
+    """
+    return re.sub(r"bot\d{6,12}:[A-Za-z0-9_-]{30,}", "bot***", str(e))
+
+
 def send_telegram(text):
     try:
         r = SESSION.post(
@@ -390,7 +428,7 @@ def send_telegram(text):
         )
         r.raise_for_status()
     except Exception as e:
-        print(f"  send_telegram error: {e}")
+        print(f"  send_telegram error: {_sin_token(e)}")
         try:
             SESSION.post(
                 f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
@@ -477,7 +515,7 @@ def send_telegram_photo(image_buf, caption):
         )
         r.raise_for_status()
     except Exception as e:
-        print(f"  send_telegram_photo error: {e}")
+        print(f"  send_telegram_photo error: {_sin_token(e)}")
         try:
             send_telegram(caption)
         except Exception:
@@ -719,6 +757,14 @@ def main():
 
     insert_pairs_snapshot(pairs)
 
+    # Régimen de mercado: se resuelve UNA vez por scan (es global) y se le pasa a classify.
+    regime_up = market_regime_up()
+    if regime_up is not None:
+        print(f"Régimen de mercado ({_REGIME_CFG.get('SYMBOL', 'BTCUSDT')} 1d vs SMA"
+              f"{_REGIME_CFG.get('MA_BARS_1D', 20)}): "
+              f"{'RISK-ON' if regime_up else 'RISK-OFF'} → "
+              f"{'sin ajuste' if regime_up else _REGIME_CFG.get('MODE', 'soft').upper()}")
+
     counts_history, last_seen = fetch_history()
     tasks = [(sym, tf) for sym in pairs for tf in INTERVALS]
     per_symbol = {sym: {} for sym in pairs}
@@ -740,7 +786,8 @@ def main():
                 continue
 
             # classify recibe el dict {tf: features}; requiere 1h/4h/1d (1w opcional, fail-safe).
-            alert = classify(symbol, per_symbol[symbol], CFG, counts_history)
+            alert = classify(symbol, per_symbol[symbol], CFG, counts_history,
+                             regime_up=regime_up)
             processed.add(symbol)
             if not alert:
                 continue
