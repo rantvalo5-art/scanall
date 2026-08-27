@@ -291,27 +291,24 @@ def insert_pairs_snapshot(pairs):
     now = datetime.now(timezone.utc)
     now_iso = now.isoformat()
     purge_before = (now - timedelta(days=SNAPSHOT_RETENTION_DAYS)).isoformat()
-    rows = [{"run_at": now_iso, "symbol": s} for s in pairs]
+    row = {"run_at": now_iso, "symbols": sorted(pairs)}
     try:
-        # Insert en batches por si Supabase tiene límite de payload
-        BATCH = 500
-        for i in range(0, len(rows), BATCH):
-            r = requests.post(
-                f"{SUPABASE_URL}/rest/v1/screener_pairs_snapshot",
-                headers=_sb_headers(),
-                json=rows[i:i + BATCH],
-                timeout=15,
-            )
-            r.raise_for_status()
+        r = requests.post(
+            f"{SUPABASE_URL}/rest/v1/screener_runs",
+            headers=_sb_headers(),
+            json=row,
+            timeout=15,
+        )
+        r.raise_for_status()
         # Auto-purge
         r2 = requests.delete(
-            f"{SUPABASE_URL}/rest/v1/screener_pairs_snapshot",
+            f"{SUPABASE_URL}/rest/v1/screener_runs",
             headers=_sb_headers(),
             params={"run_at": f"lt.{purge_before}"},
             timeout=15,
         )
         r2.raise_for_status()
-        print(f"  snapshot: {len(rows)} pares guardados (purge >{SNAPSHOT_RETENTION_DAYS}d)")
+        print(f"  snapshot: {len(row['symbols'])} pares guardados (purge >{SNAPSHOT_RETENTION_DAYS}d)")
     except Exception as e:
         print(f"Supabase insert_pairs_snapshot error: {e}")
 
