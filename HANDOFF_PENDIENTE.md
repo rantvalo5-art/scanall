@@ -377,7 +377,8 @@ Heredadas y confirmadas. Estas no se negocian:
 
 ## 4. Lo que queda sin explorar
 
-> **4.1 quedo CERRADO el 2026-08-26** (ver abajo). Quedan **4.2** y **4.3**.
+> **4.1 y 4.3 quedaron CERRADOS el 2026-08-26** (ver abajo). Queda solo **4.2**
+> (eventos de listado), que el propio handoff marca como la trampa de unlocks: n chico.
 
 Ninguna comparte causa de muerte con lo cerrado. En orden de lo que yo haría:
 
@@ -435,7 +436,40 @@ precio**.
   exactamente la trampa de unlocks, así que **contar el n post-join y el MDE antes de
   escribir la regla** no es opcional acá.
 
-### 4.3 La cola ilíquida
+### 4.3 ~~La cola ilíquida~~ — **CERRADO el 2026-08-26, por costos**
+
+> No se llego a correr la hipotesis: **la fase 0 la cerro**. El handoff decia que habia
+> que rehacer los costos antes de creerle a un solo numero, y rehacerlos alcanzo.
+> `banco/libro.py`, `libro.csv`, `libro_10k.csv` (rama `banco/primer-toque`, 74818fc).
+>
+> **Primero, lo que NO funciona:** estimar el spread de OHLC con Corwin-Schultz o Roll.
+> El rango high-low mediano de una hora de BTCUSDT son ~49 bps contra un spread real de
+> ~1 bp, asi que CS mide volatilidad: 8,4 bps en 1h, 42,9 en 1d, y **plano** entre
+> cuartiles de volumen (0,212/0,240/0,231/0,206%). Y el piso de ruido **escala con la
+> volatilidad**, o sea que habria inflado la cola por volatil y no por iliquida —
+> el artefacto exacto que 4.3 tenia que evitar, disfrazado de modelo de costos.
+>
+> **Lo que si:** medir el libro con `/api/v3/depth` y caminarlo hasta llenar la orden.
+> Valida donde CS fallaba (rank 1-50 da 1,3 bps, el numero real de BTCUSDT).
+>
+> | banda | orden $1k | orden $10k | win rate necesario (8%/8%) |
+> |---|---|---|---|
+> | rank 1-50 | 0,230% | 0,279% | 51,44% / 51,74% |
+> | rank 51-200 | 0,339% | 0,597% | 52,12% / 53,73% |
+> | rank 201-400 | 0,441% | 0,994% | 52,76% / **56,21%** |
+> | rank 401-600 | 0,524% | 1,261% | 53,28% / **57,88%** |
+>
+> Entre **1,5x y 6,3x** el 0,20% supuesto. **La cola no es terreno mas facil con la misma
+> vara: es una vara mas alta.** A tamano operable pide **57,88%**, y el mejor efecto que
+> el repo vio alguna vez fue **+4,71 pp in-sample** (lead-lag, muerto en bloques). El
+> requisito supera al mejor artefacto, asi que se cierra por la misma logica de MDE que
+> cerro unlocks.
+>
+> **Nada previo se da vuelta:** todas las familias cerradas se cerraron contra un costo
+> demasiado barato; subirlo solo las mata mas.
+
+<details><summary>Planteo original</summary>
+
 
 Todo se midió sobre `base200`, donde la competencia es máxima. Varias features de
 microestructura (Amihud, Roll, `ac1_5m`) son **mecánicamente más grandes abajo**.
@@ -447,6 +481,8 @@ microestructura (Amihud, Roll, `ac1_5m`) son **mecánicamente más grandes abajo
   que más prometen son literalmente medidas de iliquidez. **Hay que rehacer los costos
   antes de creerle a un solo número**, y eso es media sesión de infraestructura antes del
   primer resultado. Sin eso, cualquier hallazgo es un artefacto de contabilidad.
+
+</details>
 
 **Ventana OOS virgen: 2024-08-01 → 2025-08-01.** Declarada en `PREREGISTRO_ANCHO.md` y
 **nunca mirada**, porque nunca sobrevivió nada que promover. Sigue disponible.
