@@ -84,3 +84,54 @@ Sesgos declarados: el universo es el ranking de volumen de **hoy** (los deslista
 están, sesga hacia mejor), y la calibración se midió sobre 46 pares grandes con perpetuo
 desde 2021 — **no se puede extrapolar a la cola ilíquida**, donde además los costos
 reales son 1,5× a 6,3× lo que asume el banco (`banco/libro.py`).
+
+---
+
+## Correrlo solo, y medirlo
+
+### 1. Crear la tabla
+
+Pegá `tabla.sql` en el SQL Editor de Supabase. Crea `radar_runs` con su índice único
+(para que un cron disparado dos veces no duplique) y las políticas de RLS que hacen falta
+para escribir con la anon key.
+
+### 2. El cron
+
+`.github/workflows/radar.yml` corre **una vez por día**, 00:10 UTC, y guarda el universo
+entero más manda el top-8 por Telegram. Usa los secrets que ya tenés configurados:
+`SUPABASE_KEY`, `DAY_TELEGRAM_TOKEN`, `DAY_TELEGRAM_CHAT_ID`.
+
+**Una vez por día es a propósito, no pereza.** Lo validado es un rebalanceo cada 24h con
+horizonte de 24h, y esas barras **no se solapan**. Correrlo cada hora daría 24 corridas
+solapadas por día: el n contado dejaría de ser el n real, y el forward test heredaría
+exactamente el defecto que el resto del repo arrastra por contar entradas solapadas como
+si fueran independientes.
+
+Para mirarlo cuando quieras, corrélo a mano — sin `--supabase` no ensucia nada.
+
+### 3. Medirlo
+
+```
+py -3.13 -u medir.py
+```
+
+Lee lo guardado, reconstruye con velas posteriores lo que **efectivamente** pasó, y lo
+compara contra los números preregistrados:
+
+| | medido antes | en vivo |
+|---|---|---|
+| spread | +1,008 ATR base | ? |
+| múltiplo de camino | 1,15× | ? |
+| tasa de acierto | 61,3% | ? |
+
+**La regla de parada está escrita en `medir.py` antes de que existan datos:**
+
+- Con menos de **8 semanas** no concluye nada. La unidad independiente es la semana, no
+  la corrida: 60 corridas de 60 días seguidos no son 60 datos.
+- Si a las 8 semanas el spread es **≤ 0**, no replicó y el radar se apaga.
+- Entre 0 y +0,5 se reporta como **réplica débil** y sigue vivo: la primera medición de
+  cualquier cosa exagera, porque se encontró mirando, y lo que se encuentra mirando es la
+  parte alta del ruido.
+- **No se toca `n_surge` ni `k` por lo que salga acá.** Ajustar el screener con el
+  resultado del forward test convierte el out-of-sample en in-sample, y después no queda
+  ninguna ventana limpia para volver a preguntar.

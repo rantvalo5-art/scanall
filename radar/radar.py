@@ -24,7 +24,6 @@ tiene buckets BEST/STRONG/WATCH, y no tiene un archivo de configuracion con 233
 perillas. Todo eso se midio y no compraba nada.
 """
 import argparse
-import json
 import os
 import sys
 import time
@@ -167,11 +166,17 @@ def escanear(n_pares, k, vol_min, min_atr=0.0, workers=12):
     # RANKING TRANSVERSAL: la posicion de cada moneda es contra las OTRAS de este mismo
     # momento, no contra un umbral fijo. Un umbral absoluto mezcla "que moneda es" con
     # "que hora es"; el rank dentro de la barra separa las dos cosas.
-    F["rank_pct"] = F["n_surge"].rank(pct=True)
-    F = F.sort_values("n_surge", ascending=False).head(k).reset_index(drop=True)
+    F = F.sort_values("n_surge", ascending=False).reset_index(drop=True)
+    F["rank"] = np.arange(1, len(F) + 1)
+    F["en_top"] = F["rank"] <= k
+    F["universo"] = len(F)
 
+    # OI solo para el top-k: son k requests en vez de 200, y es informativo, no el eje.
+    top = F[F.en_top]
     with ThreadPoolExecutor(6) as ex:
-        F["oi_rel_168"] = list(ex.map(oi_rel, F["sym"]))
+        vals = list(ex.map(oi_rel, top["sym"]))
+    F["oi_rel_168"] = np.nan
+    F.loc[top.index, "oi_rel_168"] = vals
 
     # el camino esperado no es una prediccion nueva: es el ATR base del propio par por
     # el multiplo MEDIDO del top-8. Si el par no se mueve, esto no lo hace moverse.
@@ -179,7 +184,54 @@ def escanear(n_pares, k, vol_min, min_atr=0.0, workers=12):
     return F
 
 
-def texto(F, k):
+SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
+TABLA = "radar_runs"
+
+
+def guardar(F):
+    """Guarda el UNIVERSO ENTERO de esta corrida en Supabase.
+
+    Se guardan las ~200 filas y no solo el top-k, y no es por prolijidad: el
+    estadistico validado es `media(top-k) - media(UNIVERSO DE LA MISMA BARRA)`. Sin las
+    filas del universo el forward test no se puede calcular, y guardarlas despues es
+    imposible porque el universo de hoy no es el de manana.
+
+    `precio` es la referencia de entrada: con eso y `run_at` se reconstruye el camino
+    real despues, sin tener que guardar ningun resultado.
+    """
+    key = os.environ.get("SUPABASE_KEY")
+    if not key:
+        print("(sin SUPABASE_KEY: no se guardo)", file=sys.stderr)
+        return
+    ahora = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    filas = [{"run_at": ahora, "symbol": r.sym, "rank": int(r["rank"]),
+              "en_top": bool(r.en_top), "universo": int(r.universo),
+              "n_surge": round(float(r.n_surge), 4),
+              "turnover": round(float(r.turnover), 4),
+              "atr_base": round(float(r.atr_base), 6),
+              "precio": float(r.precio),
+              "oi_rel_168": (None if pd.isna(r.oi_rel_168)
+                             else round(float(r.oi_rel_168), 4))}
+             for _, r in F.iterrows()]
+    h = {"apikey": key, "Authorization": f"Bearer {key}",
+         "Content-Type": "application/json", "Prefer": "return=minimal"}
+    ok = 0
+    for i in range(0, len(filas), 500):
+        try:
+            r = requests.post(f"{SUPABASE_URL}/rest/v1/{TABLA}", headers=h,
+                              json=filas[i:i + 500], timeout=20)
+            r.raise_for_status()
+            ok += len(filas[i:i + 500])
+        except Exception as e:
+            print(f"Supabase error: {e}", file=sys.stderr)
+            if "r" in dir() and getattr(r, "text", ""):
+                print(f"  {r.text[:300]}", file=sys.stderr)
+            return
+    print(f"supabase: {ok} filas guardadas en {TABLA} ({ahora})", file=sys.stderr)
+
+
+def texto(F_top, k):
+    F = F_top.reset_index(drop=True)
     out = [f"RADAR — {k} monedas con mas probabilidad de MOVERSE (24h)",
            f"{time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}",
            "",
@@ -216,15 +268,23 @@ def main():
                     help="piso de ATR horario (ej 0.01 = 1%%/h). NO MEDIDO: el spread "
                          "validado no lo usa. Apagado por default.")
     ap.add_argument("--json", action="store_true")
+    ap.add_argument("--supabase", action="store_true",
+                    help="guardar el UNIVERSO ENTERO en radar_runs (requiere "
+                         "SUPABASE_KEY). Es lo que habilita el forward test.")
     ap.add_argument("--telegram", action="store_true",
                     help="enviar ademas por Telegram (TELEGRAM_TOKEN y CHAT_ID)")
     a = ap.parse_args()
 
     F = escanear(a.pares, a.k, a.vol_min, a.min_atr)
+    TOP = F[F.en_top]
+
+    if a.supabase:
+        guardar(F)
+
     if a.json:
-        print(F.to_json(orient="records", indent=2))
+        print(TOP.to_json(orient="records", indent=2))
         return
-    t = texto(F, a.k)
+    t = texto(TOP, a.k)
     print(t)
 
     if a.telegram:

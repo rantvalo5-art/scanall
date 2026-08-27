@@ -1,0 +1,46 @@
+name: Radar (magnitud)
+
+# UNA VEZ POR DIA, y es a proposito.
+#
+# Lo que se valido en `banco/PREREGISTRO_TRANSVERSAL.md` es un rebalanceo cada 24h con
+# horizonte de 24h, y esas barras NO SE SOLAPAN. Correrlo cada hora daria 24 corridas
+# solapadas por dia: el n contado dejaria de ser el n real y el forward test heredaria
+# exactamente el defecto que el resto del repo pasa contando entradas solapadas como si
+# fueran independientes.
+#
+# Si lo queres mirar mas seguido, corrélo a mano (`py -3.13 -u radar.py`). Eso no
+# ensucia nada porque no escribe a Supabase sin `--supabase`.
+on:
+  workflow_dispatch:
+  schedule:
+    # 00:10 UTC: la vela de 23:00-00:00 ya cerro. El cron de GitHub puede demorarse
+    # 5-15 min en horas pico y no importa: lo que tiene que ser estable es el dia,
+    # no el minuto.
+    - cron: "10 0 * * *"
+
+jobs:
+  escanear:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install requests "pandas==2.2.3" numpy
+
+      - name: Correr radar y guardar el universo
+        working-directory: radar
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          TELEGRAM_TOKEN: ${{ secrets.DAY_TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.DAY_TELEGRAM_CHAT_ID }}
+        # --supabase guarda el universo entero (lo que habilita medirlo despues).
+        # --telegram manda el top-8. Sacá el flag si no lo querés en el celular.
+        run: python radar.py --k 8 --supabase --telegram
