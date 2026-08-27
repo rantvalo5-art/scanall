@@ -33,8 +33,16 @@ import numpy as np
 import pandas as pd
 import requests
 
-SPOT = "https://api.binance.com"
+# HOSTS. `api.binance.com` devuelve 451 (Unavailable For Legal Reasons) desde IPs de
+# EE.UU., que es donde corren los runners de GitHub: la primera corrida del workflow
+# fallo con "universo: 0 pares" justamente por eso. `data-api.binance.vision` es el
+# mirror publico de solo-lectura de Binance y no tiene esa restriccion.
+#
+# Se prueban en orden y se usa el primero que responda, asi anda igual desde tu maquina
+# que desde el runner, sin configurar nada. Se puede forzar uno con BINANCE_SPOT.
+SPOT_HOSTS = ["https://data-api.binance.vision", "https://api.binance.com"]
 FAPI = "https://fapi.binance.com"
+SPOT = None          # lo fija `elegir_spot()` en el arranque
 
 # ---------------------------------------------------------------- lo medido
 # `banco/PREREGISTRO_TRANSVERSAL.md`, corrida 3, panel de 46 pares 2021-10 -> 2026-07,
@@ -88,23 +96,53 @@ BARRAS = 1000        # klines por simbolo (41 dias; hacen falta 720 para atr_bas
 ATR_BASE_H = 720     # mediana movil de 30d del ATR propio
 
 
+_ULTIMO_ERROR = [None]
+
+
 def _get(url, params=None, intentos=3):
     for i in range(intentos):
         try:
             r = requests.get(url, params=params, timeout=20)
             if r.status_code == 200:
                 return r.json()
+            _ULTIMO_ERROR[0] = f"HTTP {r.status_code} {r.text[:120]}"
             if r.status_code in (418, 429):
                 time.sleep(2 ** i)
-        except Exception:
+            else:
+                return None          # 451 y demas no se arreglan reintentando
+        except Exception as e:
+            _ULTIMO_ERROR[0] = f"{type(e).__name__}: {e}"
             time.sleep(1 + i)
     return None
+
+
+def elegir_spot():
+    """Primer host de Binance que responda. Devuelve la base o corta con el motivo.
+
+    Antes esto no existia y un 451 se convertia silenciosamente en "universo: 0 pares",
+    que no dice nada sobre la causa. Ahora el log del workflow dice cual anduvo.
+    """
+    global SPOT
+    forzado = os.environ.get("BINANCE_SPOT")
+    for base in ([forzado] if forzado else SPOT_HOSTS):
+        if _get(f"{base}/api/v3/ping") is not None:
+            SPOT = base
+            print(f"binance spot: {base}", file=sys.stderr, flush=True)
+            return base
+        print(f"  {base} no responde ({_ULTIMO_ERROR[0]})", file=sys.stderr, flush=True)
+    print("FATAL: ningun host de Binance responde. Ultimo error: "
+          f"{_ULTIMO_ERROR[0]}", file=sys.stderr)
+    sys.exit(1)
 
 
 def universo(n, vol_min):
     """Top n pares USDT spot por volumen de 24h. Es el ranking de HOY: los deslistados
     no estan, y eso sesga hacia mejor (mismo sesgo que todo el banco)."""
-    d = _get(f"{SPOT}/api/v3/ticker/24hr") or []
+    d = _get(f"{SPOT}/api/v3/ticker/24hr")
+    if not d:
+        print(f"FATAL: ticker/24hr vacio desde {SPOT}. Ultimo error: "
+              f"{_ULTIMO_ERROR[0]}", file=sys.stderr)
+        sys.exit(1)
     filas = [(x["symbol"], float(x["quoteVolume"])) for x in d
              if x["symbol"].endswith("USDT")
              and not x["symbol"].endswith(("UPUSDT", "DOWNUSDT"))
@@ -159,8 +197,9 @@ def escanear(n_pares, k, vol_min, min_atr=0.0, workers=12):
     with ThreadPoolExecutor(workers) as ex:
         filas = [f for f in ex.map(features, syms) if f]
     if len(filas) < 30:
-        print(f"FATAL: solo {len(filas)} pares con datos suficientes; "
-              f"sin seccion cruzada no hay ranking", file=sys.stderr)
+        print(f"FATAL: solo {len(filas)} de {len(syms)} pares con datos suficientes; "
+              f"sin seccion cruzada no hay ranking. Ultimo error: {_ULTIMO_ERROR[0]}",
+              file=sys.stderr)
         sys.exit(1)
 
     F = pd.DataFrame(filas)
@@ -191,8 +230,10 @@ def escanear(n_pares, k, vol_min, min_atr=0.0, workers=12):
     top = F[F.en_top]
     with ThreadPoolExecutor(6) as ex:
         vals = list(ex.map(oi_rel, top["sym"]))
+    # np.nan y no None: una lista con None dentro rompe el dtype float de la columna
+    # (pandas 2.x avisa, pandas 3 va a cortar)
     F["oi_rel_168"] = np.nan
-    F.loc[top.index, "oi_rel_168"] = vals
+    F.loc[top.index, "oi_rel_168"] = [np.nan if v is None else float(v) for v in vals]
 
     # el camino esperado no es una prediccion nueva: es el ATR base del propio par por
     # el multiplo MEDIDO del top-8. Si el par no se mueve, esto no lo hace moverse.
@@ -291,6 +332,7 @@ def main():
                     help="enviar ademas por Telegram (TELEGRAM_TOKEN y CHAT_ID)")
     a = ap.parse_args()
 
+    elegir_spot()
     F = escanear(a.pares, a.k, a.vol_min, a.min_atr)
     TOP = F[F.en_top]
 
