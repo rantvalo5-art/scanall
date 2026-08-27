@@ -235,7 +235,14 @@ def scores(TB, neutralizar="roc_24", ambas=True):
               "compresion", "dd_168", "dd_720", "pos_168"]
     flujo = ["desbal", "desbal_24", "desbal_168",
              "ticket_rel", "turnover", "n_surge"]
-    crudos = [c for c in precio + flujo if c in TB.columns]
+    # DERIVADOS (`metricas.py`): seis columnas de Binance Futures y ninguna es precio.
+    # Los `_pct` son los comparables entre monedas; los niveles crudos van igual, pero
+    # un sobreviviente que sea SOLO de nivel crudo esta rankeando "que moneda es" mas
+    # que "que esta pasando" (ver PREREGISTRO_TRANSVERSAL, corrida 3, seccion 3).
+    deriv = ["oi_chg_1h", "oi_chg_4h", "oi_chg_24h", "oi_z", "oi_rel_168"]
+    for c in ("tt_cuentas", "tt_pos", "ls_cuentas", "taker"):
+        deriv += [c, f"{c}_chg24", f"{c}_pct"]
+    crudos = [c for c in precio + flujo + deriv if c in TB.columns]
     crudos = [c for c in crudos if c != "atr_base"]
 
     S = {}
@@ -283,6 +290,13 @@ def _spread_semanal(TB, score, k, y, costo):
     D = TB[["t", "sym", "semana", "atr_24", "atr_base", y, y_crudo]].copy()
     D["score"] = score.to_numpy()
     D = D[D["score"].notna() & D[y].notna() & D["atr_24"].gt(0)]
+    if D.empty:
+        return None, None, None
+    # Una barra donde este score existe para pocos simbolos no da un top-k selectivo:
+    # con 12 validos, un top-8 es el 67% del universo disponible, no una seleccion.
+    # Importa sobre todo con derivados, donde la cobertura por par es despareja.
+    vivos = D.groupby("t")["score"].transform("count")
+    D = D[vivos >= max(MIN_SYMS, 2 * k)]
     if D.empty:
         return None, None, None
 
@@ -501,6 +515,9 @@ def main():
     ap.add_argument("--costo", type=float, default=COSTO_PCT)
     ap.add_argument("--q", type=float, default=Q_FDR)
     ap.add_argument("--pin", default="base200")
+    ap.add_argument("--derivados", action="store_true",
+                    help="sumar las features de metricas.py (OI y posicionamiento de "
+                         "futuros; ninguna es precio)")
     ap.add_argument("--angosto", action="store_true",
                     help="panel solo-OHLC (sin las features de flujo)")
     ap.add_argument("--nula", action="store_true",
@@ -514,6 +531,17 @@ def main():
         print("FATAL: no se pudo cargar el panel"); sys.exit(1)
 
     TB = tablero(panel, paso=a.paso, horizonte=a.horizonte)
+
+    if a.derivados:
+        from metricas import feat_metricas, load_metrics
+        # El rango se pide COMPLETO aunque el panel sea mas corto: la clave de cache de
+        # `frame_simbolo` es {sym}_{primera_fecha}_{ultima_fecha}, asi que pedir un
+        # subrango no pega en el cache y re-baja un dia por request.
+        M = load_metrics(list(panel), "2021-08-01", "2026-08-01")
+        FM = feat_metricas(M, TB[["sym", "t"]])
+        TB = pd.concat([TB, FM], axis=1)
+        cob = FM.notna().any(axis=1).mean()
+        print(f"derivados: {len(M)} pares con perp | cobertura de filas {cob:.1%}")
 
     if a.nula:
         mde_del_azar(TB, k=a.k, costo=a.costo)

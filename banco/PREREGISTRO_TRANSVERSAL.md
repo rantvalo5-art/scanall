@@ -388,3 +388,89 @@ mismo diseño**, con las dos direcciones corridas y sin normalizador manipulable
 3. **Sigue siendo UNA celda del espacio.** Falta: 5m (200 archivos cacheados), 4h/1d,
    derivados (`.metrics_cache/`, 5 años, 6 columnas y ninguna es precio), barridos de `k`
    y de horizonte, bandas, Δrank y combinaciones multi-feature.
+
+---
+
+# CORRIDA 3 — DERIVADOS (preregistro, escrito 2026-08-27 ANTES de correr)
+
+> Nada de esta sección se escribió después de ver un número de derivados. Los resultados
+> van debajo de la línea, como en las corridas 1 y 2.
+
+## 1. Por qué esto no es más de lo mismo
+
+Las corridas 1 y 2 midieron **17 features de precio + 6 de flujo del kline**. Las dos
+mitades del resultado (dirección 0/140, magnitud 28/70) están condicionadas a **una sola
+fuente de información: la vela de spot**.
+
+`banco/.metrics_cache/` tiene otra fuente, ya en disco, que el banco nunca puso en un
+ranking transversal: el dataset `metrics` de Binance Futures. **Seis columnas y ninguna
+es precio:**
+
+| columna | qué es |
+|---|---|
+| `oi`, `oi_usd` | open interest (contratos / USD) |
+| `tt_cuentas`, `tt_pos` | ratio long/short de los traders top (cuentas y posiciones) |
+| `ls_cuentas` | ratio long/short de todas las cuentas |
+| `taker` | ratio de volumen agresor comprador/vendedor |
+
+Los cuatro últimos son **posicionamiento**: quién está parado de qué lado. Es el insumo
+clásico de una señal contraria direccional, y la dirección es exactamente la mitad que
+falla. Que el precio no ordene no dice nada sobre si el posicionamiento ordena.
+
+`metricas.py` ya resuelve la parte donde se cuela el lookahead: agrupa por hora tomando
+el **último** valor del bin y lo etiqueta con `t[i]`, o sea lo que se sabe cuando la vela
+cierra. Se usa `feat_metricas()` tal cual, sin tocarla.
+
+## 2. La ventana cambia, y eso es a favor
+
+El caché tiene 47 pares con **2021-08-01 → 2026-07-31 completo**: cinco años, horario.
+Contra las 49 semanas de las corridas 1 y 2, acá hay **~260 semanas** — y la semana es la
+unidad independiente, así que la potencia sube mucho. Además cubre el bull de 2021, el
+bear de 2022, la recuperación 2023-24 y el bear actual: **la objeción de "esto es un solo
+régimen" deja de aplicar**, que es justo lo que hacía falta.
+
+**El precio a pagar, declarado:** el universo baja de 145 pares a ~46 (se saca
+`USDCUSDT`, que es un par de stablecoin y en un ranking por volatilidad sería ruido
+estructural). Es un universo **sesgado a sobrevivientes grandes** — son los que tienen
+perp desde 2021 y siguen vivos. Sesga hacia mejor y hay que decirlo en cualquier
+conclusión.
+
+Con 46 pares, **`k` baja de 20 a 8** para mantener la selectividad (~17%, contra
+20/145 ≈ 14% de las corridas anteriores). Se fija ahora, no después de ver resultados.
+
+## 3. Brazos
+
+17 features de `metricas._feat()` — `oi_chg_1h/4h/24h`, `oi_z`, `oi_rel_168`, y para cada
+uno de `tt_cuentas`/`tt_pos`/`ls_cuentas`/`taker` su nivel, su cambio a 24h y su
+percentil propio a 168h — **en las dos direcciones**, más sus residualizadas contra
+`roc_24`, más los 3 controles al azar, x 3 objetivos.
+
+> **Sobre comparabilidad**: el docstring de `metricas.py` avisa que los ratios en crudo
+> **no son comparables entre monedas**. Por eso las versiones `_pct` (percentil contra su
+> propia historia) son las que tienen sentido transversal; los niveles crudos se corren
+> igual pero **un sobreviviente que sea solo de nivel crudo se trata como sospechoso de
+> estar rankeando "qué moneda es", no "qué está pasando"**, y hay que mirarle el
+> `sin_top3`.
+
+## 4. Compuertas — las mismas, sin tocar
+
+Las siete de la sección 3, más la de ARTEFACTO DE ESCALA de la corrida 1 y el
+normalizador `atr_base` de la corrida 2. FDR sobre el lote entero. Costo 0,20% y 0,50%.
+Nula corrida primero para el MDE.
+
+## 5. Regla de parada — fijada ANTES
+
+1. **Si ningún brazo de derivados supera el MDE contra los controles al azar** → el
+   posicionamiento no ordena transversalmente y la fuente queda cerrada para esta forma
+   de uso. **No se prueba una feature más de precio para compensar.**
+2. **Si sobrevive algo en `largo` o `corto`** → es el primer resultado direccional del
+   repo y **no se cree**: hay que partirlo por régimen (los cinco años dan al menos
+   cuatro trozos con signo de mercado distinto) y exigir que **no cambie de signo**.
+   Sobrevivir pooled sobre 5 años y morir en el bull de 2021 es el mismo autoengaño de
+   siempre con más datos.
+3. **Si sobrevive solo en `magnitud`** → confirma la corrida 2 desde otra fuente. Es
+   informativo pero no cambia el problema del instrumento (§8.3).
+4. **Si sobrevive un nivel crudo y no su `_pct`** → sospechoso de rankear identidad de
+   moneda. Se exige `sin_top3` y `sin_top1` positivos, que ya están cableados.
+5. **El universo de 46 sobrevivientes grandes se declara en cualquier conclusión.** No se
+   puede extrapolar a la cola.
