@@ -100,6 +100,24 @@ def main():
     D["run_at"] = pd.to_datetime(D["run_at"], utc=True, format="mixed")
     D["t_ms"] = D["run_at"].astype("int64") // 10**6
 
+    # DE-SOLAPAR. Dos corridas separadas por menos de H horas comparten futuro, asi que
+    # contarlas como dos observaciones infla el n aparente — el defecto que este repo
+    # arrastra en todos lados por contar entradas solapadas como independientes. Pasa por
+    # tres vias: corridas de prueba, el cron disparado dos veces, y corridas manuales
+    # mezcladas con las automaticas. Se camina hacia adelante quedandose con la primera
+    # de cada grupo. No se borra nada de la tabla: se filtra al medir.
+    ts = sorted(pd.Series(D["run_at"].unique()))
+    quedan, ult = [], None
+    for t in ts:
+        if ult is None or (t - ult) >= pd.Timedelta(hours=H):
+            quedan.append(t)
+            ult = t
+    if len(quedan) < len(ts):
+        print(f"de-solape: {len(ts)} corridas -> {len(quedan)} "
+              f"({len(ts) - len(quedan)} descartadas por estar a menos de {H}h "
+              f"de la anterior)")
+    D = D[D["run_at"].isin(quedan)]
+
     # solo corridas con horizonte COMPLETO: truncar sesgaria hacia lo que ya se movio
     corte = pd.Timestamp.utcnow() - pd.Timedelta(hours=H + 1)
     D = D[D["run_at"] <= corte]
