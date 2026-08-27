@@ -1,22 +1,33 @@
 name: Radar (magnitud)
 
-# UNA VEZ POR DIA, y es a proposito.
+# CADA 4 HORAS, y el numero se midio, no se eligio.
 #
-# Lo que se valido en `banco/PREREGISTRO_TRANSVERSAL.md` es un rebalanceo cada 24h con
-# horizonte de 24h, y esas barras NO SE SOLAPAN. Correrlo cada hora daria 24 corridas
-# solapadas por dia: el n contado dejaria de ser el n real y el forward test heredaria
-# exactamente el defecto que el resto del repo pasa contando entradas solapadas como si
-# fueran independientes.
+# `banco/horizonte_util.py` barrio el horizonte con metricas SIN ESCALA (las unicas
+# comparables entre horizontes) y la senal es MONOTONA: mas fuerte cuanto mas corto.
+#
+#   horizonte    multiplo   tasa    t
+#        4h        1,21x   62,6%  22,6     <- gana en las tres
+#       24h        1,15x   61,3%  15,5
+#      168h        1,11x   59,6%   7,0
+#
+# Es agrupamiento de volatilidad: la informacion de un pico de actividad dura horas, no
+# dias. La primera version de este workflow corria una vez por dia porque el banco habia
+# fijado 24h al principio y nunca se cuestiono.
+#
+# La cadencia tiene que ser IGUAL al horizonte (paso = horizonte), asi las barras no se
+# solapan y el n contado es el n real. Correrlo cada hora con horizonte de 4h daria
+# corridas solapadas y el forward test heredaria el defecto que el resto del repo
+# arrastra por contar entradas solapadas como si fueran independientes.
 #
 # Si lo queres mirar mas seguido, corrélo a mano (`py -3.13 -u radar.py`). Eso no
 # ensucia nada porque no escribe a Supabase sin `--supabase`.
 on:
   workflow_dispatch:
   schedule:
-    # 00:10 UTC: la vela de 23:00-00:00 ya cerro. El cron de GitHub puede demorarse
-    # 5-15 min en horas pico y no importa: lo que tiene que ser estable es el dia,
-    # no el minuto.
-    - cron: "10 0 * * *"
+    # :10 de cada 4 horas: la vela de la hora anterior ya cerro. El cron de GitHub
+    # puede demorarse 5-15 min en horas pico y no importa para la medicion: lo que
+    # tiene que ser estable es el espaciado, no el minuto exacto.
+    - cron: "10 0,4,8,12,16,20 * * *"
 
 jobs:
   escanear:

@@ -1,5 +1,5 @@
 """
-RADAR — que monedas se van a MOVER en las proximas 24h. No dice para donde.
+RADAR — que monedas se van a MOVER en las proximas 4h. No dice para donde.
 
 Por que existe, y por que es tan chico. El screener de la raiz tiene 2.111 lineas y 233
 parametros de configuracion, y se midio que:
@@ -40,25 +40,41 @@ FAPI = "https://fapi.binance.com"
 # `banco/PREREGISTRO_TRANSVERSAL.md`, corrida 3, panel de 46 pares 2021-10 -> 2026-07,
 # 251 semanas, top-8 contra el universo de la MISMA barra:
 #
-#   n_surge      spread +1,008 ATR base | 97% de 251 semanas | p 0,0000
-#   oi_rel_168   spread +1,108 ATR base | 97% de 201 semanas | p 0,0000
-#   turnover     spread +0,953 ATR base | 96% de 251 semanas | p 0,0000
+#   n_surge      spread +0,511 ATR base | 100% de 251 semanas | t = 22,6
 #
-# En crudo (que es lo que se siente): las 8 elegidas por `n_surge` recorren 7,30% en 24h
-# contra 6,33% del universo (1,15x), y la elegida supera la mediana de su barra el 61,3%
-# de las veces contra 49,5% de linea base.
+# EL HORIZONTE ES 4h Y ESO SE MIDIO, no se eligio. La primera version de este archivo
+# usaba 24h por inercia: fue el horizonte que se fijo al principio del banco y nunca se
+# cuestiono. `banco/horizonte_util.py` lo barrio con metricas SIN ESCALA —las unicas
+# comparables entre horizontes, porque el spread crudo crece con el tiempo y la
+# consistencia semanal sube a horizontes cortos solo porque hay mas barras por semana:
 #
-# ES MODESTO Y HAY QUE DECIRLO: "se mueve ~15% mas que la tipica", no "se mueve el doble".
-CAL_MULTIPLO = 1.15
-CAL_TASA = 0.613
+#   horizonte    multiplo   tasa    t
+#        4h        1,21x   62,6%  22,6     <- el mejor en las tres
+#        8h        1,18x   62,2%  19,6
+#       24h        1,15x   61,3%  15,5
+#       72h        1,13x   59,2%   9,9
+#      168h        1,11x   59,6%   7,0
+#
+# Monotono: la senal se decae con el tiempo. Es agrupamiento de volatilidad —la
+# informacion de un pico de actividad dura horas, no dias— y ubica al radar en el
+# horizonte del DAY TRADER, no en el del swing.
+#
+# En crudo (que es lo que se siente): las 8 elegidas recorren 2,85% en 4h contra 2,37%
+# del universo (1,21x), y superan la mediana de su barra el 62,6% de las veces contra
+# 49,5% de linea base.
+#
+# ES MODESTO Y HAY QUE DECIRLO: "se mueve ~21% mas que la tipica", no "se mueve el doble".
+HORIZONTE_H = 4
+CAL_MULTIPLO = 1.21
+CAL_TASA = 0.626
 CAL_TASA_BASE = 0.495
-# Camino de 24h en unidades del ATR base, MEDIDO (mediana sobre las 251 semanas):
-#   top-8 por n_surge  5.41      universo  4.83
+# Camino de 4h en unidades del ATR base, MEDIDO (mediana sobre las 251 semanas):
+#   top-8 por n_surge  2.134     universo  1.805
 # Se usa el medido y no una cuenta propia. La primera version de este archivo hacia
 # `atr_base * 24` —multiplicar un ATR HORARIO por 24 horas— y daba disparates como
 # "BICOUSDT se mueve 104% por dia". La volatilidad no escala lineal con el tiempo, y
 # ademas `atr_base` ya es un promedio de rangos horarios, no un rango diario.
-CAL_CAMINO_ATR = 5.41
+CAL_CAMINO_ATR = 2.134
 
 # Se rankea por UNA feature, no por una combinacion. Medido en `banco/combo.py`: combinar
 # oi+n_surge+turnover gana +0,0077 contra un MDE de +-0,078, o sea ruido. Tres features
@@ -232,7 +248,7 @@ def guardar(F):
 
 def texto(F_top, k):
     F = F_top.reset_index(drop=True)
-    out = [f"RADAR — {k} monedas con mas probabilidad de MOVERSE (24h)",
+    out = [f"RADAR — {k} monedas con mas probabilidad de MOVERSE ({HORIZONTE_H}h)",
            f"{time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}",
            "",
            "NO dice direccion. Solo magnitud. Medido: las elegidas recorren "
@@ -241,7 +257,7 @@ def texto(F_top, k):
            f"(base {100*CAL_TASA_BASE:.0f}%).",
            ""]
     out.append(f"{'#':>2} {'par':<14}{'actividad':>10}{'volumen':>9}"
-               f"{'OI 7d':>8}{'ATR/h':>8}{'recorrido 24h':>14}")
+               f"{'OI 7d':>8}{'ATR/h':>8}{f'recorrido {HORIZONTE_H}h':>14}")
     out.append("-" * 69)
     for i, r in F.iterrows():
         oi = "  n/d" if pd.isna(r.oi_rel_168) else f"{100*r.oi_rel_168:+5.0f}%"
@@ -252,7 +268,7 @@ def texto(F_top, k):
             "            (es el eje del ranking: lo unico validado)",
             "OI 7d     = open interest contra su media de 7 dias (informativo)",
             "ATR/h     = rango horario tipico del par",
-            f"recorrido = distancia total esperada en 24h (maximo menos minimo),",
+            f"recorrido = distancia total esperada en {HORIZONTE_H}h (maximo menos minimo),",
             f"            = ATR/h x {CAL_CAMINO_ATR} (mediana medida del top-8).",
             "            OJO: es camino RECORRIDO, no ganancia. Puede ser todo hacia abajo."]
     return "\n".join(out)

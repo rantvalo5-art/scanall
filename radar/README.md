@@ -1,4 +1,4 @@
-# radar/ — qué monedas se van a MOVER. No para dónde.
+# radar/ — qué monedas se van a MOVER en las próximas 4h. No para dónde.
 
 ```
 py -3.13 -u radar.py                       # top-8
@@ -37,11 +37,11 @@ misma barra:
 
 | | |
 |---|---|
-| spread de `n_surge` | **+1,008 ATR base**, **97% de las 251 semanas**, p = 0,0000 |
-| recorrido en 24h de las elegidas | **7,30%** contra **6,33%** del universo → **1,15×** |
-| la elegida supera la mediana de su barra | **61,3%** de las veces (línea base 49,5%) |
+| spread de `n_surge` | **+0,511 ATR base**, **100% de las 251 semanas**, t = 22,6 |
+| recorrido en 4h de las elegidas | **2,85%** contra **2,37%** del universo → **1,21×** |
+| la elegida supera la mediana de su barra | **62,6%** de las veces (línea base 49,5%) |
 
-**Es modesto y hay que decirlo así:** *"se mueve ~15% más que la típica"*, no *"se mueve
+**Es modesto y hay que decirlo así:** *"se mueve ~21% más que la típica"*, no *"se mueve
 el doble"*. Lo que lo hace valioso no es el tamaño sino la **consistencia**: 97% de las
 semanas, y con el mismo signo en bear 2022, bull 2023-24, lateral 2024-25 y bear 2025-26,
 mientras un ranking al azar se queda en cero.
@@ -55,6 +55,28 @@ Tres features correlacionadas no son tres features.
 **`n_surge` y no `oi_rel_168`,** aunque el segundo mide 0,10 mejor (dentro del MDE):
 `n_surge` sale de los mismos klines, no necesita que el par tenga perpetuo (~20% no lo
 tiene) ni una request extra por símbolo. `oi_rel_168` se muestra al lado, informativo.
+
+**Horizonte de 4h, y se midió — no se eligió.** La primera versión usaba 24h por
+inercia: fue el horizonte que el banco fijó al principio y nunca se cuestionó.
+`banco/horizonte_util.py` lo barrió con métricas **sin escala**, que son las únicas
+comparables entre horizontes (el spread crudo crece con el tiempo, y la consistencia
+semanal sube a horizontes cortos solo porque hay más barras por semana):
+
+| horizonte | múltiplo | tasa | t |
+|---|---|---|---|
+| **4h** | **1,21×** | **62,6%** | **22,6** |
+| 8h | 1,18× | 62,2% | 19,6 |
+| 24h | 1,15× | 61,3% | 15,5 |
+| 72h | 1,13× | 59,2% | 9,9 |
+| 7d | 1,11× | 59,6% | 7,0 |
+
+Monótono: la señal **se decae con el tiempo**. Es agrupamiento de volatilidad — la
+información de un pico de actividad dura horas, no días.
+
+**Esto ubica al radar en el horizonte del day trader, no en el del swing.** No es
+ninguno de los dos: el day trader escanea cada 2 min y sostiene horas; el swing usa
+1h/4h/1d y sostiene ~7 días. El radar rebalancea cada 4h. Es un tercer horizonte, y es
+el que la medición eligió.
 
 **Ranking transversal, no umbral.** La posición de cada moneda es contra las otras **de
 este mismo instante**. Un umbral fijo mezcla "qué moneda es" con "qué hora es"; el rank
@@ -97,15 +119,14 @@ para escribir con la anon key.
 
 ### 2. El cron
 
-`.github/workflows/radar.yml` corre **una vez por día**, 00:10 UTC, y guarda el universo
-entero más manda el top-8 por Telegram. Usa los secrets que ya tenés configurados:
+`.github/workflows/radar.yml` corre **cada 4 horas** (00:10, 04:10, … UTC) y guarda el
+universo entero más manda el top-8 por Telegram. Usa los secrets que ya tenés configurados:
 `SUPABASE_KEY`, `DAY_TELEGRAM_TOKEN`, `DAY_TELEGRAM_CHAT_ID`.
 
-**Una vez por día es a propósito, no pereza.** Lo validado es un rebalanceo cada 24h con
-horizonte de 24h, y esas barras **no se solapan**. Correrlo cada hora daría 24 corridas
-solapadas por día: el n contado dejaría de ser el n real, y el forward test heredaría
-exactamente el defecto que el resto del repo arrastra por contar entradas solapadas como
-si fueran independientes.
+**La cadencia tiene que ser igual al horizonte.** Con `paso = horizonte = 4h` las barras
+no se solapan y el n contado es el n real. Correrlo cada hora con horizonte de 4h daría
+corridas solapadas, y el forward test heredaría exactamente el defecto que el resto del
+repo arrastra por contar entradas solapadas como si fueran independientes.
 
 Para mirarlo cuando quieras, corrélo a mano — sin `--supabase` no ensucia nada.
 
@@ -120,14 +141,14 @@ compara contra los números preregistrados:
 
 | | medido antes | en vivo |
 |---|---|---|
-| spread | +1,008 ATR base | ? |
-| múltiplo de camino | 1,15× | ? |
-| tasa de acierto | 61,3% | ? |
+| spread | +0,511 ATR base | ? |
+| múltiplo de camino | 1,21× | ? |
+| tasa de acierto | 62,6% | ? |
 
 **La regla de parada está escrita en `medir.py` antes de que existan datos:**
 
 - Con menos de **8 semanas** no concluye nada. La unidad independiente es la semana, no
-  la corrida: 60 corridas de 60 días seguidos no son 60 datos.
+  la corrida: 6 corridas por día durante 10 días no son 60 datos.
 - Si a las 8 semanas el spread es **≤ 0**, no replicó y el radar se apaga.
 - Entre 0 y +0,5 se reporta como **réplica débil** y sigue vivo: la primera medición de
   cualquier cosa exagera, porque se encontró mirando, y lo que se encuentra mirando es la

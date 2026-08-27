@@ -9,9 +9,9 @@ efectivamente paso con velas posteriores, y compara contra los numeros preregist
 
 Lo que se compara, y esta fijado ANTES de que existan datos:
 
-    spread     +1,008 ATR base   (el numero medido sobre 251 semanas)
-    multiplo    1,15x            (camino del top-8 / camino del universo)
-    tasa        61,3%            (veces que la elegida supera la mediana de su barra)
+    spread     +0,511 ATR base   (el numero medido sobre 251 semanas, a 4h)
+    multiplo    1,21x            (camino del top-8 / camino del universo)
+    tasa        62,6%            (veces que la elegida supera la mediana de su barra)
     linea base  49,5%
 
 REGLA DE PARADA, escrita ahora:
@@ -19,7 +19,7 @@ REGLA DE PARADA, escrita ahora:
   - Con menos de 8 SEMANAS de corridas no se concluye nada. La semana es la unidad
     independiente, no la corrida: 60 corridas de 60 dias consecutivos no son 60 datos.
   - Si a las 8 semanas el spread es <= 0, el radar no replico y se apaga.
-  - Si esta entre 0 y +0,5 (la mitad de lo medido), sigue vivo pero se reporta como
+  - Si esta entre 0 y la MITAD de lo medido, sigue vivo pero se reporta como
     "replica debil": la primera medicion de cualquier cosa exagera, porque se encontro
     mirando, y lo que se encuentra mirando es la parte alta del ruido.
   - No se toca `n_surge` ni `k` por lo que salga aca. Ajustar el screener con el
@@ -39,9 +39,11 @@ import requests
 SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
 SPOT = "https://api.binance.com"
 TABLA = "radar_runs"
-H = 24                      # horizonte, en horas — el mismo que se valido
+H = 4                       # horizonte, en horas — el mismo que se valido
+                            # (`banco/horizonte_util.py`: 4h gana en multiplo,
+                            #  tasa y t contra 8/24/72/168h)
 
-PRE_SPREAD, PRE_MULT, PRE_TASA, PRE_BASE = 1.008, 1.15, 0.613, 0.495
+PRE_SPREAD, PRE_MULT, PRE_TASA, PRE_BASE = 0.511, 1.21, 0.626, 0.495
 SEM_MIN = 8
 
 
@@ -102,7 +104,8 @@ def main():
     corte = pd.Timestamp.utcnow() - pd.Timedelta(hours=H + 1)
     D = D[D["run_at"] <= corte]
     if D.empty:
-        print("hay corridas, pero ninguna cumplio todavia las 24h de horizonte."); return
+        print(f"hay corridas, pero ninguna cumplio todavia las {H}h de horizonte.")
+        return
 
     print(f"corridas: {D.run_at.nunique()} | filas: {len(D):,} | "
           f"{D.run_at.min():%Y-%m-%d} -> {D.run_at.max():%Y-%m-%d}", flush=True)
