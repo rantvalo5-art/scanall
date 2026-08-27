@@ -562,3 +562,149 @@ un corte por régimen sobre cuatro regímenes.
    siguen vivos. No se puede extrapolar a la cola.
 3. **Es un ranking, no un backtest.** Mide el spread de un top-8 contra el universo, sin
    modelar impacto de mercado ni la operativa real de rebalancear 8 posiciones por día.
+
+---
+
+# CORRIDA 4 — BARRIDO de horizonte y k (preregistro, 2026-08-27, ANTES de correr)
+
+## La pregunta
+
+Las corridas 1-3 midieron siempre lo mismo: **comprar y mirar 24h después**, eligiendo
+**8** monedas (o 20). Si la dirección existe pero vive en otro horizonte —minutos, o una
+semana— o requiere ser mucho más selectivo, las corridas anteriores **no la habrían
+visto**. Es el último lugar barato donde puede estar escondida.
+
+## Diseño
+
+- **Horizonte** ∈ {4h, 8h, 24h, 72h, 168h}. `paso = horizonte` siempre, así que las
+  barras nunca se solapan (la propiedad que hace que el n contado sea el n real).
+- **k** ∈ {3, 8, 16}. Con 46 pares eso es 6,5% / 17% / 35% del universo.
+- **15 combinaciones × 141 rankings × 2 objetivos direccionales = 4.230 brazos.**
+- `magnitud` NO entra: ya está contestada, y meterla solo inflaría la multiplicidad
+  contra la pregunta que sí importa acá.
+
+## Multiplicidad — la parte que hace honesto un barrido
+
+Un barrido es una máquina de fabricar falsos positivos: mirás 15 configuraciones y te
+quedás con la mejor. La corrección va sobre **el barrido entero**, no por configuración:
+**Benjamini-Hochberg q=0,10 sobre los 4.230 brazos juntos.**
+
+Optimización declarada: los chequeos de concentración (`sin_top3`, `sin_top1`) se
+computan **solo para los brazos que ya pasaron signo, MDE, p de bloques y FDR**. No es
+aflojar: un brazo igual tiene que pasarlos para sobrevivir; simplemente no se gastan
+4.230 × 2 cómputos en brazos ya muertos.
+
+## Regla de parada — fijada ANTES
+
+1. **Si ningún brazo direccional sobrevive en ninguna de las 15 configuraciones** → la
+   dirección queda cerrada para esta familia completa (ranking transversal, top-k, sobre
+   precio + flujo + posicionamiento). **No se prueba un k más ni un horizonte más.** Lo
+   que quedaría vivo es otra cosa: otra resolución de datos (5m), otra fuente (libro,
+   on-chain, listados) u otra forma (banda, Δrank, multi-feature).
+2. **Si sobrevive en UNA configuración aislada y no en sus vecinas** → es ruido de
+   barrido. Un efecto real es continuo: si a 24h anda, a 20h y a 30h tiene que andar
+   parecido. Un pico solitario rodeado de ceros **se descarta**, y esto se escribe ahora
+   para no discutirlo después.
+3. **Si sobrevive en una zona contigua** (dos o más configuraciones vecinas) → es el
+   primer resultado direccional del repo. Va al corte por régimen de la §5.2 de la
+   corrida 3, con la misma exigencia: **no puede cambiar de signo entre los cuatro
+   tramos.**
+4. **El horizonte de 4h y 8h arrastran más costo por unidad de tiempo** (se rebalancea
+   6× y 3× más seguido que a 24h). Se corren a 0,20% y a 0,50% igual que todo lo demás,
+   y un sobreviviente que solo vive a 0,20% no cuenta.
+
+---
+
+# RESULTADOS DE LA CORRIDA 4 — barrido (2026-08-27)
+
+**4.140 brazos direccionales** = 141 rankings × 2 objetivos × 15 configuraciones
+(horizonte ∈ {4, 8, 24, 72, 168}h × k ∈ {3, 8, 16}). FDR q=0,10 sobre el barrido entero.
+1.241 s.
+
+## El mapa
+
+| horizonte | k=3 | k=8 | k=16 |
+|---|---|---|---|
+| 4h | −0,087 | −0,105 | −0,126 |
+| 8h | −0,056 | −0,092 | −0,120 |
+| 24h | +0,069 | −0,033 | −0,085 |
+| 72h | +0,592 | +0,225 | +0,136 |
+| 168h | +1,448 | +0,867 | +0,427 |
+
+(mejor spread de cada configuración). **Los horizontes cortos están muertos y planos.**
+A 72h y 168h aparecen spreads positivos — pero también sube la dispersión, y el control
+al azar se mueve igual: a 168h/k=3 el control da +0,065 en `corto` y −0,385 en `largo`.
+Con k=3 y ~190 semanas, un solo sorteo al azar no es línea base.
+
+**Candidatos que pasan signo + crudo + FDR sobre los 4.140: 1.**
+
+## El candidato: `tt_pos ~ sin roc_24` en CORTO
+
+`tt_pos` es el ratio long/short de las **posiciones** de los traders top. Ranquearlo alto
+= las monedas donde el dinero grande está más largo. Objetivo `corto` = medir si **bajan**.
+Traducido: *las monedas donde los traders top están más largos, caen.* Tiene mecanismo
+(el largo amontonado se liquida) y es la hipótesis contraria clásica.
+
+**No es un pico solitario** — la regla 2 no aplica. Es monótono en las dos dimensiones:
+
+| horizonte | k=3 | k=8 | k=16 |
+|---|---|---|---|
+| 4h | −0,156 | −0,153 | −0,155 |
+| 8h | −0,137 | −0,140 | −0,144 |
+| 24h | −0,056 | −0,071 | −0,113 |
+| 72h | +0,233 (p 0,029) | +0,163 (p 0,015) | −0,000 |
+| 168h | **+0,874 (p 0,0000, pasa FDR)** | +0,374 (p 0,011) | +0,118 |
+
+Y la familia es **antisimétrica**: `tt_pos [bajo]` (las más shorteadas) da **−1,092** donde
+`tt_pos` alto da +0,661. Los dos extremos se comportan al revés, que es lo que hace una
+señal monótona real y no una casualidad.
+
+## Por qué muere igual — la regla 5.2, escrita antes
+
+Contra **200 rankings al azar por tramo** (no uno solo, que es lo que hacía la primera
+auditoría y era insuficiente):
+
+| tramo | brazo | media de la nula | percentil | p circular |
+|---|---|---|---|---|
+| 2021-11 → 2022-11 bear | **sin datos** | — | — | — |
+| 2022-12 → 2024-03 bull | +1,554 | −0,187 | **100%** | 0,017 |
+| 2024-03 → 2025-08 lateral | +0,912 | −0,113 | **99%** | 0,017 |
+| **2025-08 → 2026-08 bear** | **−0,046** | −0,082 | **48%** | **0,431** |
+| TODO | +0,874 | −0,142 | 100% | 0,000 |
+
+**En el último año está exactamente en la mediana del azar.** No es que se debilita: el
+percentil 48 y p circular 0,431 son *el centro de la nula*. Funcionó 2023 → mediados de
+2025 y dejó de funcionar.
+
+Y hay tres cosas más que se acumulan en la misma dirección:
+
+1. **La cobertura de `tt_pos` no son 5 años.** 2021: 32%, **2022: 11%**, 2023: 93%,
+   2024-26: 100%. El primer bear —el tramo que habría sido la prueba independiente más
+   valiosa— **no se puede medir**. El "cuatro regímenes" de la corrida 3 no aplica a esta
+   feature: son ~3 años y dos regímenes y medio.
+2. **Depende de tres monedas.** +0,874 → +0,637 sin LTCUSDT → **+0,314 sin el top-3**.
+   Pasa la compuerta por poco y pierde el 64%.
+3. **La versión comparable entre monedas no funciona.** `tt_pos_pct` —el percentil de
+   cada moneda contra su propia historia, que es la forma correcta de comparar un ratio
+   entre monedas distintas— da −0,219 / −0,075 / +0,077 / −0,214: **nada**. Solo funciona
+   el nivel crudo. Es exactamente el síntoma que la regla 4 de la corrida 3 anticipó:
+   rankear *qué moneda es*, no *qué está pasando*.
+
+**Veredicto: MUERE.** Y muere en el peor lado posible — el tramo donde falla es **el más
+reciente**, que es el que más se parece a lo que operarías mañana.
+
+## Veredicto de la corrida 4
+
+> **Dirección: 0 de 4.140 brazos, sobre 15 configuraciones de horizonte y selectividad,
+> con precio + flujo + posicionamiento, en las dos direcciones.** El único que llegó a
+> candidato lo mató el corte por régimen que estaba escrito antes de correr.
+
+Por la regla 1: la familia queda cerrada — **ranking transversal top-k sobre precio,
+flujo del kline y posicionamiento de futuros, a horizontes de 4h a 7d.** No se prueba un
+`k` más ni un horizonte más.
+
+Lo que sigue vivo es **otra cosa**, no otra variante de esto: otra resolución (5m), otra
+fuente (libro, on-chain, listados) u otra forma (banda, Δrank, multi-feature).
+
+Y lo de la corrida 3 no se toca: **la magnitud sigue en pie, con `oi_rel_168` a la
+cabeza y aguantando los cuatro regímenes.**
