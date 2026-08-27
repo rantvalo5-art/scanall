@@ -111,6 +111,7 @@ def tablero(panel, paso=24, horizonte=24, verbose=True):
             f"efectivo dejaria de ser el contado. Subi el paso o bajá el horizonte.")
 
     H = horizonte
+    t0_grilla = min(int(df["t"].iloc[0]) for df in panel.values())
     piezas = []
     for k, (sym, df) in enumerate(panel.items(), 1):
         c = df["c"].to_numpy(float)
@@ -128,7 +129,20 @@ def tablero(panel, paso=24, horizonte=24, verbose=True):
         # Es el denominador que el ranking no puede elegir (ver el comentario abajo).
         f["atr_base"] = (pd.Series(f["atr_24"]).rolling(720, min_periods=168)
                          .median().to_numpy())
-        idx = np.arange(WARMUP, n - H, paso)
+        # GRILLA GLOBAL de tiempos, no posiciones por simbolo.
+        #
+        # `np.arange(WARMUP, n-H, paso)` cuenta barras DESDE EL PRIMER DATO DE CADA PAR.
+        # Con historiales de distinto largo las grillas no se alinean: un par que empieza
+        # en 2021 y otro en 2023 caen en horas distintas y NO COMPARTEN NINGUNA BARRA.
+        # En un diseno transversal eso no es un detalle: se rompe la seccion cruzada.
+        # Se vio con el panel de 5 anios — de 46 pares quedaban 31, y los que faltaban
+        # eran justo los de historia corta.
+        #
+        # Con el panel de un anio no pasaba porque todos los pares tenian la ventana
+        # entera, asi que las grillas posicionales coincidian por accidente.
+        en_grilla = ((t - t0_grilla) % (paso * 3600000) == 0)
+        idx = np.flatnonzero(en_grilla)
+        idx = idx[(idx >= WARMUP) & (idx < n - H)]
         if not len(idx):
             continue
 
@@ -291,14 +305,14 @@ def _spread_semanal(TB, score, k, y, costo):
     D["score"] = score.to_numpy()
     D = D[D["score"].notna() & D[y].notna() & D["atr_24"].gt(0)]
     if D.empty:
-        return None, None, None
+        return None, None, None, (np.nan, np.nan)
     # Una barra donde este score existe para pocos simbolos no da un top-k selectivo:
     # con 12 validos, un top-8 es el 67% del universo disponible, no una seleccion.
     # Importa sobre todo con derivados, donde la cobertura por par es despareja.
     vivos = D.groupby("t")["score"].transform("count")
     D = D[vivos >= max(MIN_SYMS, 2 * k)]
     if D.empty:
-        return None, None, None
+        return None, None, None, (np.nan, np.nan)
 
     # top-k por barra
     D = D.sort_values(["t", "score"], ascending=[True, False], kind="mergesort")
@@ -326,7 +340,7 @@ def _spread_semanal(TB, score, k, y, costo):
 
     por_barra = (top - uni).dropna()
     if por_barra.empty:
-        return None, None, None
+        return None, None, None, (np.nan, np.nan)
 
     # aporte de cada simbolo al spread (para el chequeo de concentracion)
     S = D[sel].copy()

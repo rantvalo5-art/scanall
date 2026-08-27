@@ -474,3 +474,91 @@ Nula corrida primero para el MDE.
    moneda. Se exige `sin_top3` y `sin_top1` positivos, que ya están cableados.
 5. **El universo de 46 sobrevivientes grandes se declara en cualquier conclusión.** No se
    puede extrapolar a la cola.
+
+---
+
+# RESULTADOS DE LA CORRIDA 3 — derivados (2026-08-27)
+
+Panel `deriv46`, **2021-10-14 → 2026-07-31** (el tablero arranca ahí: antes no hay 30
+pares con perp y la guarda de sección cruzada tira esas barras). **70.899 filas · 1.752
+barras · 46 pares · 251 semanas.** `k=8`, paso 24h, horizonte 24h, sin solape.
+Cobertura de derivados: **93,6%** de las filas. **141 rankings × 3 objetivos = 423
+brazos.** MDE ±0,062 ATR (contra ±0,102 de la corrida 2: 251 semanas rinden).
+
+## Dos bugs corregidos, y el segundo solo aparece con historiales desparejos
+
+1. Retornos tempranos de `_spread_semanal` con 3 valores tras haber pasado a 4.
+2. **La grilla de muestreo era POSICIONAL por símbolo.** `np.arange(WARMUP, n-H, paso)`
+   cuenta barras desde el primer dato *de cada par*: un par que empieza en 2021 y otro
+   en 2023 caen en horas distintas y **no comparten ninguna barra**. En un diseño
+   transversal eso destruye la sección cruzada — de 46 pares quedaban **31**, y los que
+   faltaban eran justo los de historia corta. Con el panel de un año no se veía porque
+   todos tenían la ventana entera y las grillas coincidían por accidente. Ahora la
+   grilla es **global en tiempo**.
+
+## Dirección: 0 de 276, y ahora el negativo es fuerte
+
+138 brazos en `largo` + 138 en `corto`. **Ninguno con spread positivo.** El mejor de los
+276 es `rango_168` en largo con **−0,033**, contra un control al azar de −0,171.
+
+Y esta vez incluye lo que faltaba:
+
+- **posicionamiento** (`tt_cuentas`, `tt_pos`, `ls_cuentas`, `taker`, sus cambios a 24h y
+  sus percentiles propios) — el insumo clásico de una señal contraria direccional,
+- **las dos direcciones** de cada uno,
+- **251 semanas y cuatro regímenes**, no 49 semanas de un bear,
+- y **93,6% de cobertura** de una fuente que no es precio.
+
+Los brazos de posicionamiento aparecen en el top-8 de `largo` — `tt_cuentas [bajo]`,
+`ls_cuentas [bajo]`, `tt_pos [bajo]`— y **todos con spread negativo**. Que estén arriba
+del resto y aun así por debajo de cero es lo más parecido a una señal que hay, y no
+alcanza ni de lejos.
+
+## Magnitud: 38 sobrevivientes — y el mejor NO es precio
+
+| ranking | fuente | spread | crudo | sem>0 | p |
+|---|---|---|---|---|---|
+| **`oi_rel_168`** | **OI de futuros** | **+1,108** | +0,0136 | **97%** | 0,0000 |
+| `n_surge` | flujo del kline | +1,008 | +0,0139 | 97% | 0,0000 |
+| `turnover` | flujo del kline | +0,953 | +0,0120 | 96% | 0,0000 |
+| `roc_168` | precio | +0,952 | +0,0156 | 90% | 0,0000 |
+| **`oi_chg_24h`** | **OI de futuros** | +0,781 | +0,0106 | 94% | 0,0000 |
+| `atr_24` | precio | +0,727 | +0,0335 | 80% | 0,0000 |
+
+**`oi_rel_168` —el open interest contra su propio nivel de la semana— le gana a todas
+las features de precio.** Es información que no está en la vela, y es el mejor predictor
+de movimiento del repo.
+
+## El corte por régimen — el que decide si esto vale algo
+
+Spread de magnitud por tramo (en ATR base, top-8 contra el universo de la misma barra):
+
+| brazo | 2021-11→2022-11 bear | 2022-12→2024-03 bull | 2024-03→2025-08 lateral | 2025-08→2026-08 bear | TODO |
+|---|---|---|---|---|---|
+| `oi_rel_168` | **+1,298** | **+1,092** | **+0,872** | **+1,389** | +1,108 |
+| `oi_chg_24h` | +0,932 | +0,781 | +0,626 | +0,939 | +0,781 |
+| `n_surge` | +0,770 | +1,150 | +0,805 | +1,355 | +1,008 |
+| `turnover` | +0,722 | +1,108 | +0,796 | +1,207 | +0,953 |
+| `roc_168` | +0,560 | +1,091 | +0,809 | +1,371 | +0,952 |
+| `atr_24` | +0,505 | +0,770 | +0,488 | +1,174 | +0,727 |
+| **CONTROL azar** | −0,099 | +0,064 | −0,046 | −0,006 | −0,020 |
+
+**Mismo signo en los cuatro tramos, magnitud parecida, y el control al azar clavado en
+cero.** El tramo 2022-12 → 2024-03 es el bull grande (BTC de ~16k a ~73k), así que esto
+no es un artefacto de mercado bajista. Es la primera vez que algo de este repo sobrevive
+un corte por régimen sobre cuatro regímenes.
+
+## El veredicto de la corrida 3
+
+> **La dirección no aparece por ningún lado: 0 de 276 brazos, con posicionamiento
+> incluido, las dos direcciones, cinco años y cuatro regímenes. Y la magnitud sí, es
+> robusta, y su mejor predictor no sale del precio.**
+
+## Lo que sigue faltando, dicho sin adornos
+
+1. **El instrumento.** §8.3 sigue en pie: sin convexidad, la magnitud no se cobra, y
+   sintetizarla con órdenes stop ya está cerrado.
+2. **El universo son 46 sobrevivientes grandes** — los que tienen perp desde 2021 y
+   siguen vivos. No se puede extrapolar a la cola.
+3. **Es un ranking, no un backtest.** Mide el spread de un top-8 contra el universo, sin
+   modelar impacto de mercado ni la operativa real de rebalancear 8 posiciones por día.
