@@ -33,7 +33,23 @@ from klines import load_panel, to_ms
 
 INICIO = "2025-08-01"
 FIN = "2026-08-01"
-COSTO_PCT = 0.20          # spot taker ida+vuelta (0,10% por lado). SIN slippage.
+# OJO: 0,20% es SOLO el fee taker (0,10% por lado). NO incluye spread ni slippage,
+# y por eso es OPTIMISTA. Se midio el costo real caminando el libro (`libro.py`,
+# 2026-08-26, 480 pares USDT spot vivos, round trip completo):
+#
+#   banda          orden $1k   orden $10k     win rate necesario (target/stop 8%)
+#   rank 1-50        0,230%      0,279%          51,44%  /  51,74%
+#   rank 51-200      0,339%      0,597%          52,12%  /  53,73%
+#   rank 201-400     0,441%      0,994%          52,76%  /  56,21%
+#   rank 401-600     0,524%      1,261%          53,28%  /  57,88%
+#
+# O sea entre 1,5x y 6,3x este numero. Se DEJA en 0,20 a proposito: cambiarlo
+# rompe la comparabilidad con todo lo ya medido, y como todas las familias
+# cerradas se cerraron contra un costo demasiado BARATO, subirlo solo las mata
+# mas — ningun negativo previo se da vuelta. Pero para cualquier resultado
+# POSITIVO, o para cualquier cosa fuera del top-200, usar la tabla de arriba:
+# con 0,20 el umbral esta ~0,7 pp demasiado bajo.
+COSTO_PCT = 0.20
 MS_DIA = 86400000
 
 
