@@ -290,3 +290,101 @@ ATR: la volatilidad es persistente y eso ya está en el precio, gratis.
 - **Consecuencia accionable**: cualquier producto que salga de acá tiene que cobrar
   **ancho de camino**, no dirección — y el repo ya cerró la vía de sintetizar convexidad
   con órdenes stop. Sin instrumento convexo, esto no es operable.
+
+---
+
+# CORRIDA 2 — el espacio que la corrida 1 no cubrió (2026-08-27)
+
+La corrida 1 se presentó como si cerrara "el ranking transversal". **No lo hacía.**
+Cubría una celda: OHLC × 1h × top-k × k=20 × 24h × spot. Tres agujeros concretos,
+todos corregidos acá:
+
+## Agujero 1 — solo se rankeó DESCENDENTE
+
+`_spread_semanal` toma siempre los k más **altos**. "Los k más bajos de X" es una
+selección **distinta**, no su espejo. La corrida 1 probó 23 rankings creyendo que cubría
+23 ideas: cubría **23 de 46**. Ahora `scores(ambas=True)` genera las dos direcciones.
+
+## Agujero 2 — se usó OHLC teniendo el panel ANCHO cacheado
+
+412 archivos `_v2` en `.kline_cache/` con `o, v, qv, n, vb`. **`vb` es el volumen taker
+comprador: la única variable del kline que no es precio**, y el docstring de `klines.py`
+ya decía que el banco nunca la pudo probar. Se agregaron 6 features de flujo
+(`desbal`, `desbal_24`, `desbal_168`, `ticket_rel`, `turnover`, `n_surge`).
+
+**73 rankings × 3 objetivos = 219 brazos**, contra 69 de la corrida 1.
+
+## Agujero 3 — el normalizador, corregido por segunda vez
+
+La corrida 1 dividía por `atr_24` y agregó el chequeo del signo crudo. Insuficiente: el
+`atr_ratio` comparaba contra el **universo**, y eso no ve cuando un ranking elige un
+momento quieto **del propio símbolo**. Medido:
+
+| ranking | ATR/universo | **ATR/PROPIO** | magnitud cruda |
+|---|---|---|---|
+| CONTROL azar | 1,01 | 1,00 | +0,0019 |
+| `compresion [bajo]` | 0,96 *(parece limpio)* | **0,93** | **+0,0011** ← peor que el azar |
+| `atr_24` | 1,94 | 1,67 | +0,0588 |
+
+`compresion` está **definida** como `vol_24/vol_168`, así que rankearla por lo bajo
+deprime el denominador por construcción. Había dado 4 "sobrevivientes" y al menos uno
+era falso.
+
+**Corrección v3**: se normaliza por `atr_base` — la **mediana móvil de 30 días** del ATR
+del propio símbolo. Es pasado (sin lookahead) y el ranking **no la puede mover eligiendo
+un momento**: para moverla tendría que elegir otro símbolo, que es justo la decisión que
+se quiere medir. Se conservan las tres vistas (base, cruda, y los dos `atr_ratio`).
+
+---
+
+# RESULTADOS DE LA CORRIDA 2 — el resultado se parte en dos, limpio
+
+| objetivo | brazos | spread ≤ 0 | artefacto | **SOBREVIVEN** |
+|---|---|---|---|---|
+| **largo** | 70 | **70** | 0 | **0** |
+| **corto** | 70 | **70** | 0 | **0** |
+| **magnitud** | 70 | 12 | 22 | **28** |
+
+## Dirección: 0 de 140, y ni uno solo con spread positivo
+
+Las dos direcciones, 35 rankings cada una, incluidas las de flujo y las residualizadas.
+**Ningún brazo tiene spread positivo.** El mejor de los 140 es `roc_168` en largo con
+−0,024. No es "murió en una compuerta": **no hay ni un candidato**.
+
+Esto ahora sí es fuerte, porque cubre lo que la corrida 1 no cubría: las dos direcciones,
+el order flow del kline, y con un normalizador que el ranking no puede elegir.
+
+## Magnitud: 28 sobrevivientes, y `atr_24` era un falso negativo
+
+Con el normalizador corregido, `atr_24` pasa de **−0,98** (corrida 1, circular) a
+**+2,33** con 96% de semanas y p=0,0000. El falso negativo que sospechábamos era real.
+
+| ranking | spread | crudo | sem>0 | p |
+|---|---|---|---|---|
+| `roc_168` | +2,812 | +0,0331 | 98% | 0,0000 |
+| **`turnover`** | +2,650 | +0,0274 | **100%** | 0,0000 |
+| **`n_surge`** | +2,566 | +0,0284 | 98% | 0,0000 |
+| `roc_72` | +2,551 | +0,0328 | 98% | 0,0000 |
+| `atr_24` | +2,334 | +0,0583 | 96% | 0,0000 |
+
+**`turnover` y `n_surge` son features de FLUJO** — de las que se agregaron hoy y el banco
+nunca había probado. `turnover` acierta en **49 de 49 semanas**.
+
+## Lectura
+
+> **Predecir CUÁNTO se va a mover una moneda respecto de su propia línea base funciona,
+> y funciona robusto: 28 rankings, 94-100% de las semanas, sobreviven concentración y
+> FDR. Predecir HACIA DÓNDE no funciona: 0 de 140, sin un solo candidato.**
+
+Es la misma frase de siempre, pero por primera vez con las dos mitades **medidas en el
+mismo diseño**, con las dos direcciones corridas y sin normalizador manipulable.
+
+## Lo que NO se puede concluir todavía
+
+1. **Los 28 son in-sample.** Ventana única, régimen único (bear). La §6 sigue vigente:
+   reserva OOS 2024-08 → 2025-08, **sin tocar**.
+2. **La magnitud sigue sin instrumento.** §8.3 del preregistro: sin convexidad no se
+   cobra, y el repo ya cerró sintetizarla con órdenes stop.
+3. **Sigue siendo UNA celda del espacio.** Falta: 5m (200 archivos cacheados), 4h/1d,
+   derivados (`.metrics_cache/`, 5 años, 6 columnas y ninguna es precio), barridos de `k`
+   y de horizonte, bandas, Δrank y combinaciones multi-feature.

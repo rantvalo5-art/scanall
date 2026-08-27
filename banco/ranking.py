@@ -64,6 +64,36 @@ WARMUP = 720         # roc_720 necesita 30d de historia; igual que movers.py
 
 
 # ------------------------------------------------------------------ el tablero
+def _feat_flujo(df):
+    """Features de FLUJO. Solo existen en el panel ANCHO (`load_panel(..., full=True)`).
+
+    `vb` es el volumen taker COMPRADOR: lo mas parecido a order flow que hay en una
+    vela, y la unica variable del kline que no es precio. El banco lo tenia cacheado
+    (412 archivos `_v2`) y nunca lo puso en un ranking transversal.
+
+    Todo mira solo al pasado.
+    """
+    v = df["v"].to_numpy(float)
+    vb = df["vb"].to_numpy(float)
+    qv = df["qv"].to_numpy(float)
+    nt = df["n"].to_numpy(float)
+    out = {}
+    with np.errstate(invalid="ignore", divide="ignore"):
+        # desbalance agresor: -1 = todo vendedor, +1 = todo comprador, 0 = parejo
+        des = np.where(v > 0, (2.0 * vb - v) / v, np.nan)
+        out["desbal"] = des
+        out["desbal_24"] = pd.Series(des).rolling(24).mean().to_numpy()
+        out["desbal_168"] = pd.Series(des).rolling(168).mean().to_numpy()
+        # tamano de ticket RELATIVO a su propia historia (el absoluto solo mide tamano
+        # de la moneda, que transversalmente seria rankear por capitalizacion)
+        tk = pd.Series(np.where(nt > 0, qv / nt, np.nan))
+        out["ticket_rel"] = (tk / tk.rolling(168).median()).to_numpy()
+        s_qv, s_n = pd.Series(qv), pd.Series(nt)
+        out["turnover"] = (s_qv / s_qv.rolling(168).median()).to_numpy()
+        out["n_surge"] = (s_n / s_n.rolling(168).median()).to_numpy()
+    return out
+
+
 def tablero(panel, paso=24, horizonte=24, verbose=True):
     """Una fila por (simbolo, barra): features del PASADO + resultado del FUTURO.
 
@@ -92,6 +122,12 @@ def tablero(panel, paso=24, horizonte=24, verbose=True):
             continue
 
         f = _feat_simbolo(df)
+        if "vb" in df.columns:          # panel ANCHO: sumar las features de flujo
+            f = {**f, **_feat_flujo(df)}
+        # linea base de volatilidad del simbolo: mediana movil de 30d, SOLO pasado.
+        # Es el denominador que el ranking no puede elegir (ver el comentario abajo).
+        f["atr_base"] = (pd.Series(f["atr_24"]).rolling(720, min_periods=168)
+                         .median().to_numpy())
         idx = np.arange(WARMUP, n - H, paso)
         if not len(idx):
             continue
@@ -116,11 +152,27 @@ def tablero(panel, paso=24, horizonte=24, verbose=True):
         raise RuntimeError("panel vacio o demasiado corto para el warmup pedido")
     TB = pd.concat(piezas, ignore_index=True)
 
-    # normalizacion por ATR del propio simbolo. La seccion 8B de PREREGISTRO_RANKING
-    # midio que ~87% de cualquier efecto crudo es ESCALA: los brazos "ganadores" se
-    # movian 40-45% menos y con deriva base negativa eso acerca la mediana a cero por
-    # mecanica, sin ninguna ventaja. En unidades de ATR ese artefacto no existe.
-    atr = TB["atr_24"].replace(0, np.nan)
+    # NORMALIZADOR. La seccion 8B de PREREGISTRO_RANKING midio que ~87% de cualquier
+    # efecto crudo es ESCALA, asi que hay que normalizar. Pero POR QUE se normaliza
+    # decide el resultado, y aca hubo que corregirlo dos veces:
+    #
+    #   v1: dividir por `atr_24`. MAL. `atr_24` es una de las features que se rankean:
+    #       el ranking elige su propio denominador. Dio 2 falsos positivos y 4 falsos
+    #       negativos (ver PREREGISTRO_TRANSVERSAL, corrida 1).
+    #   v2: agregar el chequeo del signo crudo. Mejor, pero insuficiente: comparaba el
+    #       ATR de la seleccion contra el UNIVERSO, y eso no ve cuando un ranking elige
+    #       un momento quieto DEL PROPIO SIMBOLO. `compresion` esta definida como
+    #       vol_24/vol_168, o sea que rankearla por lo bajo deprime el denominador por
+    #       construccion: atr/universo 0,96 (parece limpio) contra atr/propio 0,93.
+    #   v3, la de ahora: dividir por `atr_base`, la mediana movil de 30d del propio
+    #       ATR. Es PASADO (no hay lookahead) y el ranking no la puede mover eligiendo
+    #       un momento: para moverla tendria que elegir un simbolo distinto, que es
+    #       justamente la decision que queremos medir.
+    #
+    # Se conservan las tres vistas: `y_*` (normalizada por la base), `y_*_crudo` (sin
+    # normalizar) y el `atr_ratio` de diagnostico. Un brazo tiene que dar el mismo signo
+    # en las dos primeras.
+    atr = TB["atr_base"].replace(0, np.nan)
     TB["y_largo"] = TB["ret"] / atr
     TB["y_corto"] = -TB["ret"] / atr
     TB["y_magnitud"] = (TB["runup"] - TB["caida"]) / atr
@@ -166,7 +218,7 @@ def _z(s):
     return (s - s.mean()) / sd if sd and np.isfinite(sd) else s * 0.0
 
 
-def scores(TB, neutralizar="roc_24"):
+def scores(TB, neutralizar="roc_24", ambas=True):
     """{nombre: serie} con los rankings a probar.
 
     Incluye la version RESIDUALIZADA de cada uno contra el momentum reciente. Ese es
@@ -178,10 +230,13 @@ def scores(TB, neutralizar="roc_24"):
     La residualizacion es una regresion transversal POR BARRA: con ambos lados
     z-scoreados dentro de la barra, beta = correlacion de esa barra.
     """
-    crudos = ["atr_24", "vol_24", "vol_168", "rango_168",
+    precio = ["atr_24", "vol_24", "vol_168", "rango_168",
               "roc_24", "roc_72", "roc_168", "roc_720",
               "compresion", "dd_168", "dd_720", "pos_168"]
-    crudos = [c for c in crudos if c in TB.columns]
+    flujo = ["desbal", "desbal_24", "desbal_168",
+             "ticket_rel", "turnover", "n_surge"]
+    crudos = [c for c in precio + flujo if c in TB.columns]
+    crudos = [c for c in crudos if c != "atr_base"]
 
     S = {}
     for c in crudos:
@@ -195,6 +250,13 @@ def scores(TB, neutralizar="roc_24"):
         beta = (za * zb).groupby(TB["t"]).transform("mean")
         S[f"{c} ~ sin {neutralizar}"] = za - beta * zb
 
+    # LAS DOS DIRECCIONES. `_spread_semanal` toma siempre los k mas ALTOS, asi que sin
+    # esto la mitad del espacio queda sin correr: "los k mas bajos de X" es una seleccion
+    # distinta de "los k mas altos", NO su espejo. La primera corrida (2026-08-27) probo
+    # 23 rankings creyendo que cubria 23 ideas, y cubria 23 de 46.
+    if ambas:
+        for c in list(S):
+            S[f"{c} [bajo]"] = -S[c]
     return S
 
 
@@ -218,7 +280,7 @@ def _spread_semanal(TB, score, k, y, costo):
     seleccionados de esa barra.
     """
     y_crudo = f"{y}_crudo"
-    D = TB[["t", "sym", "semana", "atr_24", y, y_crudo]].copy()
+    D = TB[["t", "sym", "semana", "atr_24", "atr_base", y, y_crudo]].copy()
     D["score"] = score.to_numpy()
     D = D[D["score"].notna() & D[y].notna() & D["atr_24"].gt(0)]
     if D.empty:
@@ -231,7 +293,7 @@ def _spread_semanal(TB, score, k, y, costo):
 
     uni = D.groupby("t")[y].mean()
     top = D[sel].groupby("t")[y].mean()
-    atr_sel = D[sel].groupby("t")["atr_24"].median()
+    atr_sel = D[sel].groupby("t")["atr_base"].median()
     if costo:
         top = top - (costo / 100.0) / atr_sel
 
@@ -243,7 +305,10 @@ def _spread_semanal(TB, score, k, y, costo):
     crudo = (top_c - uni_c).dropna()
 
     # cuanto mas (o menos) volatil es lo que elige este ranking que el universo
-    ratio = float((atr_sel / D.groupby("t")["atr_24"].median()).mean())
+    # dos diagnosticos: contra el universo y contra la propia linea base
+    ratio = float((D[sel].groupby("t")["atr_24"].median()
+                   / D.groupby("t")["atr_24"].median()).mean())
+    ratio_propio = float((D[sel]["atr_24"] / D[sel]["atr_base"]).median())
 
     por_barra = (top - uni).dropna()
     if por_barra.empty:
@@ -257,7 +322,7 @@ def _spread_semanal(TB, score, k, y, costo):
     sem_de = D.groupby("t")["semana"].first()
     sem = por_barra.groupby(sem_de.reindex(por_barra.index)).mean()
     sem_crudo = crudo.groupby(sem_de.reindex(crudo.index)).mean()
-    return sem, aporte, sem_crudo, ratio
+    return sem, aporte, sem_crudo, (ratio, ratio_propio)
 
 
 def _p_bloques(sem, reps=REPS, seed=0):
@@ -282,7 +347,7 @@ def evaluar(TB, score, nombre, objetivo="largo", k=20, costo=COSTO_PCT):
     # la magnitud no es una posicion: no se le descuenta costo (ver preregistro §3.7)
     c = 0.0 if objetivo == "magnitud" else costo
 
-    sem, aporte, sem_crudo, ratio = _spread_semanal(TB, score, k, y, c)
+    sem, aporte, sem_crudo, ratios = _spread_semanal(TB, score, k, y, c)
     fila = {"ranking": nombre, "objetivo": objetivo}
     if sem is None or len(sem) < SEM_N_MIN:
         fila.update(semanas=0 if sem is None else len(sem), spread=np.nan, p=1.0,
@@ -295,7 +360,8 @@ def evaluar(TB, score, nombre, objetivo="largo", k=20, costo=COSTO_PCT):
     fila["sem_ok"] = float((sem > 0).mean())
     fila["p"] = _p_bloques(sem) if sem.mean() > 0 else 1.0
     fila["spread_crudo"] = float(sem_crudo.mean())
-    fila["atr_ratio"] = ratio          # <1 = elige nombres mas quietos que el universo
+    fila["atr_ratio"] = ratios[0]        # <1 = mas quieto que el UNIVERSO
+    fila["atr_propio"] = ratios[1]       # <1 = momento quieto del PROPIO simbolo
 
     # concentracion: recomputar SIN los simbolos que mas aportan (no pueden ser elegidos)
     for etiq, cuantos in (("sin_top3", TOP_N), ("sin_top1", 1)):
@@ -435,12 +501,15 @@ def main():
     ap.add_argument("--costo", type=float, default=COSTO_PCT)
     ap.add_argument("--q", type=float, default=Q_FDR)
     ap.add_argument("--pin", default="base200")
+    ap.add_argument("--angosto", action="store_true",
+                    help="panel solo-OHLC (sin las features de flujo)")
     ap.add_argument("--nula", action="store_true",
                     help="SOLO los controles al azar: calcula el MDE y sale")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
 
-    panel = load_panel(a.inicio, a.fin, n=a.pares, pin=a.pin)
+    panel = load_panel(a.inicio, a.fin, n=a.pares, pin=a.pin,
+                       full=not a.angosto)
     if not panel:
         print("FATAL: no se pudo cargar el panel"); sys.exit(1)
 
