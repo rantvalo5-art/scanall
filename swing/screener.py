@@ -786,8 +786,7 @@ def main():
                 continue
 
             # classify recibe el dict {tf: features}; requiere 1h/4h/1d (1w opcional, fail-safe).
-            alert = classify(symbol, per_symbol[symbol], CFG, counts_history,
-                             regime_up=regime_up)
+            alert = classify(symbol, per_symbol[symbol], CFG, counts_history)
             processed.add(symbol)
             if not alert:
                 continue
