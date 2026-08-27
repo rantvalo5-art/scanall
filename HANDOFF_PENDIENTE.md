@@ -1,4 +1,8 @@
-# HANDOFF — todo lo que queda por hacer
+# HANDOFF — todo lo que queda por hacer  ·  **VENCIDO**
+
+> ⚠️ **Este handoff quedó CERRADO ENTERO el 2026-08-26** (sección 1 adjudicada, 4.1 y
+> 4.3 cerradas). El punto de entrada ahora es **`HANDOFF_SIGUIENTE.md`**, que tiene las
+> cinco direcciones que quedan. Esto se conserva como registro de lo medido.
 
 > Escrito el **2026-08-26**. Este es el **único punto de entrada**: los handoffs anteriores
 > (`HANDOFF_UNLOCKS.md`, `HANDOFF_SENALES.md`, `HANDOFF_BASIS.md`, `HANDOFF_CIERRE.md`)
