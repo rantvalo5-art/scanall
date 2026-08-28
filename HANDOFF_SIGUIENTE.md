@@ -1,7 +1,8 @@
 # HANDOFF — las cinco direcciones que quedan
 
 > Escrito el **2026-08-26**, **actualizado el 2026-08-27** (ver sección 0.5: la sesión
-> del 27 cerró 4.1, respondió parte de 4.2 y produjo lo primero que sobrevivió).
+> del 27 cerró 4.1, respondió parte de 4.2 y produjo lo primero que sobrevivió) y
+> **el 2026-08-28** (la corrida 5 cerró **4.2** entero: ver §0.6).
 > Este reemplaza a `HANDOFF_PENDIENTE.md` como **punto de entrada**: aquel quedó con TODAS sus secciones cerradas (1, 4.1 y 4.3) y sirve ya
 > solo como registro. Los anteriores (`HANDOFF_UNLOCKS.md`, `HANDOFF_SENALES.md`,
 > `HANDOFF_BASIS.md`, `HANDOFF_CIERRE.md`) son históricos.
@@ -135,6 +136,72 @@ Los dos se venían arrastrando sin examinar, y los dos cambiaron al medirlos:
 
 ---
 
+## 0.6. ESTADO AL 2026-08-28 — la corrida 5 cerró 4.2
+
+**Se midió el instrumento, no una feature más.** Cuatro paneles sobre la misma ventana,
+la misma nula y las mismas seis compuertas, cambiando de a una cosa por vez:
+
+| panel | qué es | sobrevivientes direccionales |
+|---|---|---|
+| **S** | spot, `base200` (réplica de la corrida 2) | **0** de 140 |
+| **SF** | spot, los mismos 172 nombres que tienen perp | **0** de 140 |
+| **FS** | **perp** de esos mismos nombres, fee 0,10% + funding | **2** de 148 a 0,10% → **0** a 0,50% |
+| **F200** | **perp**, top-200 por volumen de perp | **2** de 148 a 0,10% → **0** a 0,50% |
+
+### La descomposición, que es el resultado
+
+Promediando los **140 brazos direccionales** (no el mejor, el promedio):
+
+| qué cambia | cuánto mueve el spread |
+|---|---|
+| limpiar el universo (sacar lo que no es cripto) | **+0,047 ATR** |
+| abaratar el fee de 0,20% a 0,10% | **+0,077 ATR** — exactamente el término aritmético de costo |
+| **cambiar la serie de spot al PERPETUO** | **+0,004 ATR — cero** |
+
+> **El perpetuo ordena igual que el spot.** Lo único que aporta es el fee a la mitad, que
+> mueve todos los brazos por igual: eso no es ventaja, es una vara más baja. La frase
+> *"abaratar el trading baja la vara, no resucita nada"* pasó de opinión a número.
+
+### Tres cosas más que cayeron con 4.2
+
+1. **El lado corto: cero.** Ninguno de los 4 candidatos es corto; **ningún brazo corto
+   sobrevivió en ningún panel a ningún costo.** Y eso era *la mitad del caso de 4.2* — el
+   repo encontraba señales cortas y decía no tener instrumento. Con el instrumento puesto,
+   y con el funding jugando **a favor** del corto (+0,0161%/24h ≈ **5,9% anualizado**), no
+   ordenó nada.
+2. **`carry_acum` (el funding como ranking, no como costo)**: no sobrevive en ningún panel
+   a ningún costo. Muere en FDR en el mejor caso.
+3. **Los 4 candidatos no mueren por ser cero: mueren porque el efecto TIENE EL TAMAÑO DEL
+   COSTO.** Cruzan cero entre **31 y 46 bps** ida y vuelta, y el costo real medido del §2.3
+   es 23-28 bps (rank 1-50) y 34-60 bps (rank 51-200). Caen *dentro* de la banda.
+
+### Lo único que 4.2 deja abierto — y es barato
+
+**El libro del PERPETUO no está medido.** `banco/libro.py` camina `api.binance.com`, o
+sea spot. Si el perp de los top-200 ejecuta por debajo de **~30 bps** ida y vuelta
+*incluido spread y slippage*, los 4 candidatos vuelven a estar vivos y hay que correrles
+el corte por régimen y la reserva OOS. Si ejecuta por arriba, quedan cerrados del todo.
+Es **una medición de un rato**: apuntar `libro.py` a `fapi.binance.com/fapi/v1/depth`.
+
+### ⚠️ Un defecto de `base200` que aparecería en cualquier corrida futura
+
+**26 de los 200 símbolos de `base200` no tienen perpetuo, y 16 de esos 26 no son cripto:**
+7 stablecoins y FX (`USD1`, `RLUSD`, `EURI`, `FDUSD`, `EUR`, `BFUSD`, `XUSD`) y 9
+**acciones tokenizadas** (sufijo `B`: `QQQB`, `SPYB`, `AAPLB`, `NVDAB`, `CRCLB`…), que ni
+cotizan los fines de semana.
+
+Su `atr_base` es de **0,013-0,018%** contra ~2% de una alt: **cien veces más quietas**. Son
+el 9,1% del universo y se llevan **37-44% de los cupos del top-20** de cualquier ranking
+que seleccione "lo quieto" (`vol_24 [bajo]` 44,3%, `atr_24 [bajo]` 43,1%, `dd_720` 36,9%).
+
+El sesgo **empuja hacia abajo** el spread de esa familia, o sea que pudo producir **falsos
+negativos** en las corridas 1, 2 y 4. **La corrida 5 lo re-testeó sin querer y la
+conclusión se sostiene** (`SF@0,20` = la corrida 2 con el universo limpio, 0
+sobrevivientes igual). Pero de acá en adelante: **filtrar el universo por clase de activo,
+no solo por volumen.**
+
+---
+
 ## 1. Estado del repo al cerrar la sesión
 
 **Nada mergeado. Tres ramas vivas:**
@@ -176,6 +243,7 @@ regenerables** tras la purga de 30 días).
 | Swing | sin ventaja; el defecto es el timing de entrada |
 | **Ranking transversal, DIRECCION** | **0 de 4.140** (27-ago) — precio + flujo + posicionamiento, las dos direcciones, 4h a 7d, k 3/8/16, 5 años, 4 regímenes |
 | **Market making en spot (4.1)** | **cerrado por comisión** (27-ago) — spread realizado 0,0133% contra un fee de 0,0750%; tampoco cruza el de futuros (0,0200%) |
+| **El INSTRUMENTO: perpetuos (4.2)** | **cerrado** (28-ago) — la serie del perp ordena igual que la de spot (**+0,004 ATR** de diferencia media sobre 140 brazos); el lado corto en cero con el instrumento puesto; el funding como señal muere en FDR. Ver §0.6 |
 
 ### 2.2 EL PATRÓN, que es lo más valioso de todo esto
 
@@ -262,6 +330,16 @@ la cola por volátil y no por ilíquida. **Medir el libro, no estimarlo.**
 > **Generar ancho, no pre-filtrar.** Las compuertas son sobre conclusiones, no sobre
 > explorar. El harness mata barato; el prior propio no aporta.
 
+> **El universo se filtra por CLASE DE ACTIVO, no solo por volumen.** `base200` es el
+> top-200 por volumen y por eso arrastra 7 stablecoins y 9 acciones tokenizadas: 9,1% del
+> universo que se lleva **37-44% de los cupos** de cualquier ranking que elija "lo quieto"
+> (§0.6). Un instrumento con ATR cien veces menor no compite en el mismo ranking.
+
+> **Cuando cambian tres cosas a la vez, se corren los paneles intermedios.** La corrida 5
+> vio un salto de +0,41 ATR entre spot y perp y parecía el instrumento; partido en
+> universo / costo / serie, el instrumento aportaba **+0,004**. Sin el panel intermedio
+> —spot sobre exactamente los mismos símbolos— eso se publicaba como hallazgo.
+
 > **Ojo con el denominador entre corridas.** La composición depende del período: el
 > mismo replay da ratio 0,84 en 56 días y 0,35 en 7. Entre ventanas distintas solo son
 > comparables **multiplicadores**.
@@ -270,8 +348,14 @@ la cola por volátil y no por ilíquida. **Medir el libro, no estimarlo.**
 
 ## 4. LAS CINCO DIRECCIONES
 
-Ordenadas por lo que yo haría. Las dos primeras salen directamente de lo medido hoy y
-no necesitan datos nuevos.
+Ordenadas por lo que yo haría. **Las dos primeras están cerradas** (4.1 el 27-ago, 4.2 el
+28-ago) y quedan como registro. **Vivas: 4.3, 4.4 y 4.5** — las tres necesitan una fuente
+de datos nueva o un instrumento que puede no existir, que es exactamente por qué estaban
+después de las otras dos.
+
+> **Antes de abrir cualquiera de las tres, está el pendiente barato de §0.6**: medir el
+> libro del **perpetuo** con `libro.py`. Decide si los 4 candidatos de la corrida 5 están
+> vivos o muertos, y es una medición de un rato.
 
 ### 4.1 Ser el MAKER, no el taker — ~~★ la que yo haría primero~~ **CERRADO 2026-08-27**
 
@@ -311,12 +395,19 @@ cobrado?** Si no, el spread es una ilusión contable.
 **Ojo:** esto mide el *piso*. Un MM real además tiene riesgo de inventario y
 competencia de latencia, que solo empeoran el número. Si el piso ya es negativo, cerrado.
 
-### 4.2 Futuros en vez de spot — **prior MUY bajado 2026-08-27**
+### 4.2 Futuros en vez de spot — ~~prior MUY bajado~~ **CERRADO 2026-08-28**
 
-> El posicionamiento de futuros (OI y ratios long/short, 5 años) se metió en un
-> ranking transversal en las dos direcciones: **0 de 276**. No cierra 4.2 literalmente
-> —falta re-correr sobre *klines* de futuros con su costo— pero las señales de
-> posicionamiento no ordenaron ni de un lado ni del otro, que era la mitad del caso.
+> **Medido y cerrado.** Se re-corrió el lote sobre **klines de perpetuo**, con costo de
+> futuros y el funding metido dentro del retorno, en cuatro paneles que separan universo,
+> costo e instrumento. **La serie del perp ordena igual que la de spot: +0,004 ATR de
+> diferencia media sobre 140 brazos.** El lado corto —la mitad del caso— quedó en **cero
+> en los cuatro paneles a todos los costos**, aun con el funding a favor (5,9% anualizado).
+> `carry_acum` (el funding como *ranking*) muere en FDR. Los 4 candidatos que aparecían a
+> 0,10% mueren en la compuerta de 0,50%, escrita antes de correr.
+> Todo en **`banco/PREREGISTRO_FUTUROS.md`**, y el resumen en §0.6.
+>
+> **Queda una sola cosa abierta y barata:** el libro del perp no está medido (§0.6).
+> Lo de abajo queda como registro de por qué se probó.
 
 **La idea.** Todo el repo mide un juego **long-only sobre spot**. Dos cosas cambian con
 perpetuos:
@@ -402,7 +493,11 @@ de escribir la regla no es opcional.**
 | `banco/lote.py` | `lote(T, {nombre: máscara})` → **seis compuertas cableadas** + FDR |
 | `banco/leadlag.py` | features de lead-lag por grupo + `nula()` circular. Patrón a copiar |
 | `banco/micro.py` | 12 features intra-vela + test condicional a volatilidad |
-| `banco/libro.py` | **spread y profundidad reales** del order book, camina el libro |
+| `banco/ranking.py` | **ranking TRANSVERSAL por barra** (top-k contra el universo de la misma barra). Es el harness bueno: sin corte pooled, sin trampa de `SEM_N_MIN`, control por barra y sin solape |
+| `banco/klines.py` | además de spot, **`mercado="fut"`** trae klines de **perpetuos** (`fapi`), con caché aparte (sufijo `_fut`) |
+| `banco/futuros.py` | el **funding alineado al tablero**: entra en el RETORNO (las dos patas), no en el costo. Y `carry_acum` como score |
+| `banco/correr_futuros.py` | la corrida 5: los 4 paneles que separan universo / costo / instrumento. **El patrón a copiar** para cualquier comparación de instrumento |
+| `banco/libro.py` | **spread y profundidad reales** del order book, camina el libro. ⚠️ **solo spot** — apuntarlo a `fapi` es el pendiente de §0.6 |
 | `banco/costos.py` | Corwin-Schultz y Roll — **documentado como NO usable a 1h** |
 | `banco/test_unlocks.py` | estudio de evento esparcido: permutación + bootstrap de símbolos |
 | `banco/metricas.py`, `funding.py` | OI y posicionamiento de futuros cada 5 min desde 2020 |

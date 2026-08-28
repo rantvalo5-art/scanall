@@ -256,7 +256,11 @@ def scores(TB, neutralizar="roc_24", ambas=True):
     deriv = ["oi_chg_1h", "oi_chg_4h", "oi_chg_24h", "oi_z", "oi_rel_168"]
     for c in ("tt_cuentas", "tt_pos", "ls_cuentas", "taker"):
         deriv += [c, f"{c}_chg24", f"{c}_pct"]
-    crudos = [c for c in precio + flujo + deriv if c in TB.columns]
+    # PERP: lo unico que existe en el perpetuo y no en spot. `carry_acum` es el funding
+    # de las ultimas 24h (pasado, sin lookahead). El banco lo habia usado como COSTO
+    # (`funding.py`) y como filtro de sentimiento pooled, nunca como ranking transversal.
+    perp = ["carry_acum"]
+    crudos = [c for c in precio + flujo + deriv + perp if c in TB.columns]
     crudos = [c for c in crudos if c != "atr_base"]
 
     S = {}
