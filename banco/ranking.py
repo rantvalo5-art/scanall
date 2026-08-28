@@ -260,7 +260,16 @@ def scores(TB, neutralizar="roc_24", ambas=True):
     # de las ultimas 24h (pasado, sin lookahead). El banco lo habia usado como COSTO
     # (`funding.py`) y como filtro de sentimiento pooled, nunca como ranking transversal.
     perp = ["carry_acum"]
-    crudos = [c for c in precio + flujo + deriv + perp if c in TB.columns]
+    # ON-CHAIN (`onchain.py`): actividad de cadena, tenedores y emision. Ninguna sale del
+    # precio ni del libro. Cada metrica entra en cuatro formas —nivel, cambio a 7d y 30d,
+    # z y percentil contra su propia historia—; el percentil es el comparable ENTRE
+    # cadenas, porque el nivel crudo rankea "que cadena es" (bitcoin siempre tiene mas
+    # direcciones activas que decred) y eso ya mato a un candidato en la corrida 4.
+    cadena = [f"{m}{suf}"
+              for m in ("AdrActCnt", "AdrBalCnt", "TxCnt", "TxTfrCnt",
+                        "IssTotNtv", "SplyCur", "CapMVRVCur")
+              for suf in ("", "_chg7", "_chg30", "_z", "_pct")]
+    crudos = [c for c in precio + flujo + deriv + perp + cadena if c in TB.columns]
     crudos = [c for c in crudos if c != "atr_base"]
 
     S = {}

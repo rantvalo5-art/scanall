@@ -49,3 +49,5 @@ banco/.kline_cache/
 banco/.metrics_cache/
 banco/.funding_cache/
 banco/.unlock_cache/
+banco/.aggtrades_cache/
+banco/.onchain_cache/

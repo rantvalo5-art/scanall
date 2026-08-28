@@ -2,7 +2,7 @@
 
 > Escrito el **2026-08-26**, **actualizado el 2026-08-27** (ver sección 0.5: la sesión
 > del 27 cerró 4.1, respondió parte de 4.2 y produjo lo primero que sobrevivió) y
-> **el 2026-08-28** (la corrida 5 cerró **4.2** entero: ver §0.6).
+> **el 2026-08-28** (la corrida 5 cerró **4.2** y la corrida 6 cerró **4.3**: §0.6 y §0.7).
 > Este reemplaza a `HANDOFF_PENDIENTE.md` como **punto de entrada**: aquel quedó con TODAS sus secciones cerradas (1, 4.1 y 4.3) y sirve ya
 > solo como registro. Los anteriores (`HANDOFF_UNLOCKS.md`, `HANDOFF_SENALES.md`,
 > `HANDOFF_BASIS.md`, `HANDOFF_CIERRE.md`) son históricos.
@@ -202,6 +202,85 @@ no solo por volumen.**
 
 ---
 
+## 0.7. ESTADO AL 2026-08-28 (segunda parte) — la corrida 6 cerró 4.3
+
+**On-chain: la única clase de información que el repo nunca había tocado.** Fuente:
+**CoinMetrics Community** — gratis, sin API key, diaria desde el génesis de cada cadena.
+
+### Lo primero es lo que la fuente NO tiene
+
+> **Los flujos de exchange —la idea titular de 4.3— no se pueden medir gratis.**
+> `FlowInExNtv`/`FlowOutExNtv` existen para **2 activos de 6.093**. Así que *"monedas
+> saliendo de exchanges = menos oferta vendedora"* **sigue sin medirse**, y la corrida 6
+> **no la cierra**. Para eso hace falta fuente paga (Glassnode, Nansen, CryptoQuant) o
+> reconstruirla desde Etherscan etiquetando wallets a mano — y eso es solo ERC-20.
+
+### La compuerta de viabilidad — la que el handoff manda correr primero
+
+| | corrida 6 (on-chain) | corrida 3 (derivados, el comparador) |
+|---|---|---|
+| activos | **41** | 46 |
+| **semanas** (el n independiente) | **257** | 251 |
+| cobertura post-join | **93,3%** | 93,6% |
+| **MDE dirección** | **±0,065 ATR** | ±0,062 ATR |
+
+**No era la trampa de unlocks:** misma potencia con la que se cerró la familia de
+derivados. Lo que salga es "no está", no "no se pudo medir".
+
+### Dirección: 0 de 420, sin un solo spread positivo
+
+Direcciones activas, tenedores, transacciones, transferencias, emisión y oferta, cada una
+en cinco formas (nivel, cambio 7d y 30d, z y percentil), las dos direcciones, dos costos,
+257 semanas, cuatro regímenes. **Ni un candidato.** Las reglas de descalificación (nivel
+crudo vs `_pct`, MVRV contra los brazos de precio) ni llegaron a aplicarse.
+
+### Magnitud: on-chain es MENOS redundante con el kline que el propio kline
+
+Residualizando contra **`n_surge`** —lo que el radar ya usa en producción— dentro de cada
+barra:
+
+| brazo | crudo | sin `n_surge` | **queda** |
+|---|---|---|---|
+| `turnover` (feature de la vela) | +1,128 | +0,473 | **42%** |
+| **`TxCnt_chg7`** (on-chain) | +0,641 | **+0,453** | **71%** |
+| `AdrActCnt_chg7` (on-chain) | +0,566 | +0,422 | **75%** |
+| `TxCnt_pct` (on-chain, percentil) | +0,548 | +0,216 | 39% |
+
+La actividad de cadena **en forma de cambio** no es un proxy peor de lo mismo: es **otro
+eje**. Y aguanta los cuatro regímenes (+0,46 / +0,66 / +0,27 / +0,45, control ≈ 0).
+Ojo con el contraste interno: las formas de **percentil** retienen 39% — esas sí se
+parecen a lo que `n_surge` ya captura.
+
+### Por qué NO se puede poner en el radar hoy — y es cobertura, no señal
+
+| universo | con on-chain |
+|---|---|
+| pares USDT spot vivos en Binance (485) | **48 — 9,9%** |
+| `base200` | **24 de 200 — 12,0%** |
+
+**El radar rankea el universo entero y esta fuente cubre el 10%** — y el 10% son las
+cadenas viejas y grandes (btc, eth, ltc, doge, xrp, ada…), mientras que las monedas que el
+radar elige, las de `n_surge` alto, tienden a ser las nuevas y chicas, **que no tienen
+on-chain**. No es una falla de señal: es un desajuste de cobertura.
+
+**Lo que sí se puede hacer, y es barato:** usar `TxCnt_chg7` **encima** de `n_surge`, como
+desempate sobre las 43 monedas que sí tienen cobertura — nunca como filtro global, que
+dejaría afuera al 90% del universo.
+
+### ⚠️ Corrección de contabilidad: la reserva OOS ya no está virgen
+
+La §5 de este handoff dice que **2024-08-01 → 2025-08-01** nunca se miró. Se declaró así
+en `PREREGISTRO_ANCHO.md` con esta justificación textual: *"el pin `base200` y todos los
+lotes arrancan en 2025-08-01"*. **Era cierto el 24 de agosto; ya no lo es.**
+
+Las corridas **3, 4 y 6** usaron paneles de cinco años (2021-08 → 2026-08) que **la
+contienen**. Para la familia del **ranking transversal** esa ventana es in-sample y no
+sirve de confirmación. Sigue virgen **solo** para los diseños que arrancan en 2025-08-01
+(`lote.py`, `lote_ancho.py`). Un OOS que se cree virgen y no lo está es peor que no tener
+OOS.
+
+---
+
 ## 1. Estado del repo al cerrar la sesión
 
 **Nada mergeado. Tres ramas vivas:**
@@ -243,6 +322,7 @@ regenerables** tras la purga de 30 días).
 | Swing | sin ventaja; el defecto es el timing de entrada |
 | **Ranking transversal, DIRECCION** | **0 de 4.140** (27-ago) — precio + flujo + posicionamiento, las dos direcciones, 4h a 7d, k 3/8/16, 5 años, 4 regímenes |
 | **Market making en spot (4.1)** | **cerrado por comisión** (27-ago) — spread realizado 0,0133% contra un fee de 0,0750%; tampoco cruza el de futuros (0,0200%) |
+| **On-chain: actividad de cadena (4.3)** | **direccion cerrada** (28-ago) - 0 de 420 brazos, sin un solo spread positivo, con 257 semanas y MDE +-0,065. **NO cierra flujos de exchange**: no se pueden medir gratis. Ver 0.7 |
 | **El INSTRUMENTO: perpetuos (4.2)** | **cerrado** (28-ago) — la serie del perp ordena igual que la de spot (**+0,004 ATR** de diferencia media sobre 140 brazos); el lado corto en cero con el instrumento puesto; el funding como señal muere en FDR. Ver §0.6 |
 
 ### 2.2 EL PATRÓN, que es lo más valioso de todo esto
@@ -348,8 +428,8 @@ la cola por volátil y no por ilíquida. **Medir el libro, no estimarlo.**
 
 ## 4. LAS CINCO DIRECCIONES
 
-Ordenadas por lo que yo haría. **Las dos primeras están cerradas** (4.1 el 27-ago, 4.2 el
-28-ago) y quedan como registro. **Vivas: 4.3, 4.4 y 4.5** — las tres necesitan una fuente
+Ordenadas por lo que yo haría. **Las TRES primeras están cerradas** (4.1 el 27-ago, 4.2 y 4.3 el
+28-ago) y quedan como registro. **Vivas: 4.4 y 4.5** — las tres necesitan una fuente
 de datos nueva o un instrumento que puede no existir, que es exactamente por qué estaban
 después de las otras dos.
 
@@ -499,6 +579,8 @@ de escribir la regla no es opcional.**
 | `banco/correr_futuros.py` | la corrida 5: los 4 paneles que separan universo / costo / instrumento. **El patrón a copiar** para cualquier comparación de instrumento |
 | `banco/libro.py` | **spread y profundidad reales** del order book, camina el libro. ⚠️ **solo spot** — apuntarlo a `fapi` es el pendiente de §0.6 |
 | `banco/costos.py` | Corwin-Schultz y Roll — **documentado como NO usable a 1h** |
+| `banco/onchain.py` | **CoinMetrics Community** (gratis, sin key): actividad de cadena diaria de 48 activos que cotizan en Binance. Une por `AssetEODCompletionTime`, o sea **sin lookahead y sin lag fijo** |
+| `banco/correr_onchain.py` | la corrida 6. `--nula` corre SOLO el n post-join y el MDE, que es el paso que va primero |
 | `banco/test_unlocks.py` | estudio de evento esparcido: permutación + bootstrap de símbolos |
 | `banco/metricas.py`, `funding.py` | OI y posicionamiento de futuros cada 5 min desde 2020 |
 | `opciones/iv_rv.py` | DVOL de Deribit vs realizada — el estudio de vender volatilidad |
@@ -507,8 +589,11 @@ de escribir la regla no es opcional.**
 FDR q=0,10, pareado (no selección-de-moneda), `sin_top3`, `sin_top1`, consistencia
 semanal ≥60%. Veredicto por default: CERRADA.
 
-**Ventana OOS virgen: 2024-08-01 → 2025-08-01.** Declarada en `PREREGISTRO_ANCHO.md` y
-**nunca mirada**, porque nunca sobrevivió nada que promover. Sigue disponible.
+**Ventana OOS: 2024-08-01 → 2025-08-01.** Declarada en `PREREGISTRO_ANCHO.md` porque en su
+momento *"todos los lotes arrancaban en 2025-08-01"*. **⚠️ Ya NO está virgen para el
+ranking transversal**: las corridas 3, 4 y 6 usaron paneles de 5 años que la contienen
+(ver §0.7). Sigue disponible **solo** para los diseños que arrancan en 2025-08-01
+(`lote.py`, `lote_ancho.py`).
 
 ---
 
