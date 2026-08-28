@@ -1,7 +1,8 @@
 # HANDOFF — las cinco direcciones que quedan
 
-> Escrito el **2026-08-26**. Este reemplaza a `HANDOFF_PENDIENTE.md` como **punto de
-> entrada**: aquel quedó con TODAS sus secciones cerradas (1, 4.1 y 4.3) y sirve ya
+> Escrito el **2026-08-26**, **actualizado el 2026-08-27** (ver sección 0.5: la sesión
+> del 27 cerró 4.1, respondió parte de 4.2 y produjo lo primero que sobrevivió).
+> Este reemplaza a `HANDOFF_PENDIENTE.md` como **punto de entrada**: aquel quedó con TODAS sus secciones cerradas (1, 4.1 y 4.3) y sirve ya
 > solo como registro. Los anteriores (`HANDOFF_UNLOCKS.md`, `HANDOFF_SENALES.md`,
 > `HANDOFF_BASIS.md`, `HANDOFF_CIERRE.md`) son históricos.
 >
@@ -58,6 +59,82 @@ Con `pin="base200"` el universo queda **congelado y reproducible** — usarlo si
 
 ---
 
+## 0.5. ESTADO AL 2026-08-27 — leer esto antes que la sección 4
+
+La sesión del 27 de agosto cambió el mapa. Resumen de una línea: **se cerró la dirección
+en serio, y apareció lo primero que sobrevive un forward test.**
+
+### Lo que se midió
+
+| | |
+|---|---|
+| formas de predecir **dirección** probadas | **4.140** — precio, flujo del kline y posicionamiento de futuros, las **dos direcciones**, horizontes de 4h a 7d, k de 3/8/16, 5 años, 4 regímenes |
+| **sobrevivieron** | **0** |
+| formas de predecir **magnitud** | 38 sobreviven, aguantan los cuatro regímenes |
+
+Herramienta nueva: **`banco/ranking.py`** — evalúa rankings **transversales por barra**
+(top-k contra el universo de la misma barra), que es un diseño distinto del de `lote.py`
+y elimina por construcción cuatro defectos: el corte pooled que confunde tiempo con
+sección cruzada, la trampa de `SEM_N_MIN`, el control apareado por símbolo en vez de por
+barra, y las entradas solapadas. **El veredicto negativo se sostuvo igual**, así que ya
+no se le puede achacar al diseño.
+
+Todo el detalle, con las reglas escritas antes de cada corrida, en
+**`banco/PREREGISTRO_TRANSVERSAL.md`** (4 corridas).
+
+### Lo que se construyó: `radar/`
+
+El único hallazgo positivo, ya en producción. Rankea por **`n_surge`** (operaciones de la
+última hora contra su mediana de 7 días) y devuelve las 8 monedas que más probablemente
+**se muevan** en las próximas 4h. **No dice dirección.**
+
+- **240 líneas y cero configuración**, contra 2.111 líneas y 233 parámetros del screener
+  de la raíz.
+- Medido: **1,21×** el recorrido de la moneda típica, **62,6%** de acierto contra 49,5%
+  de línea base, **100% de 251 semanas**, t = 22,6.
+- El horizonte de 4h **se midió, no se eligió**: la señal se decae con el tiempo
+  (4h 1,21× / 24h 1,15× / 7d 1,11×).
+- Corre solo cada 4h por GitHub Actions y guarda en Supabase (`radar_runs`).
+- **Es modesto**: "se mueve ~21% más que la típica", no "se mueve el doble". Lo que vale
+  es la consistencia.
+
+**Sigue sin instrumento**: saber que algo se va a mover no es plata sin convexidad.
+
+### Los tres pendientes CON FECHA
+
+| fecha | qué | comando |
+|---|---|---|
+| **~8 sep** | primer chequeo del radar — si el efecto es del tamaño medido, ya se ve | `cd radar && py -3.13 -u medir.py` |
+| **~14 oct** | el chequeo que decide para un efecto de la mitad | idem |
+| **19 oct** | forward test de **4.7 (fade)**, de `HANDOFF_CIERRE.md` | `cd fade && py -3.13 evaluar.py` |
+
+`radar/HANDOFF_FORWARD_TEST.md` tiene la decisión de cada resultado, escrita antes de que
+existiera un dato.
+
+### Dos números heredados que resultaron estar mal
+
+Los dos se venían arrastrando sin examinar, y los dos cambiaron al medirlos:
+
+1. **El horizonte de 24h.** Era el que el banco fijó al principio y nunca se cuestionó.
+   Barrido con métricas sin escala, el correcto es **4h**.
+2. **El "esperá 8 semanas"** del forward test. Copiado del `SEM_MIN` de `lote.py`, que
+   existía porque allá las entradas **se solapan**. Acá no. Calculado con la
+   autocorrelación real (`banco/cuanto_esperar.py`): si el efecto es del tamaño medido se
+   ve en **12 días**.
+
+> **La lección, que vale más que los dos números:** cuando un parámetro no viene de una
+> medición, viene de una sesión anterior que tampoco lo midió.
+
+### Rama y estado del repo
+
+- **`main`**: el radar, corriendo. No toca nada de lo anterior.
+- **`banco/primer-toque`**: toda la investigación. ⚠️ **Arrastra 3 commits que cambian el
+  swing en producción** (`swing/backtest.py` +753 líneas, `screener.py`, `config.json`).
+  Si se mergea, esos se revisan aparte.
+- El screener de la raíz y el swing: **intactos**.
+
+---
+
 ## 1. Estado del repo al cerrar la sesión
 
 **Nada mergeado. Tres ramas vivas:**
@@ -97,6 +174,8 @@ regenerables** tras la purga de 30 días).
 | Straddles con órdenes stop | sin convexidad; regalás k·ATR por trade |
 | Day trader | pierde en todo horizonte y **peor que al azar**; ranking INVERTIDO |
 | Swing | sin ventaja; el defecto es el timing de entrada |
+| **Ranking transversal, DIRECCION** | **0 de 4.140** (27-ago) — precio + flujo + posicionamiento, las dos direcciones, 4h a 7d, k 3/8/16, 5 años, 4 regímenes |
+| **Market making en spot (4.1)** | **cerrado por comisión** (27-ago) — spread realizado 0,0133% contra un fee de 0,0750%; tampoco cruza el de futuros (0,0200%) |
 
 ### 2.2 EL PATRÓN, que es lo más valioso de todo esto
 
@@ -113,6 +192,12 @@ respuesta consistente sobre predicción direccional en cripto líquida.
 
 **Corolario para elegir qué sigue:** priorizar ideas **con mecanismo** y **no
 direccionales** sobre buscar una feature más.
+
+> **Actualización 2026-08-27.** El corolario se cumplió, y con un matiz que vale: lo que
+> apareció (`radar/`) es no direccional y con mecanismo —agrupamiento de volatilidad—
+> pero **sigue sin instrumento para cobrarse**. Vender volatilidad tenía instrumento y
+> se compitió; esto tiene señal y no tiene instrumento. Son dos formas distintas de no
+> llegar, y conviene no confundirlas al elegir qué sigue.
 
 ### 2.3 Los costos reales (medidos hoy — cambian todas las cuentas)
 
@@ -188,7 +273,14 @@ la cola por volátil y no por ilíquida. **Medir el libro, no estimarlo.**
 Ordenadas por lo que yo haría. Las dos primeras salen directamente de lo medido hoy y
 no necesitan datos nuevos.
 
-### 4.1 Ser el MAKER, no el taker ★ la que yo haría primero
+### 4.1 Ser el MAKER, no el taker — ~~★ la que yo haría primero~~ **CERRADO 2026-08-27**
+
+> **Medido y cerrado, spot y futuros.** Mediana de `RS_bal(60s)` sobre 20 pares =
+> **0,0133%**, contra un fee de maker de 0,0750% (spot con BNB) y 0,0200% (futuros):
+> no cruza ninguno. `sin_top3` lo lleva a **0,0004%**, los dos estimadores de mid
+> coinciden, y `p` de bloques = 1,0000. **No es que la selección adversa se coma el
+> spread: el spread capturable ni llega al fee.** Ver `banco/PREREGISTRO_MAKER.md`.
+> Lo de abajo queda como registro de por qué se probó.
 
 **La idea.** Hoy se midió que en la cola el spread es 0,11–0,15% y el slippage hace
 inviable *cruzar*. Pero ese costo es **el ingreso de otro**. Poner órdenes límite
@@ -219,7 +311,12 @@ cobrado?** Si no, el spread es una ilusión contable.
 **Ojo:** esto mide el *piso*. Un MM real además tiene riesgo de inventario y
 competencia de latencia, que solo empeoran el número. Si el piso ya es negativo, cerrado.
 
-### 4.2 Futuros en vez de spot
+### 4.2 Futuros en vez de spot — **prior MUY bajado 2026-08-27**
+
+> El posicionamiento de futuros (OI y ratios long/short, 5 años) se metió en un
+> ranking transversal en las dos direcciones: **0 de 276**. No cierra 4.2 literalmente
+> —falta re-correr sobre *klines* de futuros con su costo— pero las señales de
+> posicionamiento no ordenaron ni de un lado ni del otro, que era la mitad del caso.
 
 **La idea.** Todo el repo mide un juego **long-only sobre spot**. Dos cosas cambian con
 perpetuos:

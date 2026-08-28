@@ -161,7 +161,10 @@ Todo lo que no se modela juega **en contra** del maker, nunca a favor:
 - **Ventana FIJA 2026-08-11 → 2026-08-25** (14 dias UTC completos).
 - Muestreo: **3 ventanas de 10 min por dia y por par**, en instantes pseudoaleatorios con
   semilla fija. No hace falta la serie contigua: hace falta n y bloques. Cada ventana se
-  baja con 90s extra de cola para poder evaluar `mid(t+300s)` sin mirar fuera.
+  baja con **310s extra de cola** para poder evaluar `mid(t+300s)` sin mirar fuera.
+  *(Corregido antes de correr: este archivo decia 90s, que alcanza para el `D=60s` que
+  decide pero no para el `D=300s` del perfil de decaimiento. Es una inconsistencia
+  interna del preregistro; la correccion solo agrega datos y no toca la regla de parada.)*
 - Fuente: `/api/v3/aggTrades` de spot, cacheado en `.aggtrades_cache/` como `.npz`.
 
 **Sesgo de universo, declarado:** el ranking de volumen es el de HOY (mismo sesgo que
@@ -189,3 +192,60 @@ apenas con el fee de spot **antes** de restar seleccion adversa. Contra el fee d
 (0,0200%) la cola si tiene margen aritmetico, y ese es el unico desenlace que dejaria algo
 vivo: seria un resultado sobre **futuros**, no sobre spot, y habria que re-medirlo con
 datos de futuros antes de creerlo.
+
+---
+
+# RESULTADOS — corrida del 2026-08-27
+
+20 pares, 5 por banda, ventana fija 2026-08-11 → 2026-08-25, 3 ventanas de 10 min por día
+y por par. `D = 60s` es el que decide.
+
+## Mediana sobre los 20 pares de `RS_bal(60s)` = **0,0133%**
+
+| línea de comisión | maker por lado | margen | |
+|---|---|---|---|
+| spot sin BNB | 0,1000% | **−0,0867 pp** | no cruza |
+| **spot con BNB (la que decide)** | **0,0750%** | **−0,0617 pp** | **no cruza** |
+| futuros USD-M (referencia) | 0,0200% | **−0,0067 pp** | **no cruza** |
+
+**El spread realizado bruto es positivo (0,0133%) pero es ~6× más chico que el fee de
+maker más barato de spot.** Y tampoco alcanza contra el fee de futuros, que era la única
+línea que podía quedar viva.
+
+## Todas las compuertas secundarias van en la misma dirección
+
+| compuerta | resultado | |
+|---|---|---|
+| `sin_top1` | mediana 0,0050% → margen −0,0700 pp | se cae |
+| `sin_top3` | mediana **0,0004%** → margen −0,0746 pp | **se cae a cero** |
+| mid bipunta, todos los fills | 0,0133% → −0,0617 pp | no cruza |
+| mid último precio, todos | 0,0023% → −0,0727 pp | no cruza |
+| mid bipunta, 1er fill del barrido | 0,0113% → −0,0637 pp | no cruza |
+| mid último, 1er fill del barrido | 0,0023% → −0,0727 pp | no cruza |
+| `p` de bloques por día (14 bloques) | **1,0000** | no se distingue de nada |
+
+Los dos estimadores de mid coinciden en el veredicto, la variante favorable al maker
+(solo el primer fill de cada barrido) también, y sacando 3 pares el spread realizado
+**se va a cero**.
+
+## El diagnóstico de deriva confirmó que balancear hacía falta
+
+Pooleado sin balancear: 0,0037%. Balanceado por lado: 0,0133%. Son 3,6× de diferencia, o
+sea que los fills estaban desbalanceados y el pooleado se estaba comiendo la deriva del
+período — exactamente el autoengaño que la sección de la métrica anticipaba. Se reporta
+el balanceado, como estaba escrito.
+
+## VEREDICTO: ítem 4.1 CERRADO, spot y futuros
+
+Por la regla de parada, dispara la primera condición (mediana − 0,0750% ≤ 0) **y** la
+segunda (mediana − 0,0200% ≤ 0), así que se cierra el ítem entero y no queda la vía de
+re-medir sobre `aggTrades` de futuros.
+
+**No es que la selección adversa se coma el spread: es que el spread capturable ni
+siquiera llega al fee.** El medio-spread que se cobra en la cola —donde `libro.py` había
+medido 0,11-0,15%— no sobrevive al momento de cobrarlo: lo que queda después de la
+selección adversa son 0,0133%, y la comisión sola es 5,6× eso.
+
+Y coherente con la sección 9 de `PREREGISTRO_RANKING.md`, que ya había bajado el prior de
+este ítem: el costo explica el 7-18% de la pérdida del bot, no la causa. Atacar el costo
+—que es lo que hace ser maker— nunca iba a tocar el término dominante.

@@ -16,15 +16,31 @@ Lo que se compara, y esta fijado ANTES de que existan datos:
 
 REGLA DE PARADA, escrita ahora:
 
-  - Con menos de 8 SEMANAS de corridas no se concluye nada. La semana es la unidad
-    independiente, no la corrida: 60 corridas de 60 dias consecutivos no son 60 datos.
-  - Si a las 8 semanas el spread es <= 0, el radar no replico y se apaga.
-  - Si esta entre 0 y la MITAD de lo medido, sigue vivo pero se reporta como
-    "replica debil": la primera medicion de cualquier cosa exagera, porque se encontro
-    mirando, y lo que se encuentra mirando es la parte alta del ruido.
+  - No hay un numero fijo de semanas. Se compara el efecto observado contra el MDE
+    ACTUAL —lo mas chico que se puede distinguir de cero con los datos que hay— y el
+    script lo calcula en cada corrida. Un "no se pudo medir" NO es "no esta".
+  - Si el observado supera el MDE actual y es positivo -> replico.
+  - Si el observado es NEGATIVO y su magnitud supera el MDE -> no replico, se apaga.
+  - Si cae dentro del MDE -> todavia no alcanza. Seguir juntando.
   - No se toca `n_surge` ni `k` por lo que salga aca. Ajustar el screener con el
     resultado del forward test convierte el out-of-sample en in-sample y no queda
     ninguna ventana limpia.
+
+POR QUE NO SON 8 SEMANAS FIJAS. El `SEM_MIN = 8` original salio de copiar el umbral de
+`banco/lote.py`, que existia por otra razon: alla las entradas SE SOLAPAN (una cada 12h
+con horizonte de 30d, ~60 trades vivos a la vez) y el n efectivo es una fraccion del
+contado. Aca las barras no se solapan por diseno (paso = horizonte), asi que el argumento
+no se traslada. `banco/cuanto_esperar.py` lo calculo con la autocorrelacion real del
+spread (0,449 a un lag, factor de inflacion 4,24):
+
+    si el efecto real es    dias     semanas
+    lo medido (x1,0)          12         1,7
+    la mitad (x0,5)           48         6,8
+    un tercio (x0,33)        107        15,3
+    un cuarto (x0,25)        191        27,3
+
+Refutar es mucho mas rapido que confirmar: si el efecto es tan grande como se midio, se
+ve en dos semanas. Por eso conviene mirar temprano y seguido, no esperar sentado.
 """
 import argparse
 import os
@@ -44,7 +60,8 @@ H = 4                       # horizonte, en horas — el mismo que se valido
                             #  tasa y t contra 8/24/72/168h)
 
 PRE_SPREAD, PRE_MULT, PRE_TASA, PRE_BASE = 0.511, 1.21, 0.626, 0.495
-SEM_MIN = 8
+Z = 2.80          # (1,96 + 0,84): 80% de potencia, alfa 0,05 a dos colas
+N_MIN_BARRAS = 20  # abajo de esto el sd propio no es estimable, ni se intenta
 
 
 def bajar(desde):
@@ -99,6 +116,24 @@ def main():
         print("todavia no hay corridas guardadas."); return
     D["run_at"] = pd.to_datetime(D["run_at"], utc=True, format="mixed")
     D["t_ms"] = D["run_at"].astype("int64") // 10**6
+
+    # DE-SOLAPAR. Dos corridas separadas por menos de H horas comparten futuro, asi que
+    # contarlas como dos observaciones infla el n aparente — el defecto que este repo
+    # arrastra en todos lados por contar entradas solapadas como independientes. Pasa por
+    # tres vias: corridas de prueba, el cron disparado dos veces, y corridas manuales
+    # mezcladas con las automaticas. Se camina hacia adelante quedandose con la primera
+    # de cada grupo. No se borra nada de la tabla: se filtra al medir.
+    ts = sorted(pd.Series(D["run_at"].unique()))
+    quedan, ult = [], None
+    for t in ts:
+        if ult is None or (t - ult) >= pd.Timedelta(hours=H):
+            quedan.append(t)
+            ult = t
+    if len(quedan) < len(ts):
+        print(f"de-solape: {len(ts)} corridas -> {len(quedan)} "
+              f"({len(ts) - len(quedan)} descartadas por estar a menos de {H}h "
+              f"de la anterior)")
+    D = D[D["run_at"].isin(quedan)]
 
     # solo corridas con horizonte COMPLETO: truncar sesgaria hacia lo que ya se movio
     corte = pd.Timestamp.utcnow() - pd.Timedelta(hours=H + 1)
