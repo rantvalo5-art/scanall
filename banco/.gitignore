@@ -1,3 +1,6 @@
 # velas cacheadas (se regeneran solas desde la API)
 .kline_cache/
 .leadlag_T.csv
+
+# velas diarias de todos los pares USDT que existieron (corrida 9)
+.listados_cache/

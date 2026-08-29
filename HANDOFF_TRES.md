@@ -1,8 +1,9 @@
 # HANDOFF — las direcciones que quedan
 
 > Escrito el **2026-08-28** al cerrar las corridas 5, 5b, 6 y 7.
-> **Actualizado el 2026-08-29:** la corrida 8 cerró la volatilidad de alts (ahora §2.0). Quedan
-> **dos direcciones y una medición**.
+> **Actualizado el 2026-08-29:** las corridas 8 y 9 cerraron **dos** de las tres —
+> volatilidad de alts (§2.0.A) y eventos de listado (§2.0.B)—, las dos **por potencia** y
+> por razones opuestas. Queda **una dirección y una medición**, y la medición va primero.
 >
 > **Este es el punto de entrada.** `HANDOFF_SIGUIENTE.md` es el registro completo de lo
 > cerrado (§0.5 a §0.8 tienen el detalle de la sesión del 28); los anteriores
@@ -75,23 +76,23 @@ Diez familias estándar de confirmación de dirección. **Nueve medidas, todas e
 | Posicionamiento / contrarian | 0 de 276 |
 | Régimen | 7 detectores × 22 trimestres, ninguno gateable |
 | On-chain | 0 de 420 (corrida 6) |
-| Estudios de evento | unlocks cerrado; **listados = 2.1** |
+| Estudios de evento | unlocks cerrado; **listados cerrados 29-ago** (corrida 9): 544 eventos, 266 semanas, MDE 4,2% a 1d |
 | **Patrones de velas** | 0 de 660 (corrida 7) — la canónica acierta **50,0%** |
 | ML / no lineal | techo condicional medido |
-| **Patrones de gráfico** | **← nunca tocada (2.2)** |
+| **Patrones de gráfico** | **← nunca tocada (§2.1). La última que queda** |
 
 **Lo único que funcionó, dos veces, es no direccional:**
 - **Vender volatilidad** (+20,96%/año en BTC, 5,3 años, mecanismo real). Se cerró en
   BTC/ETH por no superar el piso de stablecoins, y la **corrida 8 cerró la extensión a
   alts (29-ago)**: el instrumento existe y el spread es barato, pero **no hay historia de
   implícita para medir la prima** — MDE 39%/año en SOL contra un umbral de 10%, y **BTC
-  con la misma ventana da 27,1%**. Detalle en §2.0.
+  con la misma ventana da 27,1%**. Detalle en §2.0.A.
 - **Magnitud** (el radar): sobrevive en **cinco** diseños distintos y cuatro regímenes.
   Sigue **sin instrumento** para cobrarse.
 
 ### 1.3 Lo que las sesiones del 28 y 29-ago agregaron al método
 
-Seis cosas que cambian cómo se corre lo que sigue:
+Siete cosas que cambian cómo se corre lo que sigue:
 
 1. **El universo se filtra por CLASE DE ACTIVO, no solo por volumen.** `base200` arrastra
    7 stablecoins/FX y 9 acciones tokenizadas: 9,1% del universo que se lleva **37-44% de
@@ -111,27 +112,39 @@ Seis cosas que cambian cómo se corre lo que sigue:
    activos" tiene que medir esa ρ primero.
 6. **Un número que contradice una estructura de mercado conocida es un bug, no un
    hallazgo.** La corrida 8 midió USD 628.000 millones/día de opciones de BTC en OKX —seis
-   veces Deribit— y eso, no el código, fue lo que delató un error de unidades de 100×.
+   veces Deribit— y eso, no el código, fue lo que delató un error de unidades de 100×. La
+   corrida 9 volvió a pisarlo: "Binance deslistó el 0,1% de sus pares" es falso de entrada,
+   y era un filtro por nombre en vez de por `status`.
+7. **Contar el n NO alcanza, y esto corrige la regla escrita.** La corrida 9 tiene **266
+   semanas** —más que las 257 con las que la corrida 6 concluyó— y **no pudo concluir**,
+   porque su σ es 20× más grande. El n nunca fue el que decidía: decidía `σ/√n`. Hay que
+   calcular las dos cosas, y **decir cuál de las dos falló**, porque una se arregla
+   esperando y la otra no.
 
 ---
 
 ## 2. LAS DIRECCIONES QUE QUEDAN
 
-Eran tres. La **§2.0 se cerró el 29-ago** y queda arriba porque lo que la mató es un
-resultado de método que aplica a todo lo que venga. Quedan **dos direcciones** (§2.1 y
-§2.2) y **una medición** (§2.4.D).
+Eran tres. **Dos se cerraron el 29-ago** (§2.0, opciones y listados) y quedan arriba
+porque lo que las mató son resultados de método que aplican a todo lo que venga: las dos
+murieron **por potencia**, y por razones opuestas.
 
-Ordenadas por **lo que yo haría**, y el criterio no es el prior: es **cuánto cuesta
-cerrarlas**. Las dos tienen prior bajo. La primera es casi toda adquisición de datos; la
-segunda necesita construir un detector.
+Queda **una dirección** (§2.1, patrones de gráfico) y **una medición** (§2.4.D,
+dislocaciones entre venues). **La medición va primero**: es barata, es una medición y no
+una construcción, y §2.1 exige construir un detector de ~300 líneas cuyo diseño es la mitad
+del trabajo.
 
 **Y §2.4**, que no es una dirección sino el mapa de **los otros negocios** —dónde sí se gana
 plata en este mercado y por qué está afuera de lo probado—, con los dos que resultaron
-medibles ya medidos y **uno que sigue abierto y que ahora va antes que §2.2**.
+medibles ya medidos y **uno que sigue abierto, §2.4.D, que ahora es lo primero de la
+lista**.
+
+> **Si abrís esto en frío y querés empezar a medir hoy: andá a §2.4.D.** Es lo único que
+> queda que es una medición barata y no una construcción.
 
 ---
 
-### 2.0 Volatilidad de alts — **CERRADA 29-ago (corrida 8)**
+### 2.0.A Volatilidad de alts — **CERRADA 29-ago (corrida 8)**
 
 **La idea era la mejor que quedaba:** vender volatilidad es lo único que este repo encontró
 que funcionó de verdad (+20,96%/año en BTC, mecanismo real), y se había medido **solo en
@@ -168,38 +181,52 @@ un problema de método: **el dato no existe.**
 
 ---
 
-### 2.1 Eventos de listado en Binance  ★ la primera
+### 2.0.B Eventos de listado en Binance — **CERRADA 29-ago (corrida 9)**
 
-**La idea.** Un listado tiene **timestamp exacto**, efecto documentado en la literatura, y
-**no sale del precio**. La maquinaria de estudio de evento esparcido sirve tal cual:
-`banco/test_unlocks.py` (`preparar()`, `_p_permutacion()`, `_ic_bootstrap()`).
+**La idea.** Un listado tiene timestamp exacto, efecto documentado, y **no sale del
+precio**. Era la última familia de estudio de evento con mecanismo plausible.
 
-**En contra, y es lo mismo que mató a unlocks:** no hay endpoint (se scrapea el blog de
-anuncios de Binance o se usa un dataset de terceros) y **el n va a ser chico** — pocos
-listados por mes.
+**Dos sorpresas buenas antes del cierre, y las dos hay que llevárselas:**
 
-> **Antes de escribir una sola regla: contar el n POST-JOIN y calcular el MDE con la nula
-> real.** Es lo que convirtió un "no se pudo medir" en un "no está" en unlocks (1.040
-> eventos, MDE 6,6 pp/década) y en la cola ilíquida, y lo que dejó a la corrida 6 poder
-> concluir en serio (41 activos, 257 semanas, MDE ±0,065 — igual que el que cerró
-> derivados).
->
-> **Regla de parada:** si el n post-join no alcanza un MDE comparable al de las corridas
-> que sí concluyeron, el veredicto es **"no se pudo medir"** y se cierra sin gastar más.
-> `correr_onchain.py --nula` es el patrón exacto a copiar.
+1. **No hace falta scrapear el blog. La primera vela de un par ES el listado**, exacta y
+   verificable (BTCUSDT 2017-08-17, SOL 2020-08-11, PEPE 2023-05-05, SRM deslistado
+   2022-11-28 tras FTX). El handoff daba por hecho que había que scrapear o comprar datos.
+2. **La muestra no tiene sesgo de supervivencia.** `exchangeInfo` **sí** devuelve los
+   deslistados, con `status == "BREAK"`. **734 pares USDT existieron; 249 están muertos.**
+   Tras excluir por clase de activo quedan **579 eventos, 544 útiles, 266 semanas, y
+   32,1% de ellos son símbolos hoy deslistados.**
 
-**Un detalle que importa y que la corrida 7 dejó armado:** el estimador correcto para un
-evento es el de `correr_velas.py` — **control POR BARRA**, no por símbolo. Un listado
-ocurre en un momento del mercado, y si el mercado subía ese día, el evento "funciona" sin
-que el listado aporte nada. `lote.py` aparea por símbolo y nunca neutralizó ese término.
+> ⚠️ **Filtrar `exchangeInfo` por NOMBRE los da a todos por vivos y dice que el 0,1% se
+> deslistó.** Hay que filtrar por **`status`**. Ese error, sin detectar, convierte el
+> estudio en un falso positivo garantizado: los listados que se hundieron desaparecen de
+> la muestra y el drift post-listado sale positivo por construcción.
 
-**Costo:** medio, y casi todo es adquisición de datos.
-**Prior:** bajo-medio. El efecto está documentado, pero es el más publicado del mundo y
-lleva años de arbitraje.
+**Lo que la mató: la σ, no el n.** El exceso de retorno de un par recién listado tiene
+**σ = 23,8 pp a un día** — una moneda que debuta se mueve ±24% contra el mercado en su
+primer día.
+
+| h | eventos | semanas | **MDE (ATR)** | **MDE (%)** | años para detectar 1% |
+|---|---|---|---|---|---|
+| 1d | 544 | 266 | **0,472** | 4,2% | **90** |
+| 3d | 543 | 266 | 0,880 | 7,6% | 296 |
+| 7d | 544 | 266 | 0,660 | 5,7% | 165 |
+| 30d | 544 | 266 | 1,352 | 12,0% | 742 |
+
+*(umbral preregistrado 0,10 ATR. Binance tiene 9 años de listados.)*
+
+**Lo que sí queda descartado, dicho con precisión:** un efecto de más de **±4,2% a un día**
+no está. Eso mata la versión fuerte ("comprar todo listado nuevo es un negocio obvio") y
+**nada más**. Un efecto de 1-2% —que sería 2-4× el costo y muy operable— queda debajo del
+ruido y no se puede ni afirmar ni negar.
+
+**Lo único que quedó vivo de esta dirección:** medir **el anuncio** en vez del listado, con
+el timestamp del blog, **restringido a activos que ya cotizaban en otro venue**. Ahí hay
+serie de precio previa y la dispersión es la del activo maduro, no la del debut. Exige el
+scrapeo que esta corrida evitó y el n baja mucho, pero es una corrida distinta y viable.
 
 ---
 
-### 2.2 Patrones de gráfico — la décima familia, la única sin tocar
+### 2.1 Patrones de gráfico — la décima familia, la única sin tocar  ★ la que queda
 
 **La idea.** Hombro-cabeza-hombro, triángulos, banderas, cuñas, dobles techos y pisos.
 Es la **única familia estándar de confirmación de dirección que el repo nunca midió**, y
@@ -242,9 +269,16 @@ Esa forma funcional no está en ninguna de las corridas anteriores.
   barajados**. Si el patrón real no se separa de su versión con la estructura destruida,
   lo que se detectó es ruido con forma.
 
-**Costo:** el más alto de lo que queda. El detector son ~300 líneas y el diseño de sus
-parámetros es la mitad del trabajo.
-**Prior:** el más bajo de lo que queda.
+**Costo:** el más alto de todo lo que quedó, y por eso va después de §2.4.D. El detector
+son ~300 líneas y el diseño de sus parámetros es la mitad del trabajo.
+**Prior:** bajo, y bajó más después de la corrida 7.
+
+> **Y una advertencia que las corridas 8 y 9 dejaron pagada:** antes de construir el
+> detector, **correr la compuerta de potencia con un detector cualquiera** —hasta uno
+> trivial— para medir la σ por evento y ver cuántas semanas harían falta. Un patrón de
+> gráfico es un evento esparcido sobre símbolos volátiles, o sea **exactamente la forma
+> que hizo fracasar a la corrida 9**. Si la σ sale del orden de la de listados, se cierra
+> ahí y no se escriben las 300 líneas.
 
 ---
 
@@ -351,8 +385,8 @@ persiste **más de 5 segundos** de forma recurrente, es capturable **sin** co-lo
   dislocaciones enormes que no son operables.
 
 **Prior:** bajo — es la parte más obviamente competida del mercado. **Costo:** bajo, y es
-una **medición**, no una construcción. Va **después de §2.1 y antes de §2.2**: es lo segundo
-de la lista.
+una **medición**, no una construcción. **Con §2.0.A y §2.0.B cerradas, esto pasó a ser lo
+PRIMERO de la lista** — lo único que queda que se mide en vez de construirse.
 
 ---
 
@@ -410,6 +444,17 @@ de la lista.
 > demuestre lo contrario.** No fue el código el que delató un error de unidades de 100× en
 > la corrida 8: fue que el resultado ponía a OKX seis veces arriba de Deribit.
 
+> **Contar el n no alcanza: hay que medir la σ, y decir cuál de las dos falló.** Corrida 6:
+> 257 semanas, MDE ±0,065 ATR, **concluyó**. Corrida 9: **266 semanas**, MDE 0,47-1,35 ATR,
+> **no pudo**. Más n, veredicto opuesto. Y la distinción importa para el que sigue: un "no
+> se pudo medir" por **n** se reabre si aparece el dato (corrida 8); uno por **σ** no se
+> reabre con más datos, solo con otro estimador (corrida 9).
+
+> **Un estudio de eventos se filtra por ESTADO, no por nombre.** `exchangeInfo` devuelve los
+> deslistados con `status == "BREAK"`; filtrar por nombre los da a todos por vivos. En un
+> estudio de listados ese error tiene la forma exacta del efecto buscado y **fabrica un
+> falso positivo garantizado**.
+
 > **Generar ancho, no pre-filtrar.** Las compuertas son sobre conclusiones, no sobre
 > explorar. El prior propio no aporta; el harness mata barato.
 
@@ -420,13 +465,14 @@ de la lista.
 | archivo | qué hace |
 |---|---|
 | **`banco/ranking.py`** | **el harness bueno.** Ranking transversal por barra: sin corte pooled, sin trampa de `SEM_N_MIN`, control por barra, sin solape. Seis compuertas + FDR |
-| **`banco/correr_velas.py`** | **el harness de EVENTOS.** Control por barra para máscaras booleanas. Para §2.2 solo hay que cambiar el detector |
+| **`banco/correr_velas.py`** | **el harness de EVENTOS.** Control por barra para máscaras booleanas. Para §2.1 solo hay que cambiar el detector |
 | `banco/velas.py` | 15 patrones de velas con sus umbrales canónicos fijados. El patrón a copiar para preregistrar un detector |
 | `banco/klines.py` | `load_panel(..., tf=, full=, pin=, syms=, mercado=)`. **`mercado="fut"`** trae perpetuos; `tf="1d"` trae diarias |
 | `banco/onchain.py` | CoinMetrics Community (gratis, sin key). Une por `AssetEODCompletionTime`: **sin lookahead y sin lag fijo** |
 | `banco/futuros.py` | funding alineado al tablero. Entra en el **retorno**, no en el costo |
 | **`banco/libro_perp.py`** | **costos reales del libro**, spot y perp en el mismo instante y apareados |
-| `banco/test_unlocks.py` | estudio de evento esparcido: permutación + bootstrap de símbolos. **La base para §2.1** |
+| `banco/test_unlocks.py` | estudio de evento esparcido: permutación + bootstrap de símbolos |
+| **`banco/correr_listados.py`** | **`--nula` mide supervivencia, n post-join, MDE en ATR Y en %, y los años que harían falta.** El patrón para cualquier estudio de evento nuevo. Su caché tiene la **diaria completa de los 734 pares USDT que existieron**, deslistados incluidos |
 | `opciones/iv_rv.py` | DVOL de Deribit vs realizada futura. Cerró BTC/ETH; **su barra de error está ahora medida en la corrida 8** |
 | **`opciones/viabilidad.py`** | **foto de los 3 venues de opciones**: volumen, OI y spread ATM por subyacente, todo a nocional USD. El patrón de "medir si el instrumento existe ANTES de medir el efecto" |
 | **`opciones/potencia.py`** | **n, σ, MDE y años necesarios** para un estimador dado, con calibración contra un efecto conocido y la ρ que decide si poolear sirve |
@@ -460,12 +506,19 @@ scoring lo arregla, porque el daño es común a todas sus alertas.
 
 Y el 29-ago se agregó una cuarta, que es de otra naturaleza:
 
-- **No siempre es que no haya efecto: a veces el efecto no es medible con nada.** La
-  corrida 8 encontró que para vender volatilidad en alts **el instrumento existe y es
-  barato de cruzar** —lo contrario de lo que el prior decía— y aun así cerró, porque la
-  historia de implícita da MDE 39%/año contra un umbral de 10%. **BTC, con esa misma
-  ventana, da 27,1%.** Es la primera vez en el repo que una dirección muere por el
-  **estimador**, no por el mercado ni por el dato.
+- **No siempre es que no haya efecto: a veces no hay con qué medirlo, y hay dos maneras
+  distintas de que pase.** Las corridas 8 y 9 murieron las dos por potencia, en extremos
+  opuestos:
+  - **corrida 8** (volatilidad de alts): el instrumento **existe** y el spread **es
+    barato** —lo contrario de lo que el prior decía— pero hay **18 meses de historia** y
+    harían falta 23 años. **BTC, con la misma ventana, tampoco sería detectable** (MDE
+    27,1%/año). Muere por **n**, y se reabre si aparece el dato.
+  - **corrida 9** (listados): el n es **excelente** —544 eventos, 266 semanas, 32%
+    deslistados, sin sesgo de supervivencia— y aun así no concluye, porque una moneda que
+    debuta se mueve **±24% contra el mercado en su primer día**. Muere por **σ**, y no se
+    reabre con más datos: harían falta 90 años.
+
+  Las dos veces, la compuerta de potencia corrida ANTES ahorró la sesión entera.
 
 **Lo que sí sobrevive todo lo que se le tire es la MAGNITUD** — cinco diseños, cuatro
 regímenes, 100% de las semanas en el mejor caso. El problema nunca fue medirla: es que
