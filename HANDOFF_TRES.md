@@ -1,9 +1,10 @@
 # HANDOFF — las direcciones que quedan
 
 > Escrito el **2026-08-28** al cerrar las corridas 5, 5b, 6 y 7.
-> **Actualizado el 2026-08-29:** las corridas 8 y 9 cerraron **dos** de las tres —
-> volatilidad de alts (§2.0.A) y eventos de listado (§2.0.B)—, las dos **por potencia** y
-> por razones opuestas. Queda **una dirección y una medición**, y la medición va primero.
+> **Actualizado el 2026-08-29:** las corridas 8 a 12 cerraron **las tres** —volatilidad de
+> alts (§2.0.A), eventos de listado (§2.0.B) y patrones de gráfico (§2.0.C)—. Con la última
+> **se completa la décima familia estándar: el mapa de direcciones ya no tiene huecos.**
+> No queda ninguna dirección abierta: quedan **una medición corriendo y tres fechas**.
 >
 > **Este es el punto de entrada.** `HANDOFF_SIGUIENTE.md` es el registro completo de lo
 > cerrado (§0.5 a §0.8 tienen el detalle de la sesión del 28); los anteriores
@@ -79,7 +80,7 @@ Diez familias estándar de confirmación de dirección. **Nueve medidas, todas e
 | Estudios de evento | unlocks cerrado; **listados cerrados 29-ago** (corrida 9): 544 eventos, 266 semanas, MDE 4,2% a 1d |
 | **Patrones de velas** | 0 de 660 (corrida 7) — la canónica acierta **50,0%** |
 | ML / no lineal | techo condicional medido |
-| **Patrones de gráfico** | **← nunca tocada (§2.1). La última que queda** |
+| **Patrones de gráfico** | **0 de 300 brazos** (corridas 11 y 12) — la ruptura pelada le gana a las cinco figuras |
 
 **Lo único que funcionó, dos veces, es no direccional:**
 - **Vender volatilidad** (+20,96%/año en BTC, 5,3 años, mecanismo real). Se cerró en
@@ -92,7 +93,7 @@ Diez familias estándar de confirmación de dirección. **Nueve medidas, todas e
 
 ### 1.3 Lo que las sesiones del 28 y 29-ago agregaron al método
 
-Siete cosas que cambian cómo se corre lo que sigue:
+Ocho cosas que cambian cómo se corre lo que sigue:
 
 1. **El universo se filtra por CLASE DE ACTIVO, no solo por volumen.** `base200` arrastra
    7 stablecoins/FX y 9 acciones tokenizadas: 9,1% del universo que se lleva **37-44% de
@@ -120,27 +121,34 @@ Siete cosas que cambian cómo se corre lo que sigue:
    porque su σ es 20× más grande. El n nunca fue el que decidía: decidía `σ/√n`. Hay que
    calcular las dos cosas, y **decir cuál de las dos falló**, porque una se arregla
    esperando y la otra no.
+8. **La resolución que conviene no es la que tiene más barras.** A 1h hay 25× más datos y
+   el ruido baja a 0,029 ATR, pero **el costo de una vuelta sube a 0,155 ATR**: un ATR
+   horario es ~5× más chico que uno diario, así que el mismo 0,20% pesa 5× más en esas
+   unidades. **A 1h manda el costo; a 1d manda el ruido.** Hay que elegir la resolución
+   donde el efecto buscado sea grande contra `max(ruido, costo)`, y las dos se calculan
+   **antes** (corrida 12).
 
 ---
 
 ## 2. LAS DIRECCIONES QUE QUEDAN
 
-Eran tres. **Dos se cerraron el 29-ago** (§2.0.A opciones y §2.0.B listados) y quedan arriba
-porque lo que las mató son resultados de método que aplican a todo lo que venga: las dos
-murieron **por potencia**, y por razones opuestas.
+Eran tres. **Las tres se cerraron el 29-ago** —§2.0.A opciones, §2.0.B listados, §2.0.C
+patrones de gráfico— y quedan arriba porque lo que las mató son resultados de método que
+aplican a todo lo que venga.
 
-Queda **una dirección** (§2.1, patrones de gráfico) y **una medición** (§2.4.D,
-dislocaciones entre venues). **La medición va primero**: es barata, es una medición y no
-una construcción, y §2.1 exige construir un detector de ~300 líneas cuyo diseño es la mitad
-del trabajo.
+**Con §2.0.C cierra la décima familia estándar. El mapa de direcciones ya no tiene
+huecos.**
 
-**Y §2.4**, que no es una dirección sino el mapa de **los otros negocios** —dónde sí se gana
-plata en este mercado y por qué está afuera de lo probado—, con los dos que resultaron
-medibles ya medidos y **uno que sigue abierto, §2.4.D, que ahora es lo primero de la
-lista**.
+**No queda ninguna dirección abierta.** Lo que queda es:
 
-> **Si abrís esto en frío y querés empezar a medir hoy: andá a §2.4.D.** Es lo único que
-> queda que es una medición barata y no una construcción.
+| qué | dónde | estado |
+|---|---|---|
+| **dislocación entre venues** | §2.4.D | **una medición**, muestreando |
+| **forward test del fade** | §1.1 | 19-oct, decisión escrita de antemano |
+| **chequeos del radar** | §1.1 | ~8-sep y ~14-oct |
+
+> **Si abrís esto en frío: no hay una dirección nueva para elegir.** Hay tres cosas con
+fecha y una medición corriendo. El resto está cerrado con número.
 
 ---
 
@@ -226,59 +234,57 @@ scrapeo que esta corrida evitó y el n baja mucho, pero es una corrida distinta 
 
 ---
 
-### 2.1 Patrones de gráfico — la décima familia, la única sin tocar  ★ la que queda
+### 2.0.C Patrones de gráfico — **CERRADA 29-ago (corridas 11 y 12)**
 
-**La idea.** Hombro-cabeza-hombro, triángulos, banderas, cuñas, dobles techos y pisos.
-Es la **única familia estándar de confirmación de dirección que el repo nunca midió**, y
-quedó explícitamente fuera del alcance de la corrida 7 (§6 de `PREREGISTRO_VELAS.md`).
+**Era la última familia estándar sin tocar.** Hombro-cabeza-hombro, doble techo/piso,
+triángulos: estructura sobre decenas de barras, una forma funcional que no estaba en
+ninguna corrida anterior.
 
-**Por qué no es lo mismo que las velas.** Un patrón de velas es una conjunción sobre 2-3
-barras — una función local del OHLC. Un patrón de gráfico es **estructura sobre decenas de
-barras**: requiere detectar pivotes, ajustar líneas de tendencia, y decidir tolerancias.
-Esa forma funcional no está en ninguna de las corridas anteriores.
+**Primero la compuerta de potencia (corrida 11), que es la advertencia que las corridas 8
+y 9 dejaron pagada. Y PASÓ** — la primera en tres. La idea que la hizo barata: el MDE de
+este estimador **no depende de qué patrón sea, sino de cada cuánto dispara**, así que la
+curva se mide con máscaras al azar **sin escribir un solo detector**.
 
-**Por qué va última, y hay que ser honesto:**
+| | frontera (tasa mínima medible) |
+|---|---|
+| 1d, H=1 / H=3 / H=5 | 0,200% / 0,500% / **2,000%** |
+| 1h, H=4 / H=24 | **0,050%** / 0,500% |
 
-1. **Hay que construir el detector**, y ahí vive el peligro. Cada patrón tiene ~4
-   parámetros libres (cuántas barras de lookback, qué tolerancia para "dos techos
-   iguales", cuánto puede desviarse la línea, qué cuenta como ruptura). **Eso es una
-   máquina de fabricar falsos positivos**, y hay que preregistrarlos igual que se
-   preregistraron los umbrales de `velas.py`.
-2. **El prior bajó** después de la corrida 7. La familia adyacente —la que comparte la
-   premisa de que la forma del gráfico anticipa dirección— dio la dirección canónica
-   acertando **exactamente 50,0%** contra su propio espejo.
-3. **Es subjetiva por construcción.** Dos implementaciones razonables de "hombro-cabeza-
-   hombro" detectan conjuntos distintos, y no hay una definición canónica como la hay para
-   un envolvente.
+Tasas medidas: doble techo 0,76%, doble piso 0,65%, HCH 0,46%, HCH inv 0,43%, triángulo
+0,19%. **A 1h los cinco pasan con holgura** (0 brazos "no se pudo medir" de 120). A 1d
+solo en horizontes cortos.
 
-**Cómo lo haría, si se hace:**
+**Después el efecto (corrida 12): CERO, y es un cero MEDIDO.** 180 brazos a 1d, 120 a 1h,
+**ninguno sobrevive y ninguno pasa FDR**.
 
-- **Preregistrar los parámetros del detector ANTES**, con la misma disciplina que
-  `velas.py`: cada tolerancia escrita en el código con su valor canónico y sin tocarla
-  después. Si un umbral se ajusta viendo el resultado, la corrida no vale.
-- **Declarar la dirección de cada patrón antes de medir.** La corrida 7 mostró por qué:
-  tres de sus cinco mejores brazos estaban *invertidos*, y elegido el signo después, los
-  cinco contaban como aciertos.
-- **Estimador con control por barra**, reutilizando `correr_velas.py` tal cual: solo hay
-  que reemplazar `velas.patrones(df)` por el detector nuevo. Todo lo demás —compuertas,
-  FDR sobre el lote entero, `sin_top3`, bootstrap de bloques semanales, el umbral de "no
-  se pudo medir"— ya está escrito y validado.
-- **Dos resoluciones, 1d y 1h**, por la misma razón: los patrones de gráfico se definieron
-  en diarias.
-- **Un control obligatorio:** un detector con **los mismos parámetros pero pivotes
-  barajados**. Si el patrón real no se separa de su versión con la estructura destruida,
-  lo que se detectó es ruido con forma.
+**Lo que cierra la familia no es el cero: es POR QUÉ.** Excesos antes de costos:
 
-**Costo:** el más alto de todo lo que quedó, y por eso va después de §2.4.D. El detector
-son ~300 líneas y el diseño de sus parámetros es la mitad del trabajo.
-**Prior:** bajo, y bajó más después de la corrida 7.
+| el mejor de… | 1h |
+|---|---|
+| **`CTRL ruptura arriba` — sin pivotes, sin tolerancias, sin figura** | **+0,2532** |
+| el mejor patrón de gráfico real | +0,1545 |
+| el mismo detector con **pivotes barajados** | +0,0758 |
+| máscara al azar | +0,0291 |
 
-> **Y una advertencia que las corridas 8 y 9 dejaron pagada:** antes de construir el
-> detector, **correr la compuerta de potencia con un detector cualquiera** —hasta uno
-> trivial— para medir la σ por evento y ver cuántas semanas harían falta. Un patrón de
-> gráfico es un evento esparcido sobre símbolos volátiles, o sea **exactamente la forma
-> que hizo fracasar a la corrida 9**. Si la σ sale del orden de la de listados, se cierra
-> ahí y no se escriben las 300 líneas.
+> **Una ruptura pelada del máximo de 60 barras le gana a los cinco patrones.** Y el
+> detector con la estructura destruida —mismos parámetros, pivotes al azar— llega tan
+> lejos como el real. Lo poco que los patrones capturan **es el breakout**; la geometría
+> no aporta nada medible.
+
+**Dos brazos casi engañan, y las dos veces lo que los mata estaba escrito antes:**
+
+- **`hch_inv` corto, 1d, H=5**: +0,2158, **p = 0,0245**, y **aguanta `sin_top3`**. Muerto
+  por tres cosas independientes: es la **dirección invertida** (HCH invertido es alcista y
+  este brazo gana yendo corto); **la compuerta de la corrida 11 ya lo había descalificado**
+  —dispara al 0,182%, y su MDE a su propia tasa y horizonte es 0,2245, o sea que su
+  exceso está **dentro de su propia banda de ruido**—; y no pasa FDR.
+- **`CONTROL azar 2` largo, 1d, H=5**: exceso +0,1103, **p = 0,0495**, `sin_top3` +0,0475.
+  **Ruido puro con p < 0,05 que aguanta la compuerta de concentración.** Con 180 brazos es
+  exactamente lo esperable, y es la razón de que el FDR vaya sobre el lote entero.
+
+**Lo que NO queda dicho:** que ninguna implementación posible funcione. Sí queda medido que
+**la estructura no aporta sobre la ruptura** —dos controles independientes—, y eso es un
+resultado sobre la forma funcional, no sobre un juego de umbrales.
 
 ---
 
@@ -455,6 +461,21 @@ PRIMERO de la lista** — lo único que queda que se mide en vez de construirse.
 > estudio de listados ese error tiene la forma exacta del efecto buscado y **fabrica un
 > falso positivo garantizado**.
 
+> **Antes de elegir resolución, calcular el COSTO en las mismas unidades que el ruido.**
+> A 1h el costo de una vuelta es **0,155 ATR** y el MDE **0,029**: la corrida solo podía
+> encontrar un efecto 5× más grande que el que su propio ruido permitía detectar. Bajar el
+> ruido no sirve si el piso de costo sube más rápido.
+
+> **Un control tiene que poder GANAR, o no es un control.** La corrida 12 midió que una
+> ruptura pelada —sin pivotes, sin tolerancias, sin figura— **le gana a los cinco patrones
+> de gráfico**, y que el mismo detector con los pivotes barajados llega tan lejos como el
+> real. Sin esos dos controles el cero se habría leído como "el mercado es eficiente" en
+> vez de "lo que el patrón detecta es el breakout".
+
+> **El FDR va sobre el LOTE ENTERO, con los controles adentro.** Medido: con 180 brazos,
+> una **máscara al azar** dio **p = 0,0495** y **aguantó `sin_top3`**. Mirando un brazo por
+> vez, eso es un descubrimiento.
+
 > **Generar ancho, no pre-filtrar.** Las compuertas son sobre conclusiones, no sobre
 > explorar. El prior propio no aporta; el harness mata barato.
 
@@ -465,7 +486,7 @@ PRIMERO de la lista** — lo único que queda que se mide en vez de construirse.
 | archivo | qué hace |
 |---|---|
 | **`banco/ranking.py`** | **el harness bueno.** Ranking transversal por barra: sin corte pooled, sin trampa de `SEM_N_MIN`, control por barra, sin solape. Seis compuertas + FDR |
-| **`banco/correr_velas.py`** | **el harness de EVENTOS.** Control por barra para máscaras booleanas. Para §2.1 solo hay que cambiar el detector |
+| **`banco/correr_velas.py`** | **el harness de EVENTOS.** Control por barra para máscaras booleanas. `correr_graficos.py` es el ejemplo de cómo enchufarle un detector nuevo |
 | `banco/velas.py` | 15 patrones de velas con sus umbrales canónicos fijados. El patrón a copiar para preregistrar un detector |
 | `banco/klines.py` | `load_panel(..., tf=, full=, pin=, syms=, mercado=)`. **`mercado="fut"`** trae perpetuos; `tf="1d"` trae diarias |
 | `banco/onchain.py` | CoinMetrics Community (gratis, sin key). Une por `AssetEODCompletionTime`: **sin lookahead y sin lag fijo** |
@@ -477,6 +498,10 @@ PRIMERO de la lista** — lo único que queda que se mide en vez de construirse.
 | **`opciones/viabilidad.py`** | **foto de los 3 venues de opciones**: volumen, OI y spread ATM por subyacente, todo a nocional USD. El patrón de "medir si el instrumento existe ANTES de medir el efecto" |
 | **`opciones/potencia.py`** | **n, σ, MDE y años necesarios** para un estimador dado, con calibración contra un efecto conocido y la ρ que decide si poolear sirve |
 | `banco/correr_onchain.py` | el patrón de `--nula`: contar el n y el MDE antes de nada |
+| **`banco/potencia_graficos.py`** | **la curva MDE(tasa, horizonte) con máscaras al azar.** Dice si una familia se puede medir ANTES de construirle el detector |
+| `banco/graficos.py` | 5 patrones de gráfico con sus tolerancias fijadas, sin lookahead, y su versión con **pivotes barajados** (el control de estructura) |
+| `banco/correr_graficos.py` | el lote de la corrida 12: control de ruptura simple, pivotes barajados, azar, y FDR sobre todo junto |
+| **`banco/dislocacion.py`** | **filo ejecutable entre Binance/OKX/Bybit** con control de tamaño y de skew. `--recolectar` y `--analizar` |
 | `banco/libro.py` | camina el libro. `--mercado fut` para perpetuos |
 
 **Los preregistros** (`banco/PREREGISTRO_*.md`) tienen las reglas escritas antes de cada
@@ -488,8 +513,8 @@ corrida y los resultados debajo de la línea. `TRANSVERSAL` (4 corridas), `FUTUR
 ## 5. Lo que este repo mide, dicho sin vueltas
 
 El mercado es eficiente respecto de la información que hay en el precio, en las 200 monedas
-más líquidas, a horizontes de horas a semanas. Después de **nueve corridas** y nueve de las
-diez familias estándar, eso ya no es un resultado provisorio.
+más líquidas, a horizontes de horas a semanas. Después de **doce corridas** y **las diez
+familias estándar completas**, eso ya no es un resultado provisorio: es el resultado.
 
 Lo que se agregó el 28-ago, y que cierra tres escapes que quedaban abiertos:
 

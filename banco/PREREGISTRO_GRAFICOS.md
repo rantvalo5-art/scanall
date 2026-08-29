@@ -215,4 +215,140 @@ controles están para separar **la estructura** del **breakout pelado**.
 
 # RESULTADOS DE LA CORRIDA 12
 
-_(debajo de esta linea, despues de correr)_
+> Corrido el **2026-08-29**. `banco/correr_graficos.py --tf 1d` (161 s) y `--tf 1h` (2.487 s).
+> **180 brazos a 1d**, **120 a 1h**. 136 pares a 1d, 142 a 1h, 2021-08-01 → 2026-08-01.
+
+## VEREDICTO: **CERO. Y es un cero MEDIDO.**
+
+**Ningún brazo sobrevive, en ninguna de las dos resoluciones. Ninguno pasa FDR.** La
+décima familia queda cerrada, y con la compuerta de §1 corrida antes, **esto no es un
+"no se pudo medir"**: en los horizontes que la compuerta habilitó, la potencia estaba.
+
+---
+
+### R1. Lo que la estructura NO agrega: el control pelado le gana a todo
+
+Ésta es la tabla que cierra la familia. Excesos **antes de costos**, despejados
+exactamente de las dos corridas de costo (el término de costo es lineal, así que
+`e(0) = e(0,20) + 0,20·(e(0,20) − e(0,50))/0,30`):
+
+| resolución | el mejor de… | exceso pre-costo |
+|---|---|---|
+| **1h** | **`CTRL ruptura arriba` — sin pivotes, sin tolerancias, sin figura** | **+0,2532** |
+| 1h | el mejor patrón de gráfico real | +0,1545 |
+| 1h | el mismo detector con **pivotes barajados** | +0,0758 |
+| 1h | máscara al azar | +0,0291 |
+
+> **Una ruptura pelada del máximo de 60 barras le gana a los cinco patrones de gráfico,
+> antes y después de costos.** Y el detector con la estructura destruida —mismos
+> parámetros, pivotes al azar— llega a +0,0758 contra +0,0652 del `doble_piso` real al
+> mismo horizonte.
+>
+> O sea: lo poco que los patrones detectan **es el breakout**. La geometría —los dos
+> techos iguales, el cuello, los hombros simétricos— **no aporta nada medible.**
+
+Después de costos la conclusión es la misma pero más aburrida: a 1d el mejor brazo real
+es `doble_techo` corto a H=5 con **+0,0577** contra un MDE de **0,1561**; el control de
+ruptura simple da **+0,0569** —prácticamente lo mismo— y una **máscara al azar** llega a
+**+0,0823**, más que cualquier patrón.
+
+---
+
+### R2. El brazo que casi engaña, y las tres cosas que lo matan
+
+El resultado más tentador de toda la corrida:
+
+| | |
+|---|---|
+| brazo | **`hch_inv`, objetivo CORTO, 1d, H=5** |
+| exceso pre-costo | **+0,2158** |
+| `p` de bloques | **0,0245** a H=3, **0,0450** a H=5 |
+| `sin_top3` | **+0,1242** — *sobrevive sacar 3 símbolos* |
+
+Un p de 0,0245 que aguanta `sin_top3`. **Y está muerto por tres razones escritas antes de
+mirarlo:**
+
+1. **Es la dirección INVERTIDA.** `hch_inv` —hombro-cabeza-hombro invertido— es un patrón
+   **alcista**: su dirección declarada en §2.1 es **largo**. Este brazo gana yendo
+   **corto**. Elegir el signo después convierte el hallazgo en su opuesto.
+2. **La compuerta de §1 ya lo había descalificado.** `hch_inv` dispara al **0,182%**, por
+   debajo de la frontera de 0,200% a 1d. Su MDE **a su propia tasa y a H=5 es 0,2245**, y
+   su exceso es **0,2158**: **está adentro de su propia banda de ruido.** Eso se sabía
+   antes de correr el efecto.
+3. **No pasa FDR** sobre el lote entero (180 brazos a 1d).
+
+**Los tres filtros lo matan por separado.** Y el más limpio es el segundo, porque el
+número que lo mata se calculó **antes** de que este brazo existiera.
+
+---
+
+### R3. Una máscara al azar con p = 0,0495
+
+`CONTROL azar 2`, objetivo largo, 1d, H=5: exceso pre-costo **+0,1103**, `p` de bloques
+**0,0495**, y **`sin_top3` +0,0475** — o sea que también aguanta sacar tres símbolos.
+
+**Es ruido puro con p < 0,05 y resistente a la compuerta de concentración.** Con 180
+brazos, que uno al azar cruce 0,05 es exactamente lo esperable. Por eso el FDR va **sobre
+el lote entero** y no brazo por brazo, y por eso los controles entran al lote.
+
+> Si esta corrida se hubiera hecho mirando un patrón por vez, habría "encontrado" dos
+> cosas: un HCH invertido que funciona al revés y una máscara aleatoria.
+
+---
+
+### R4. La inversión costo/ruido entre resoluciones — lo que corrige a la compuerta
+
+El término de costo, medido en ATR (es el mismo despeje lineal de R1):
+
+| resolución | costo a 0,20% | costo a 0,50% | MDE (horizonte corto) | **qué manda** |
+|---|---|---|---|---|
+| **1d** | **0,0292 ATR** | 0,0730 | **0,0547** | **el ruido** |
+| **1h** | **0,1548 ATR** | 0,3869 | **0,0289** | **el costo, 5,4×** |
+
+**A 1h el costo de una vuelta es cinco veces el mínimo detectable.** La compuerta de §1
+decía que 1h era la resolución primaria porque tiene 25× más barras y por lo tanto menos
+ruido — y es cierto, pero **incompleto**: bajar el ruido no sirve si el piso de costo sube
+más rápido. Un ATR horario es ~5× más chico que uno diario, así que el mismo 0,20% pesa
+~5× más en esas unidades.
+
+> **La resolución que conviene no es la que tiene más barras: es aquella donde el efecto
+> buscado es grande comparado con `max(ruido, costo)`.** A 1h esta corrida solo podría
+> haber encontrado un efecto **mayor a 0,155 ATR**, o sea 5× más grande que lo que su
+> propio ruido permitía detectar. **Eso se puede calcular antes**, y la compuerta de §1 no
+> lo hacía. Es lo que le falta a esa compuerta y hay que agregárselo a la próxima.
+
+---
+
+### R5. Las tasas de disparo a 1h, que la compuerta había pedido
+
+| patrón | tasa 1h | disparos | frontera H=4 |
+|---|---|---|---|
+| `doble_techo` | 0,756% | 30.135 | 0,050% ✔ |
+| `doble_piso` | 0,654% | 26.058 | ✔ |
+| `hch` | 0,457% | 18.202 | ✔ |
+| `hch_inv` | 0,427% | 17.000 | ✔ |
+| `triangulo` | 0,192% | 7.663 | ✔ |
+
+**Los cinco pasan con holgura a 1h**, y ningún brazo cayó en "no se pudo medir" (0 de 120)
+— contra 24 de 180 a 1d. La compuerta acertó en eso.
+
+---
+
+### R6. Lo que queda dicho, y lo que no
+
+**Dicho:** con este detector, estos siete parámetros, cinco figuras clásicas, dos
+resoluciones y cinco horizontes, **no hay dirección**. Y el mecanismo del cero está
+identificado: lo que los patrones capturan es el **breakout**, que ya se mide solo y mejor
+sin ninguna geometría.
+
+**NO dicho:** que ninguna implementación posible de "hombro-cabeza-hombro" funcione. Los
+patrones de gráfico son subjetivos por construcción y otro juego de tolerancias detecta
+otro conjunto. Lo que sí quedó medido es que **la estructura no aporta sobre la ruptura**
+—control de pivotes barajados y control de ruptura simple, los dos—, y ése es un resultado
+sobre la **forma funcional**, no sobre un juego de umbrales.
+
+> **Y el camino para reabrirlo tiene un peaje escrito:** barrer tolerancias es la máquina
+> de fabricar falsos positivos que el handoff señala. Quien lo intente tiene que
+> preregistrar la grilla completa **antes** y meterla entera en el FDR — o el resultado no
+> vale. Con 180 brazos ya apareció una máscara aleatoria con p = 0,0495.
+
