@@ -1,12 +1,15 @@
-# HANDOFF — las tres direcciones que quedan
+# HANDOFF — las direcciones que quedan
 
-> Escrito el **2026-08-28** al cerrar la sesión de las corridas 5, 5b, 6 y 7.
-> **Este es el punto de entrada.** `HANDOFF_SIGUIENTE.md` pasa a ser el registro completo
-> de lo cerrado (sus §0.5 a §0.8 tienen el detalle de esta sesión); los anteriores
+> Escrito el **2026-08-28** al cerrar las corridas 5, 5b, 6 y 7.
+> **Actualizado el 2026-08-29:** la corrida 8 cerró la volatilidad de alts (ahora §2.0). Quedan
+> **dos direcciones y una medición**.
+>
+> **Este es el punto de entrada.** `HANDOFF_SIGUIENTE.md` es el registro completo de lo
+> cerrado (§0.5 a §0.8 tienen el detalle de la sesión del 28); los anteriores
 > (`HANDOFF_CIERRE.md`, `HANDOFF_SENALES.md`, `HANDOFF_BASIS.md`) son históricos.
 >
-> Se abre en frío: la §0 es operativa, la §1 dice dónde estamos, la §2 son las tres
-> direcciones, la §3 las reglas que no se negocian.
+> Se abre en frío: la §0 es operativa, la §1 dice dónde estamos, la §2 son las direcciones,
+> la §3 las reglas que no se negocian.
 
 ---
 
@@ -72,20 +75,23 @@ Diez familias estándar de confirmación de dirección. **Nueve medidas, todas e
 | Posicionamiento / contrarian | 0 de 276 |
 | Régimen | 7 detectores × 22 trimestres, ninguno gateable |
 | On-chain | 0 de 420 (corrida 6) |
-| Estudios de evento | unlocks cerrado; **listados = 2.2** |
+| Estudios de evento | unlocks cerrado; **listados = 2.1** |
 | **Patrones de velas** | 0 de 660 (corrida 7) — la canónica acierta **50,0%** |
 | ML / no lineal | techo condicional medido |
-| **Patrones de gráfico** | **← nunca tocada (2.3)** |
+| **Patrones de gráfico** | **← nunca tocada (2.2)** |
 
 **Lo único que funcionó, dos veces, es no direccional:**
-- **Vender volatilidad** (+20,96%/año, 5,3 años, mecanismo real). Murió **compitiéndose**,
-  no siendo falsa: +7,33%/año en el régimen reciente, dentro del piso de stablecoins.
+- **Vender volatilidad** (+20,96%/año en BTC, 5,3 años, mecanismo real). Se cerró en
+  BTC/ETH por no superar el piso de stablecoins, y la **corrida 8 cerró la extensión a
+  alts (29-ago)**: el instrumento existe y el spread es barato, pero **no hay historia de
+  implícita para medir la prima** — MDE 39%/año en SOL contra un umbral de 10%, y **BTC
+  con la misma ventana da 27,1%**. Detalle en §2.0.
 - **Magnitud** (el radar): sobrevive en **cinco** diseños distintos y cuatro regímenes.
   Sigue **sin instrumento** para cobrarse.
 
-### 1.3 Lo que la sesión del 28-ago agregó al método
+### 1.3 Lo que las sesiones del 28 y 29-ago agregaron al método
 
-Cuatro cosas que cambian cómo se corre lo que sigue:
+Seis cosas que cambian cómo se corre lo que sigue:
 
 1. **El universo se filtra por CLASE DE ACTIVO, no solo por volumen.** `base200` arrastra
    7 stablecoins/FX y 9 acciones tokenizadas: 9,1% del universo que se lleva **37-44% de
@@ -99,58 +105,70 @@ Cuatro cosas que cambian cómo se corre lo que sigue:
 4. **La tabla de costos de spot subestima al perpetuo por 2×.** Perp: 12-18 bps a $1k,
    15-32 bps a $10k. Spot: 24-34 y 30-62. Medido en el mismo instante, apareado por
    símbolo (`libro_perp.py`).
+5. **Sumar monedas NO agrega potencia: la vol de cripto es un factor.** ρ = +0,92 entre el
+   P&L mensual de la straddle de BTC, ETH, SOL y XRP → **4 subyacentes son 1,07
+   independientes** (corrida 8). Cualquier plan futuro que diga "gano n poniendo más
+   activos" tiene que medir esa ρ primero.
+6. **Un número que contradice una estructura de mercado conocida es un bug, no un
+   hallazgo.** La corrida 8 midió USD 628.000 millones/día de opciones de BTC en OKX —seis
+   veces Deribit— y eso, no el código, fue lo que delató un error de unidades de 100×.
 
 ---
 
-## 2. LAS TRES DIRECCIONES
+## 2. LAS DIRECCIONES QUE QUEDAN
+
+Eran tres. La **§2.0 se cerró el 29-ago** y queda arriba porque lo que la mató es un
+resultado de método que aplica a todo lo que venga. Quedan **dos direcciones** (§2.1 y
+§2.2) y **una medición** (§2.4.D).
 
 Ordenadas por **lo que yo haría**, y el criterio no es el prior: es **cuánto cuesta
-cerrarlas**. Las tres tienen prior bajo. La primera se cierra o se abre en una tarde; la
-última necesita construir un detector.
+cerrarlas**. Las dos tienen prior bajo. La primera es casi toda adquisición de datos; la
+segunda necesita construir un detector.
 
-**Y una cuarta sección, §2.4**, que no es una dirección sino el mapa de **los otros
-negocios** —dónde sí se gana plata en este mercado y por qué está afuera de lo probado—,
-con los dos que resultaron medibles ya medidos y uno que sigue abierto.
-
----
-
-### 2.1 Volatilidad de alts — ★ la primera, y puede terminar en 20 minutos
-
-**La idea.** Vender volatilidad es **lo único que este repo encontró que funcionó de
-verdad**: +20,96%/año en BTC, 5,3 años, DD máx −11,3%, sobrevive sacar los 3 mejores
-meses, y tiene **mecanismo** (prima de seguro), no es un patrón encontrado buscando. Se
-midió **solo en BTC/ETH**, donde Deribit es eficiente y el premio ya se arbitró. En alts
-la competencia es mucho menor, así que la prima debería estar menos comprimida.
-
-Es la única dirección que **extiende lo que funcionó** en vez de buscar una feature más.
-
-**Lo que la mata, y hay que medirlo PRIMERO: puede que el instrumento no exista.**
-
-> **Primer paso, y es de VIABILIDAD, no de estadística.** Averiguar si hay algún mercado
-> de opciones de alts con volumen real. Deribit listó algunas más allá de BTC/ETH; hay que
-> mirar también OKX y Bybit. Lo que se necesita: **open interest y volumen diario por
-> subyacente**, y el spread bid-ask de las opciones at-the-money.
->
-> **Regla de parada, escribirla antes de mirar:** si no hay al menos **3 subyacentes que
-> no sean BTC/ETH** con volumen diario consistente y un spread ATM que deje margen sobre
-> el premio esperado, **se cierra ahí**. No se gasta una sesión midiendo una prima que no
-> se puede cobrar.
-
-**Si el instrumento existe**, recién ahí se mide la prima, y el harness ya está:
-`opciones/iv_rv.py` compara implícita contra **realizada de los 30 días siguientes** (que
-es contra lo que se cobra de verdad, no contra la realizada pasada). Su veredicto para
-BTC/ETH está adentro del archivo, con el número que lo cerró.
-
-**Y una advertencia que ya está pagada:** sintetizar la venta de volatilidad **con órdenes
-stop está cerrado** — regalás k·ATR por trade y falta la convexidad. Si no hay opciones,
-no hay atajo.
-
-**Costo:** viabilidad, muy bajo. Medición, bajo (el harness existe).
-**Prior:** el más alto de los tres, condicional a que exista el instrumento.
+**Y §2.4**, que no es una dirección sino el mapa de **los otros negocios** —dónde sí se gana
+plata en este mercado y por qué está afuera de lo probado—, con los dos que resultaron
+medibles ya medidos y **uno que sigue abierto y que ahora va antes que §2.2**.
 
 ---
 
-### 2.2 Eventos de listado en Binance
+### 2.0 Volatilidad de alts — **CERRADA 29-ago (corrida 8)**
+
+**La idea era la mejor que quedaba:** vender volatilidad es lo único que este repo encontró
+que funcionó de verdad (+20,96%/año en BTC, mecanismo real), y se había medido **solo en
+BTC/ETH**, donde el premio ya se arbitró. En alts la competencia es menor, así que la prima
+debería estar menos comprimida. Era la única dirección que **extendía lo que funcionó**.
+
+**Se cerró en una tarde, y no por donde se esperaba.** El preregistro
+(`banco/PREREGISTRO_OPCIONES.md`) puso tres compuertas. Las dos que se temían pasaron:
+
+| compuerta | lo que se temía | lo que pasó |
+|---|---|---|
+| **(A)** ¿existe el instrumento? | que no hubiera mercado | **PASA**: 6 alts con opciones listadas; SOL, XRP y HYPE cumplen vol ≥ $1M/24h y OI ≥ $5M |
+| **(B)** ¿se puede cruzar? | spreads impagables | **PASA por un orden de magnitud**: ATM 2,3-4,5% relativo, o sea 1-2% de la prima |
+| **(C)** ¿se puede **medir**? | — | **FALLA por 4×** |
+
+**Lo que la mató fue la potencia, y el número que lo cierra es sobre BTC, no sobre las alts.**
+
+- **El DVOL de Deribit solo existe para BTC y ETH.** La única historia de implícita para
+  alts es el índice de Bybit: **18 meses para SOL, 10 para XRP, 7 semanas para HYPE.**
+- Straddles mensuales **no solapadas** → n = 18, 10 y 0 meses. MDE **39,0%**, **56,5%** e
+  **infinito** por año, contra un umbral preregistrado de 10%.
+- **La calibración es lo incontestable: BTC con esos mismos 18 meses da MDE 27,1%/año.** Su
+  efecto está medido y es conocido, y **tampoco sería detectable**. No es que las alts sean
+  especiales — es que el estimador tiene una señal/ruido de ~1/5 por mes.
+- Para un MDE de 10%/año harían falta **11 años en BTC, 23 en SOL, 27 en XRP**. Con la σ del
+  DVOL largo, 17 años en BTC.
+
+**Las tres salidas están medidas y tapadas** (§(C) del preregistro): delta-hedgear no baja
+la varianza porque la σ usada *ya es* la del P&L hedgeado; esperar no alcanza; y poolear
+subyacentes **es la peor de las tres** — ver la regla nueva en §3, ρ = +0,92.
+
+**Lo único que la reabriría:** una fuente con **historia larga** de implícita en alts. No es
+un problema de método: **el dato no existe.**
+
+---
+
+### 2.1 Eventos de listado en Binance  ★ la primera
 
 **La idea.** Un listado tiene **timestamp exacto**, efecto documentado en la literatura, y
 **no sale del precio**. La maquinaria de estudio de evento esparcido sirve tal cual:
@@ -181,7 +199,7 @@ lleva años de arbitraje.
 
 ---
 
-### 2.3 Patrones de gráfico — la décima familia, la única sin tocar
+### 2.2 Patrones de gráfico — la décima familia, la única sin tocar
 
 **La idea.** Hombro-cabeza-hombro, triángulos, banderas, cuñas, dobles techos y pisos.
 Es la **única familia estándar de confirmación de dirección que el repo nunca midió**, y
@@ -224,9 +242,9 @@ Esa forma funcional no está en ninguna de las corridas anteriores.
   barajados**. Si el patrón real no se separa de su versión con la estructura destruida,
   lo que se detectó es ruido con forma.
 
-**Costo:** el más alto de los tres. El detector son ~300 líneas y el diseño de sus
+**Costo:** el más alto de lo que queda. El detector son ~300 líneas y el diseño de sus
 parámetros es la mitad del trabajo.
-**Prior:** el más bajo de los tres.
+**Prior:** el más bajo de lo que queda.
 
 ---
 
@@ -310,7 +328,7 @@ del perp sería 4× la del spot.
 | información no pública | fuera de alcance, y no solo técnico |
 
 **No son "lo mismo pero más difícil": tienen otro costo de entrada y otra unidad de
-competencia.** Meterlas en el mismo handoff que las tres direcciones sería confundir
+competencia.** Meterlas en el mismo handoff que las direcciones abiertas sería confundir
 categorías.
 
 #### D. La única de esta lista que sigue siendo MEDIBLE y no se hizo
@@ -333,7 +351,8 @@ persiste **más de 5 segundos** de forma recurrente, es capturable **sin** co-lo
   dislocaciones enormes que no son operables.
 
 **Prior:** bajo — es la parte más obviamente competida del mercado. **Costo:** bajo, y es
-una **medición**, no una construcción. Va después de 2.1 y 2.2, y antes de 2.3.
+una **medición**, no una construcción. Va **después de §2.1 y antes de §2.2**: es lo segundo
+de la lista.
 
 ---
 
@@ -373,6 +392,24 @@ una **medición**, no una construcción. Va después de 2.1 y 2.2, y antes de 2.
 
 > **Cuando cambian varias cosas a la vez, se corren los paneles intermedios.**
 
+> **La potencia se calcula sobre la UNIDAD DEL ESTIMADOR, no sobre las filas del dato.**
+> La serie de implícita de Bybit tiene ~720 puntos por mes y **ninguno** es independiente:
+> una straddle mensual no solapada da **un** dato por mes. Corrida 8: 18 meses de SOL →
+> MDE 39%/año.
+
+> **Antes de decir "sumo activos y gano potencia", MEDIR la correlación.** ρ = +0,92 entre
+> el P&L de la straddle de BTC, ETH, SOL y XRP: `n_ef = k/(1+(k−1)ρ)` da **1,07 de 4**. La
+> barra se angosta 1,03×, no 2×. La volatilidad de cripto es un solo factor.
+
+> **Un estimador puede ser demasiado ruidoso para cualquier muestra realista, y eso es un
+> veredicto.** Vender una straddle mensual tiene señal/ruido ~1/5 por mes: para un MDE de
+> 10%/año harían falta **11 años en BTC y 23 en SOL**. "No se pudo medir" no siempre es
+> culpa del n — a veces es culpa del estimador, y hay que decir cuál de las dos.
+
+> **Un número que contradice una estructura de mercado conocida es un bug hasta que se
+> demuestre lo contrario.** No fue el código el que delató un error de unidades de 100× en
+> la corrida 8: fue que el resultado ponía a OKX seis veces arriba de Deribit.
+
 > **Generar ancho, no pre-filtrar.** Las compuertas son sobre conclusiones, no sobre
 > explorar. El prior propio no aporta; el harness mata barato.
 
@@ -383,14 +420,16 @@ una **medición**, no una construcción. Va después de 2.1 y 2.2, y antes de 2.
 | archivo | qué hace |
 |---|---|
 | **`banco/ranking.py`** | **el harness bueno.** Ranking transversal por barra: sin corte pooled, sin trampa de `SEM_N_MIN`, control por barra, sin solape. Seis compuertas + FDR |
-| **`banco/correr_velas.py`** | **el harness de EVENTOS.** Control por barra para máscaras booleanas. Para 2.3 solo hay que cambiar el detector |
+| **`banco/correr_velas.py`** | **el harness de EVENTOS.** Control por barra para máscaras booleanas. Para §2.2 solo hay que cambiar el detector |
 | `banco/velas.py` | 15 patrones de velas con sus umbrales canónicos fijados. El patrón a copiar para preregistrar un detector |
 | `banco/klines.py` | `load_panel(..., tf=, full=, pin=, syms=, mercado=)`. **`mercado="fut"`** trae perpetuos; `tf="1d"` trae diarias |
 | `banco/onchain.py` | CoinMetrics Community (gratis, sin key). Une por `AssetEODCompletionTime`: **sin lookahead y sin lag fijo** |
 | `banco/futuros.py` | funding alineado al tablero. Entra en el **retorno**, no en el costo |
 | **`banco/libro_perp.py`** | **costos reales del libro**, spot y perp en el mismo instante y apareados |
-| `banco/test_unlocks.py` | estudio de evento esparcido: permutación + bootstrap de símbolos. **La base para 2.2** |
-| `opciones/iv_rv.py` | DVOL de Deribit vs realizada futura. **La base para 2.1** |
+| `banco/test_unlocks.py` | estudio de evento esparcido: permutación + bootstrap de símbolos. **La base para §2.1** |
+| `opciones/iv_rv.py` | DVOL de Deribit vs realizada futura. Cerró BTC/ETH; **su barra de error está ahora medida en la corrida 8** |
+| **`opciones/viabilidad.py`** | **foto de los 3 venues de opciones**: volumen, OI y spread ATM por subyacente, todo a nocional USD. El patrón de "medir si el instrumento existe ANTES de medir el efecto" |
+| **`opciones/potencia.py`** | **n, σ, MDE y años necesarios** para un estimador dado, con calibración contra un efecto conocido y la ρ que decide si poolear sirve |
 | `banco/correr_onchain.py` | el patrón de `--nula`: contar el n y el MDE antes de nada |
 | `banco/libro.py` | camina el libro. `--mercado fut` para perpetuos |
 
@@ -406,7 +445,7 @@ El mercado es eficiente respecto de la información que hay en el precio, en las
 más líquidas, a horizontes de horas a semanas. Después de siete corridas y nueve de las
 diez familias estándar, eso ya no es un resultado provisorio.
 
-Lo que se agregó esta sesión, y que cierra tres escapes que quedaban abiertos:
+Lo que se agregó el 28-ago, y que cierra tres escapes que quedaban abiertos:
 
 - **No es el instrumento.** El perpetuo ordena igual que el spot: +0,004 ATR de diferencia
   media sobre 140 brazos. Abaratar el trading baja la vara, no resucita nada.
@@ -419,7 +458,20 @@ Y el screener tiene su propio defecto, medido y separado del anterior: **compra 
 después de que el movimiento ya pasó**, y devuelve −0,94 en las 48h siguientes. Ningún
 scoring lo arregla, porque el daño es común a todas sus alertas.
 
+Y el 29-ago se agregó una cuarta, que es de otra naturaleza:
+
+- **No siempre es que no haya efecto: a veces el efecto no es medible con nada.** La
+  corrida 8 encontró que para vender volatilidad en alts **el instrumento existe y es
+  barato de cruzar** —lo contrario de lo que el prior decía— y aun así cerró, porque la
+  historia de implícita da MDE 39%/año contra un umbral de 10%. **BTC, con esa misma
+  ventana, da 27,1%.** Es la primera vez en el repo que una dirección muere por el
+  **estimador**, no por el mercado ni por el dato.
+
 **Lo que sí sobrevive todo lo que se le tire es la MAGNITUD** — cinco diseños, cuatro
 regímenes, 100% de las semanas en el mejor caso. El problema nunca fue medirla: es que
-**no hay instrumento para cobrarla**. Por eso 2.1 es la primera de las tres, y por eso su
-primer paso es averiguar si el instrumento existe.
+**no hay instrumento para cobrarla**.
+
+Y la corrida 8 le puso un número a esa frase. La única forma conocida de cobrar magnitud es
+vender volatilidad; el instrumento **sí existe** en SOL, XRP y HYPE, y el spread **sí deja
+margen**. Lo que falta es la historia para saber si pagan. **Ya no es "no hay instrumento":
+es "no hay con qué decidir si conviene usarlo".**

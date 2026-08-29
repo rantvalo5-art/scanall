@@ -1,2 +1,5 @@
 # DVOL y precios cacheados (se regeneran solos desde las APIs)
 .dvol_cache/
+
+# fotos de libros de opciones (una por corrida, grandes)
+.snapshots/
