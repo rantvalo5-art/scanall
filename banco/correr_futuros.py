@@ -163,7 +163,15 @@ def main():
     ap.add_argument("--workers", type=int, default=12)
     ap.add_argument("--k", type=int, default=K)
     ap.add_argument("--out", default="rank_futuros.csv")
+    ap.add_argument("--costos", type=float, nargs="+", default=None,
+                    help="costos a correr, en %%. Por default los de COSTOS. Se usa "
+                         "para la corrida 5b: los costos MEDIDOS del libro del perp "
+                         "(16,6 bps a $1k y 29,5 bps a $10k, `libro_perp.py`), que "
+                         "reemplazan al 0,10%% de solo-fee y al 0,50%% de guarda.")
     a = ap.parse_args()
+    if a.costos:
+        for k in COSTOS:
+            COSTOS[k] = tuple(a.costos)
 
     t0 = time.time()
     partes = []

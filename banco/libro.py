@@ -33,19 +33,34 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 import pandas as pd
 
-from klines import SPOT, _get
+from klines import API, _get
 
-FEE_LADO = 0.10        # % por lado, taker spot
+# taker por lado, en %. El de futuros es la MITAD, y esa es justamente la mitad del
+# caso de 4.2 que la corrida 5 midio en +0,077 ATR sobre 140 brazos: mueve todo por
+# igual. Lo que NO estaba medido -y es lo que este archivo agrega- es el otro sumando:
+# spread y slippage del libro del PERPETUO.
+FEE = {"spot": 0.10, "fut": 0.05}
 
 
-def universo_por_volumen(top=600, min_usd=50_000):
-    """Pares USDT spot ordenados por volumen en USD de las ultimas 24h."""
-    tick = _get(f"{SPOT}/api/v3/ticker/24hr")
+def universo_por_volumen(top=600, min_usd=50_000, mercado="spot"):
+    """Pares USDT ordenados por volumen en USD de las ultimas 24h.
+
+    `mercado="fut"` devuelve PERPETUOS USDT-margen en vez de spot.
+    """
+    base, pref = API[mercado]
+    tick = _get(f"{base}{pref}/ticker/24hr")
     if not tick:
         raise RuntimeError("no se pudo bajar el ticker de 24h")
-    info = _get(f"{SPOT}/api/v3/exchangeInfo")
-    vivos = {s["symbol"] for s in info["symbols"]
-             if s["status"] == "TRADING" and s["quoteAsset"] == "USDT"} if info else None
+    info = _get(f"{base}{pref}/exchangeInfo")
+    if info and mercado == "fut":
+        vivos = {s["symbol"] for s in info["symbols"]
+                 if s["status"] == "TRADING" and s.get("quoteAsset") == "USDT"
+                 and s.get("contractType") == "PERPETUAL"}
+    elif info:
+        vivos = {s["symbol"] for s in info["symbols"]
+                 if s["status"] == "TRADING" and s["quoteAsset"] == "USDT"}
+    else:
+        vivos = None
     filas = []
     for t in tick:
         s = t["symbol"]
@@ -85,9 +100,10 @@ def _caminar(niveles, usd):
     return costo / base
 
 
-def medir(sym, usd, limite=100):
+def medir(sym, usd, limite=100, mercado="spot"):
     """Spread y slippage de ida y vuelta para una orden de `usd` dolares."""
-    d = _get(f"{SPOT}/api/v3/depth", {"symbol": sym, "limit": limite})
+    base, pref = API[mercado]
+    d = _get(f"{base}{pref}/depth", {"symbol": sym, "limit": limite})
     if not d or not d.get("bids") or not d.get("asks"):
         return None
     bid = float(d["bids"][0][0])
@@ -103,15 +119,16 @@ def medir(sym, usd, limite=100):
         slip = (p_compra / mid - 1) * 100 + (1 - p_venta / mid) * 100
     prof_ask = sum(float(p) * float(q) for p, q in d["asks"])
     prof_bid = sum(float(p) * float(q) for p, q in d["bids"])
+    fee = FEE[mercado]
     return dict(sym=sym, bid=bid, ask=ask, spread=spread, slip=slip,
                 prof_ask=prof_ask, prof_bid=prof_bid,
-                costo=2 * FEE_LADO + slip if np.isfinite(slip) else np.nan)
+                costo=2 * fee + slip if np.isfinite(slip) else np.nan)
 
 
-def snapshot(syms, usd, workers=8):
+def snapshot(syms, usd, workers=8, mercado="spot"):
     filas = []
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        futs = {ex.submit(medir, s, usd): s for s in syms}
+        futs = {ex.submit(medir, s, usd, 100, mercado): s for s in syms}
         for i, f in enumerate(as_completed(futs), 1):
             r = f.result()
             if r:
@@ -128,10 +145,12 @@ def main():
     ap.add_argument("--reps", type=int, default=3)
     ap.add_argument("--espera", type=float, default=20.0)
     ap.add_argument("--csv", default="libro.csv")
+    ap.add_argument("--mercado", default="spot", choices=["spot", "fut"])
     a = ap.parse_args()
 
-    U = universo_por_volumen(a.top)
-    print(f"universo: {len(U)} pares USDT spot vivos, ordenados por volumen 24h")
+    U = universo_por_volumen(a.top, mercado=a.mercado)
+    print(f"universo: {len(U)} pares USDT {'PERP' if a.mercado == 'fut' else 'spot'} "
+          f"vivos, ordenados por volumen 24h | fee {FEE[a.mercado]:.2f}%/lado")
     print(f"  rank 1   : {U.iloc[0]['sym']:14s} ${U.iloc[0]['qv24']:,.0f}")
     print(f"  rank 200 : {U.iloc[199]['sym']:14s} ${U.iloc[199]['qv24']:,.0f}"
           if len(U) > 200 else "")
@@ -140,7 +159,7 @@ def main():
     reps = []
     for r in range(a.reps):
         print(f"\n  snapshot {r+1}/{a.reps} (orden ${a.orden:,.0f})...", flush=True)
-        S = snapshot(U.sym.tolist(), a.orden)
+        S = snapshot(U.sym.tolist(), a.orden, mercado=a.mercado)
         S["rep"] = r
         reps.append(S)
         if r < a.reps - 1:

@@ -175,13 +175,38 @@ Promediando los **140 brazos direccionales** (no el mejor, el promedio):
    COSTO.** Cruzan cero entre **31 y 46 bps** ida y vuelta, y el costo real medido del §2.3
    es 23-28 bps (rank 1-50) y 34-60 bps (rank 51-200). Caen *dentro* de la banda.
 
-### Lo único que 4.2 deja abierto — y es barato
+### El pendiente de 4.2 — **RESUELTO el mismo día (corrida 5b)**
 
-**El libro del PERPETUO no está medido.** `banco/libro.py` camina `api.binance.com`, o
-sea spot. Si el perp de los top-200 ejecuta por debajo de **~30 bps** ida y vuelta
-*incluido spread y slippage*, los 4 candidatos vuelven a estar vivos y hay que correrles
-el corte por régimen y la reserva OOS. Si ejecuta por arriba, quedan cerrados del todo.
-Es **una medición de un rato**: apuntar `libro.py` a `fapi.binance.com/fapi/v1/depth`.
+Se midió el libro del perpetuo (`banco/libro_perp.py`), los dos libros en el **mismo
+instante** y apareados por símbolo:
+
+| banda | orden | **costo perp** | costo spot |
+|---|---|---|---|
+| 1-50 | $1k | **12,1 bps** | 23,9 bps |
+| 51-200 | $1k | **18,1 bps** | 34,4 bps |
+| 1-50 | $10k | **14,7 bps** | 29,5 bps |
+| 51-200 | $10k | **31,9 bps** | 61,6 bps |
+
+**El libro del perp es la mitad del de spot** y su spread cotizado 2,6× más ajustado. La
+condición para reabrir los 4 candidatos —ejecutar bajo ~30 bps— **se cumplió**: 16,6 bps
+de mediana en el top-200 a $1k.
+
+**Se los re-corrió a los costos medidos (0,17% y 0,30%) y siguen sin pasar:**
+
+| candidato | @0,10% | @0,17% | **muere en** |
+|---|---|---|---|
+| `dd_720` (FS) | +0,1890 ✓ | +0,1253 | **FDR** |
+| `roc_168 ~ sin roc_24` (FS) | +0,1651 ✓ | +0,1184 | **FDR** |
+| `roc_168` (F200) | +0,2020 ✓ | +0,1624 | **FDR** |
+| `pos_168` (F200) | +0,1834 ✓ | +0,1355 | **consistencia semanal (55%)** |
+
+> Los cuatro necesitaban el **0,10% de solo-fee**. Al costo real del instrumento que los
+> favorecía mueren en compuertas que **no tienen nada que ver con el costo**. Es un cierre
+> mejor que el original: aquel los mataba con una guarda de 0,50% que se podía objetar por
+> irreal; a este se le corrigió el número **a favor** y no pasan igual.
+
+⚠️ **La tabla de costos del §2.3 es de SPOT y subestima al perp por 2×.** Cualquier
+evaluación sobre perpetuos usa la de arriba, no aquella.
 
 ### ⚠️ Un defecto de `base200` que aparecería en cualquier corrida futura
 
@@ -433,9 +458,9 @@ Ordenadas por lo que yo haría. **Las TRES primeras están cerradas** (4.1 el 27
 de datos nueva o un instrumento que puede no existir, que es exactamente por qué estaban
 después de las otras dos.
 
-> **Antes de abrir cualquiera de las tres, está el pendiente barato de §0.6**: medir el
-> libro del **perpetuo** con `libro.py`. Decide si los 4 candidatos de la corrida 5 están
-> vivos o muertos, y es una medición de un rato.
+> El pendiente de §0.6 (medir el libro del perpetuo) **ya se resolvió** el mismo día: el
+> libro es la mitad del de spot, los 4 candidatos se re-corrieron al costo medido y no
+> pasan igual. No queda nada barato antes de 4.4 y 4.5.
 
 ### 4.1 Ser el MAKER, no el taker — ~~★ la que yo haría primero~~ **CERRADO 2026-08-27**
 
@@ -577,7 +602,8 @@ de escribir la regla no es opcional.**
 | `banco/klines.py` | además de spot, **`mercado="fut"`** trae klines de **perpetuos** (`fapi`), con caché aparte (sufijo `_fut`) |
 | `banco/futuros.py` | el **funding alineado al tablero**: entra en el RETORNO (las dos patas), no en el costo. Y `carry_acum` como score |
 | `banco/correr_futuros.py` | la corrida 5: los 4 paneles que separan universo / costo / instrumento. **El patrón a copiar** para cualquier comparación de instrumento |
-| `banco/libro.py` | **spread y profundidad reales** del order book, camina el libro. ⚠️ **solo spot** — apuntarlo a `fapi` es el pendiente de §0.6 |
+| `banco/libro.py` | **spread y profundidad reales** del order book, camina el libro. `--mercado fut` mide el del **perpetuo** |
+| `banco/libro_perp.py` | los **dos libros en el mismo instante**, apareados por símbolo. El perp es la MITAD que spot (§0.6) |
 | `banco/costos.py` | Corwin-Schultz y Roll — **documentado como NO usable a 1h** |
 | `banco/onchain.py` | **CoinMetrics Community** (gratis, sin key): actividad de cadena diaria de 48 activos que cotizan en Binance. Une por `AssetEODCompletionTime`, o sea **sin lookahead y sin lag fijo** |
 | `banco/correr_onchain.py` | la corrida 6. `--nula` corre SOLO el n post-join y el MDE, que es el paso que va primero |

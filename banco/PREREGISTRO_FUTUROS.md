@@ -376,3 +376,82 @@ adelante el universo hay que filtrarlo por clase de activo, no solo por volumen.
 
 **`magnitud` no se ve afectada** y replica en los cuatro paneles (34, 34, 38 y 30
 sobrevivientes): es la quinta vez que sobrevive, ahora también sobre perpetuos.
+
+---
+
+# CORRIDA 5b — el libro del perpetuo, medido (2026-08-28)
+
+Esto cierra el único pendiente que §R6 dejó abierto, y lo cierra por el camino que §R6
+dejó escrito **antes** de medir nada: *"si el perp de los top-200 ejecuta por debajo de
+~30 bps ida y vuelta incluido spread y slippage, estos cuatro brazos vuelven a estar
+vivos"*.
+
+## El libro, medido en el MISMO instante que el de spot
+
+`banco/libro_perp.py`. 200 perps por volumen, 146 con par de spot vivo, 3 snapshots, los
+dos libros pedidos en la misma vuelta y apareados por símbolo — porque medir el perp hoy y
+compararlo contra la tabla de spot de otro día mezcla mercado con momento, que es la regla
+de método que dejó §R3.
+
+| banda | orden | **spread perp** | spread spot | **costo perp** | costo spot | diferencia |
+|---|---|---|---|---|---|---|
+| 1-50 | $1k | **0,011%** | 0,027% | **12,1 bps** | 23,9 bps | −11,8 |
+| 51-200 | $1k | **0,024%** | 0,070% | **18,1 bps** | 34,4 bps | −15,6 |
+| 1-50 | $10k | **0,013%** | 0,027% | **14,7 bps** | 29,5 bps | −13,6 |
+| 51-200 | $10k | **0,025%** | 0,067% | **31,9 bps** | 61,6 bps | −26,3 |
+
+**El libro del perpetuo es la mitad del de spot, y el spread cotizado es 2,6× más
+ajustado.** Ningún par falló en llenar la orden a ninguno de los dos tamaños.
+
+Mediana del top-200 perp: **16,6 bps a $1k** (100% de los pares por debajo de 31) y
+**29,5 bps a $10k** (55,5% por debajo). O sea que **la condición de §R6 se cumple**: el
+perp ejecuta por debajo de la banda de equilibrio de los cuatro candidatos.
+
+> **Limitación heredada de `libro.py` y declarada de nuevo:** el libro es el de HOY
+> aplicado a una ventana histórica. Si en 2025-08 era peor, los candidatos mueren más, no
+> menos — así que para un cierre el sesgo va a favor.
+
+## Y aun así los cuatro mueren — pero ahora por otra cosa
+
+Re-corridos los dos paneles a los costos **medidos** (0,17% y 0,30%) en vez del 0,10% de
+solo-fee:
+
+| panel | costo | brazos | spread > 0 | **SOBREVIVEN** | mejor |
+|---|---|---|---|---|---|
+| FS | 0,17% | 148 | 21 | **0** | +0,1253 |
+| FS | 0,30% | 148 | 4 | **0** | +0,0320 |
+| F200 | 0,17% | 148 | 38 | **0** | +0,1662 |
+| F200 | 0,30% | 148 | 18 | **0** | +0,1076 |
+
+| candidato | @0,10% | @0,17% | @0,30% | **muere en** |
+|---|---|---|---|---|
+| `dd_720` (FS) | +0,1890 ✓ | +0,1253 | +0,0072 | **FDR** |
+| `roc_168 ~ sin roc_24` (FS) | +0,1651 ✓ | +0,1184 | +0,0317 | **FDR** |
+| `roc_168` (F200) | +0,2020 ✓ | +0,1624 | +0,0889 | **FDR** |
+| `pos_168` (F200) | +0,1834 ✓ | +0,1355 | +0,0466 | **consistencia semanal (55%)** |
+
+> **Los cuatro necesitaban el 0,10% de solo-fee. Al costo real del instrumento que los
+> favorecía mueren en compuertas que no tienen nada que ver con el costo: multiplicidad y
+> consistencia semanal.**
+
+## Por qué esto es un cierre MEJOR que el de §R1
+
+El cierre original los mataba con una guarda de **0,50%** que era conservadora justamente
+porque el costo del perp **no estaba medido**. Se le podía objetar —con razón— que 0,50%
+era irreal para un perpetuo líquido.
+
+Ahora esa objeción no existe: el costo está medido, es **16,6 bps**, la condición que §R6
+puso para reabrirlos **se cumplió**, se los re-corrió a ese costo, y **igual no pasan**. Un
+resultado que sobrevive a que le corrijan el número a favor es mucho más firme que uno que
+nunca fue puesto a prueba.
+
+**El pendiente de §R6 queda resuelto y 4.2 queda cerrado del todo.** No hace falta extender
+el panel de perp a cinco años para el corte por régimen: no hay candidato que cortar.
+
+## Lo que sí queda, y vale para cualquier trabajo futuro
+
+**La tabla de costos del §2.3 del handoff es de SPOT y subestima al perpetuo por 2×.**
+Cualquier cosa que se evalúe sobre perp de acá en adelante usa esta tabla, no aquella. Y
+la conclusión de fondo de la corrida 5 no se mueve: el instrumento más barato **baja la
+vara** (más brazos con spread positivo: de 44 a 0,10% a 38 a 0,17% en F200), pero no
+fabrica sobrevivientes.
