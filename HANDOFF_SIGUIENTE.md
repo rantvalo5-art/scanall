@@ -172,8 +172,11 @@ Promediando los **140 brazos direccionales** (no el mejor, el promedio):
 1. **El lado corto: cero.** Ninguno de los 4 candidatos es corto; **ningún brazo corto
    sobrevivió en ningún panel a ningún costo.** Y eso era *la mitad del caso de 4.2* — el
    repo encontraba señales cortas y decía no tener instrumento. Con el instrumento puesto,
-   y con el funding jugando **a favor** del corto (+0,0161%/24h ≈ **5,9% anualizado**), no
-   ordenó nada.
+   y con el funding, no ordenó nada. ⚠️ **Corrección del 28-ago:** el carry mediano por
+   barra es +0,0161%/24h, pero eso es la MEDIANA; la **media** por símbolo en los líquidos
+   es **−7,23%/año**, o sea que sobre el año un short **paga**. El resultado no cambia
+   (cada fila llevó su propio carry) pero la lectura sí: el funding no era viento de cola.
+   Ver §2.4 de `HANDOFF_TRES.md`.
 2. **`carry_acum` (el funding como ranking, no como costo)**: no sobrevive en ningún panel
    a ningún costo. Muere en FDR en el mejor caso.
 3. **Los 4 candidatos no mueren por ser cero: mueren porque el efecto TIENE EL TAMAÑO DEL
@@ -565,7 +568,8 @@ competencia de latencia, que solo empeoran el número. Si el piso ya es negativo
 > futuros y el funding metido dentro del retorno, en cuatro paneles que separan universo,
 > costo e instrumento. **La serie del perp ordena igual que la de spot: +0,004 ATR de
 > diferencia media sobre 140 brazos.** El lado corto —la mitad del caso— quedó en **cero
-> en los cuatro paneles a todos los costos**, aun con el funding a favor (5,9% anualizado).
+> en los cuatro paneles a todos los costos**, con el funding adentro del retorno (⚠️ y ese
+> funding NO era viento de cola: media −7,23%/año en los líquidos — ver §0.6).
 > `carry_acum` (el funding como *ranking*) muere en FDR. Los 4 candidatos que aparecían a
 > 0,10% mueren en la compuerta de 0,50%, escrita antes de correr.
 > Todo en **`banco/PREREGISTRO_FUTUROS.md`**, y el resumen en §0.6.

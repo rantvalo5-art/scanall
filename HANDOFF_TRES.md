@@ -67,15 +67,15 @@ Diez familias estándar de confirmación de dirección. **Nueve medidas, todas e
 | Momentum transversal | 4.140 hipótesis, **0** |
 | Momentum de serie / trend | ingredientes medidos, **0** |
 | Reversión / fade | **la única viva** — forward test 19-oct |
-| Carry (funding) | **0**, como costo y como señal |
+| Carry (funding) | **0** como señal; y **cash-and-carry cerrado 28-ago**: media −7,23%/año en líquidos (§2.4.A) |
 | Order flow / microestructura | 0 de 192; maker cerrado por comisión |
 | Posicionamiento / contrarian | 0 de 276 |
 | Régimen | 7 detectores × 22 trimestres, ninguno gateable |
 | On-chain | 0 de 420 (corrida 6) |
-| Estudios de evento | unlocks cerrado; **listados = 2.3** |
+| Estudios de evento | unlocks cerrado; **listados = 2.2** |
 | **Patrones de velas** | 0 de 660 (corrida 7) — la canónica acierta **50,0%** |
 | ML / no lineal | techo condicional medido |
-| **Patrones de gráfico** | **← nunca tocada (2.1)** |
+| **Patrones de gráfico** | **← nunca tocada (2.3)** |
 
 **Lo único que funcionó, dos veces, es no direccional:**
 - **Vender volatilidad** (+20,96%/año, 5,3 años, mecanismo real). Murió **compitiéndose**,
@@ -107,6 +107,10 @@ Cuatro cosas que cambian cómo se corre lo que sigue:
 Ordenadas por **lo que yo haría**, y el criterio no es el prior: es **cuánto cuesta
 cerrarlas**. Las tres tienen prior bajo. La primera se cierra o se abre en una tarde; la
 última necesita construir un detector.
+
+**Y una cuarta sección, §2.4**, que no es una dirección sino el mapa de **los otros
+negocios** —dónde sí se gana plata en este mercado y por qué está afuera de lo probado—,
+con los dos que resultaron medibles ya medidos y uno que sigue abierto.
 
 ---
 
@@ -226,6 +230,113 @@ parámetros es la mitad del trabajo.
 
 ---
 
+### 2.4 Los otros negocios — dónde SÍ se gana plata, y cuál de ellos es medible acá
+
+Las nueve familias en cero son todas de **información pública, gratis, sin ventaja de
+latencia, sobre las 200 monedas más líquidas**. Donde efectivamente se gana plata en este
+mercado está afuera de eso: latencia y co-location, flujo privado, arbitraje entre venues
+con infraestructura, market making a escala con rebates y modelo de inventario, e
+información no pública.
+
+**Ninguna de esas es "una feature que al screener se le escapó".** Son negocios distintos,
+con otro costo de entrada — y decirlo así no es resignación, es la diferencia entre
+"buscar más" y "cambiar de negocio". Pero dos de ellas tenían una pregunta **medible con
+lo que ya está en disco**, así que se midieron el 28-ago en vez de quedar como intuición.
+
+#### A. Cash-and-carry / cosechar funding — **MEDIDO Y CERRADO (28-ago)**
+
+**La idea, y por qué merecía el intento.** Comprar spot y shortear el perpetuo del mismo
+activo es **delta-neutral**: no apuesta dirección, y cobra el funding. Tiene **mecanismo**
+(el funding es lo que paga la demanda de apalancamiento) y es **no direccional** — el
+único perfil que funcionó dos veces en este repo. El cierre anterior era sobre **BTC solo**
+(+3,35%/año, bajo el piso de stablecoins); nadie había mirado la sección cruzada.
+
+**Medido sobre 253 perps, 2025-08 → 2026-08, funding anualizado que cobraría el short:**
+
+| universo | n | mediana | **media** | p90 |
+|---|---|---|---|---|
+| `base200` (líquidos) | 172 | −1,78% | **−7,23%** | +3,68% |
+| el resto (cola) | 81 | +1,59% | −3,17% | +15,99% |
+| todos | 253 | −1,46% | −5,93% | +7,06% |
+
+> **En los nombres líquidos la media es NEGATIVA: −7,23%/año. El cash-and-carry pierde
+> plata en la moneda mediana antes de pagar un solo costo.**
+
+**Y la selección tampoco lo salva.** Persistencia entre semestres: correlación **+0,253**.
+El **top-20 por funding del primer semestre rinde +1,57%/año en el segundo** (contra un
+universo de −5,92%). O sea que elegir agrega ~7,5 pp de valor relativo, pero el absoluto
+—+1,57%— queda **debajo del piso de stablecoins (~4-5%)** y muy debajo del costo:
+
+- una vuelta de cash-and-carry son **4 patas** (comprar spot, shortear perp, deshacer las dos),
+- ≈ 24-34 bps de spot + 12-18 bps de perp = **40-50 bps por ciclo**,
+- rebalanceando mensual, **~5-6%/año solo de costo**.
+
+**Veredicto: cerrado.** +1,57% de rendimiento forward contra 5-6% de costo y un piso libre
+de riesgo de 4-5%, con riesgo de liquidación y de base encima.
+
+> ⚠️ **Y deja una trampa de método que hay que llevarse:** *el funding que cobra una
+> posición es la MEDIA, no la mediana.* El carry mediano por barra da **+0,0161%/24h**
+> (≈ +5,9% anualizado) y parece viento de cola; la media por símbolo es **−7,23%**. La
+> diferencia es que el funding se va muy negativo **de golpe** —a los largos les pagan
+> fuerte en los picos— y una posición se come **todos** los pagos, no la mediana de ellos.
+> Cualquier cosa que se cobre pago a pago se evalúa con la media.
+
+#### B. Market making sobre el perpetuo — **muerto por aritmética, NO re-medirlo**
+
+`PREREGISTRO_MAKER.md` midió el spread realizado sobre **`aggTrades` de spot** y dejó
+escrito que, *si* cruzaba el fee de futuros (0,0200%), el paso siguiente sería re-medir
+sobre `aggTrades` de futuros. **No cruzó** (0,0133%), así que la regla nunca se activó.
+
+Tentaba re-abrirlo porque la corrida 5b midió que el spread cotizado del perp en la banda
+51-200 es **0,024-0,025%**, o sea *arriba* del fee de maker. Pero la cuenta lo mata sin
+gastar una corrida:
+
+- en spot, el spread realizado fue **0,0133% sobre un cotizado de 0,067-0,070%** → una
+  tasa de captura de **~19%** (el resto se lo come la selección adversa),
+- 19% del cotizado del perp (0,024%) son **~0,005%**,
+- contra un fee de maker de **0,0200%**. No cruza, y no cruza por 4×.
+
+**No re-medir.** Si alguien quiere igual, que primero muestre por qué la tasa de captura
+del perp sería 4× la del spot.
+
+#### C. Lo que queda genuinamente afuera, y por qué
+
+| negocio | por qué no es accesible acá |
+|---|---|
+| latencia / co-location | requiere infraestructura y capital; se compite en microsegundos |
+| flujo privado (internalización, OTC) | no es información que se pueda comprar suelta |
+| arbitraje entre venues con infra | el spread existe pero se cierra a velocidad de máquina |
+| market making a escala con rebates | los rebates viven en tiers de volumen inalcanzables |
+| información no pública | fuera de alcance, y no solo técnico |
+
+**No son "lo mismo pero más difícil": tienen otro costo de entrada y otra unidad de
+competencia.** Meterlas en el mismo handoff que las tres direcciones sería confundir
+categorías.
+
+#### D. La única de esta lista que sigue siendo MEDIBLE y no se hizo
+
+**¿Cuánto dura una dislocación entre venues?** El negocio de latencia es inaccesible, pero
+tiene una pregunta empírica barata: *¿las diferencias de precio entre Binance, OKX y Bybit
+se cierran en microsegundos, o hay una cola lenta?* Si una dislocación de más de ~30 bps
+persiste **más de 5 segundos** de forma recurrente, es capturable **sin** co-location.
+
+- **Cómo:** REST público de los tres venues, el mismo par, muestreado cada ~1s durante
+  varios días. No hace falta websocket ni cuenta.
+- **Qué medir:** distribución del |spread entre venues| y, condicional a que supere el
+  costo de cruzar (~40-60 bps, dos venues), **cuánto tarda en volver bajo ese umbral**.
+- **Regla de parada, escribirla antes:** si la mediana de duración de las dislocaciones
+  que superan el costo es **menor a 2 segundos**, el negocio es de latencia y **se cierra**
+  — no hay versión lenta.
+- **Ojo con dos artefactos** que van a inflar el resultado si no se controlan: los precios
+  de venues distintos **no están sincronizados** (hay que comparar timestamps del servidor,
+  no de llegada), y un par puede estar **halted o en subasta** en un venue, lo que fabrica
+  dislocaciones enormes que no son operables.
+
+**Prior:** bajo — es la parte más obviamente competida del mercado. **Costo:** bajo, y es
+una **medición**, no una construcción. Va después de 2.1 y 2.2, y antes de 2.3.
+
+---
+
 ## 3. Las reglas que no se negocian
 
 > **La regla de parada se escribe ANTES de mirar.** Si se afloja después de ver un número,
@@ -255,6 +366,10 @@ parámetros es la mitad del trabajo.
 > declarar el cierre (corrida 5b).
 
 > **El universo se filtra por clase de activo, no solo por volumen.**
+
+> **Lo que se cobra pago a pago se evalúa con la MEDIA, no con la mediana.** El funding
+> mediano por barra da +5,9% anualizado y parece viento de cola; la media por símbolo es
+> **−7,23%**. Se va muy negativo de golpe, y una posición se come todos los pagos (§2.4.A).
 
 > **Cuando cambian varias cosas a la vez, se corren los paneles intermedios.**
 
