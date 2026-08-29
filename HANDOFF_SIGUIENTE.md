@@ -306,6 +306,59 @@ OOS.
 
 ---
 
+## 0.8. La corrida 7 — velas japonesas, y la hipotesis de rescate que descarta
+
+Salio de una pregunta directa: *¿el problema es el screener, o no hay forma de confirmar
+direccion? ¿se probaron las velas japonesas?* La respuesta era **no**: el banco habia
+medido forma de vela como **features continuas** cortadas por quintiles (0 de 86), que es
+otra forma funcional. Un patron clasico es una **conjuncion booleana** de 4-6
+desigualdades sobre **2-3 velas**, y **con contexto**. Eso nunca se corrio. Y peor: los
+patrones se definieron sobre velas **diarias**, y el banco no tenia una sola cache de 1d.
+
+**Diseno**: 15 patrones con su definicion canonica fijada antes (`banco/velas.py`), con y
+sin condicion de tendencia previa, las dos direcciones, 1d (H=1/3/5) y 1h (H=4/24), dos
+costos, 180 pares, 2021-08 -> 2026-08. Estimador con **control POR BARRA** — el sesgo
+principal de un test de patrones es que los alcistas disparan mas en dias alcistas del
+mercado entero, y `lote.py` aparea por simbolo, asi que nunca lo neutralizo.
+
+### El resultado
+
+| resolucion | brazos | exceso > 0 | **SOBREVIVEN** | semanas | MDE |
+|---|---|---|---|---|---|
+| **1d** | 396 | 39 | **0** | 253 | ±0,0386 |
+| **1h** | 264 | **0** | **0** | 257 | ±0,0221 |
+
+**Y el numero que cierra la familia:** cada patron tiene una direccion que el canon dice
+que predice, declarada en el codigo **antes** de correr. Comparada contra su propio espejo,
+al mismo costo y en la misma barra:
+
+| resolucion | la direccion CANONICA le gana a la contraria |
+|---|---|
+| **1d** | **42 de 84 — 50,0%** |
+| **1h** | 16 de 56 — 28,6% |
+
+> **Es una moneda, con dos decimales.** Un patron sin ventaja pero con alguna estructura
+> daria 60 de 84 y moriria en las compuertas. Esto no llega ni a tener estructura.
+
+Tres de los cinco mejores brazos de 1d estan **invertidos** respecto de lo que el patron
+afirma (`estrella_maniana`, que es reversion alcista, da su mejor numero en CORTO). Si la
+direccion se hubiera elegido despues de mirar, los cinco contarian como aciertos.
+
+### Dos cosas que valen mas alla de esta corrida
+
+1. **Ningun brazo quedo sin medir** (0 de 432 por n insuficiente). Es "no esta", no "no se
+   pudo medir".
+2. **Es la primera vez que el banco mide en velas DIARIAS**, y eso descarta una hipotesis
+   de rescate que quedaba flotando: *"no encuentra nada porque mira a 1h"*. A 1d, con 253
+   semanas y un MDE de +-0,039, tampoco hay nada.
+
+**Validez del diseno**: `CTRL cuerpo q80` —la feature continua que ya habia dado 0 de 86—
+reproduce su cero (-0,016 / -0,037). El estimador no fabrica senal.
+
+Todo en **`banco/PREREGISTRO_VELAS.md`**.
+
+---
+
 ## 1. Estado del repo al cerrar la sesión
 
 **Nada mergeado. Tres ramas vivas:**
@@ -347,6 +400,7 @@ regenerables** tras la purga de 30 días).
 | Swing | sin ventaja; el defecto es el timing de entrada |
 | **Ranking transversal, DIRECCION** | **0 de 4.140** (27-ago) — precio + flujo + posicionamiento, las dos direcciones, 4h a 7d, k 3/8/16, 5 años, 4 regímenes |
 | **Market making en spot (4.1)** | **cerrado por comisión** (27-ago) — spread realizado 0,0133% contra un fee de 0,0750%; tampoco cruza el de futuros (0,0200%) |
+| **Patrones de velas japonesas** | **cerrada** (28-ago) - 660 brazos, 15 patrones clasicos con y sin contexto, 2 direcciones, 5 horizontes, **1d y 1h**, 253 semanas. 0 sobreviven, 0 brazos sin medir, y la direccion canonica acierta **42 de 84 (50,0%)** contra su propio espejo. Ver 0.8 |
 | **On-chain: actividad de cadena (4.3)** | **direccion cerrada** (28-ago) - 0 de 420 brazos, sin un solo spread positivo, con 257 semanas y MDE +-0,065. **NO cierra flujos de exchange**: no se pueden medir gratis. Ver 0.7 |
 | **El INSTRUMENTO: perpetuos (4.2)** | **cerrado** (28-ago) — la serie del perp ordena igual que la de spot (**+0,004 ATR** de diferencia media sobre 140 brazos); el lado corto en cero con el instrumento puesto; el funding como señal muere en FDR. Ver §0.6 |
 
