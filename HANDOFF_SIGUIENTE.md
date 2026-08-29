@@ -1,5 +1,10 @@
 # HANDOFF — las cinco direcciones que quedan
 
+> ⚠️ **ESTE YA NO ES EL PUNTO DE ENTRADA.** Al 2026-08-28 quedan tres direcciones vivas y
+> estan en **`HANDOFF_TRES.md`**, que se abre en frio. Este archivo queda como el REGISTRO
+> de lo cerrado: sus §0.5 a §0.8 tienen el detalle de las corridas 5, 5b, 6 y 7, y su §2
+> el mapa completo de lo que esta muerto y que patron deja.
+
 > Escrito el **2026-08-26**, **actualizado el 2026-08-27** (ver sección 0.5: la sesión
 > del 27 cerró 4.1, respondió parte de 4.2 y produjo lo primero que sobrevivió) y
 > **el 2026-08-28** (la corrida 5 cerró **4.2** y la corrida 6 cerró **4.3**: §0.6 y §0.7).
