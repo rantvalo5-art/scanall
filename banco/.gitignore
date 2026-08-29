@@ -4,3 +4,8 @@
 
 # velas diarias de todos los pares USDT que existieron (corrida 9)
 .listados_cache/
+
+# salidas de las corridas de graficos
+rank_graficos_*.csv
+potencia_graficos_*.csv
+*.log
