@@ -125,7 +125,7 @@ Siete cosas que cambian cómo se corre lo que sigue:
 
 ## 2. LAS DIRECCIONES QUE QUEDAN
 
-Eran tres. **Dos se cerraron el 29-ago** (§2.0, opciones y listados) y quedan arriba
+Eran tres. **Dos se cerraron el 29-ago** (§2.0.A opciones y §2.0.B listados) y quedan arriba
 porque lo que las mató son resultados de método que aplican a todo lo que venga: las dos
 murieron **por potencia**, y por razones opuestas.
 
@@ -481,14 +481,14 @@ PRIMERO de la lista** — lo único que queda que se mide en vez de construirse.
 
 **Los preregistros** (`banco/PREREGISTRO_*.md`) tienen las reglas escritas antes de cada
 corrida y los resultados debajo de la línea. `TRANSVERSAL` (4 corridas), `FUTUROS` (5 y
-5b), `ONCHAIN` (6), `VELAS` (7).
+5b), `ONCHAIN` (6), `VELAS` (7), **`OPCIONES` (8)** y **`LISTADOS` (9)**.
 
 ---
 
 ## 5. Lo que este repo mide, dicho sin vueltas
 
 El mercado es eficiente respecto de la información que hay en el precio, en las 200 monedas
-más líquidas, a horizontes de horas a semanas. Después de siete corridas y nueve de las
+más líquidas, a horizontes de horas a semanas. Después de **nueve corridas** y nueve de las
 diez familias estándar, eso ya no es un resultado provisorio.
 
 Lo que se agregó el 28-ago, y que cierra tres escapes que quedaban abiertos:
