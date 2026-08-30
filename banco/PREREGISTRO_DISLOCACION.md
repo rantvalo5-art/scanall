@@ -222,4 +222,90 @@ en las dos patas**, y con el patrón por liquidez en la dirección declarada.
 
 # RESULTADOS
 
-_(debajo de esta linea, despues de correr)_
+## ESTADO DE LA RECOLECCIÓN — **INCOMPLETA. Esto NO es el veredicto.**
+
+> Al **2026-08-30 18:38 UTC**: **21,57 h de las 24 preregistradas** (90%), **83.950
+> muestras**, 30 pares, 7 minutos de huecos en total. **Falta la franja 18:38 → 21:04 UTC.**
+>
+> El colector fue detenido desde afuera **tres veces** (a las 18,6 h, a 1,4 h y a 1,2 h);
+> las tres veces se relanzó y se reanudó sin perder lo juntado. Para terminarlo:
+>
+> ```
+> cd banco
+> py -3.13 -u dislocacion.py --recolectar --horas 2.5
+> py -3.13 -u dislocacion.py --analizar
+> ```
+>
+> **La regla de las 24 h no se afloja.** Se deja el estado escrito y el veredicto en
+> blanco, en vez de declarar uno con 21,6 h y ponerle un asterisco.
+
+### Lo que hay hasta acá
+
+| umbral (filo ejecutable, con USD 1.000 en las dos patas) | episodios | mediana | p90 |
+|---|---|---|---|
+| **> 0 bps** (bruto, antes de comisiones) | **46.673** | **2,77 s** | 23,1 s |
+| > 10 bps | 46 | 0,76 s | 0,76 s |
+| **> 20 bps** (el costo: dos taker) | **2** | 0,76 s | 0,76 s |
+| > 30 bps | 1 | 0,76 s | 0,76 s |
+
+La compuerta pide **≥ 30 episodios** sobre 20 bps para afirmar una mediana. Hay **2** en
+21,6 h. Para llegar a 30, las 2,4 h que faltan tendrían que producir 28 — unas **250× la
+tasa** observada. El resultado no está en la balanza.
+
+### ⚠️ Un número que SÍ se está moviendo, y es el interesante
+
+La duración de las dislocaciones **brutas** —el hallazgo que decía que "esto no es un
+negocio de latencia"— **está bajando a medida que entra la sesión activa**:
+
+| cobertura | mediana de duración a 0 bps |
+|---|---|
+| 7,1 h | **4,30 s** |
+| 18,7 h | **3,55 s** |
+| **21,6 h** | **2,77 s** |
+
+Va hacia el umbral de 2 s, no se aleja. **Lo que dije antes —"la dislocación es lenta, más
+del doble del umbral"— era una lectura de cobertura parcial y hay que tratarla como
+provisoria.** Las horas que faltan son las más activas del día, que es exactamente donde
+cabe esperar que se cierren más rápido. **Ése, y no el conteo de episodios, es el motivo
+real por el que vale la pena completar las 24 h.**
+
+### Lo que ya está firme, y no depende de las horas que faltan
+
+**El tamaño, no la velocidad, es lo que mata el negocio.** Fracción de observaciones con
+USD 1.000 de nocional en el tope de **las dos** patas:
+
+| par | vol 24h | con tamaño |
+|---|---|---|
+| BTCUSDT | $592 M | 95,5% |
+| ETHUSDT | $282 M | 89,7% |
+| DOGEUSDT | $24 M | 43,0% |
+| LTCUSDT | $12 M | 36,4% |
+| INJUSDT | $3,6 M | **0,0%** |
+| ALGOUSDT | $0,9 M | **0,1%** |
+| AGLDUSDT | $0,1 M | **0,2%** |
+
+> **Justo donde la hipótesis predecía menos competencia —los pares finos— no hay nada que
+> operar: el tope del libro no llega a USD 1.000.** La ventana existe y no entra nada por
+> ella. El patrón por liquidez declarado antes de medir sale **cero en los 30 pares.**
+
+### El outlier de 108 bps, auditado
+
+El filo más grande de toda la muestra fue `MANAUSDT`, ruta bybit→okx. **No era un halt ni
+una subasta**, que es lo que el preregistro mandaba descartar:
+
+En 3 segundos MANA cayó de 0,0772 a 0,0760 (−1,5%). Binance y Bybit bajaron primero; **OKX
+quedó una muestra atrás**, cotizando 0,0772 cuando el resto ya estaba en 0,0763. Era una
+**cotización rancia durante un movimiento rápido**.
+
+Y el bid rezagado de OKX tenía **200 MANA = USD 15**.
+
+> **La oportunidad más grande de 21 horas fue una cotización vieja de quince dólares.** El
+> control de tamaño —el único de los tres que agregué por fuera de lo que pedía el
+> handoff— la descartó solo.
+
+
+---
+
+# VEREDICTO
+
+_(en blanco a proposito: la recoleccion no llego a las 24 h preregistradas)_

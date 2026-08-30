@@ -181,7 +181,21 @@ def cargar():
     fs = [os.path.join(DATOS, x) for x in os.listdir(DATOS) if x.endswith(".csv")]
     if not fs:
         return pd.DataFrame()
-    D = pd.concat([pd.read_csv(x) for x in fs], ignore_index=True)
+    # GOTCHA: un colector recien arrancado deja el CSV vacio hasta el primer flush, y
+    # pd.read_csv de un archivo sin cabecera revienta con EmptyDataError. Analizar
+    # MIENTRAS se recolecta es el caso normal, no el raro.
+    partes = []
+    for x in fs:
+        try:
+            d = pd.read_csv(x)
+        except Exception as e:
+            print(f"  (salteado {os.path.basename(x)}: {type(e).__name__})")
+            continue
+        if len(d):
+            partes.append(d)
+    if not partes:
+        return pd.DataFrame()
+    D = pd.concat(partes, ignore_index=True)
     return D.drop_duplicates(["t", "par", "venue"])
 
 
