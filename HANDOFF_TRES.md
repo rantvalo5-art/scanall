@@ -1,4 +1,9 @@
-# HANDOFF — las direcciones que quedan
+# HANDOFF TRES — las direcciones que se cerraron
+
+> **ESTE YA NO ES EL PUNTO DE ENTRADA.** El punto de entrada es ****,
+> que tiene lo pendiente, la resolucion del instrumento y las reglas actualizadas.
+> Este archivo queda como el registro detallado de las cuatro cosas que se cerraron el
+> 29 y 30 de agosto (§2.0.A a §2.0.D).
 
 > Escrito el **2026-08-28** al cerrar las corridas 5, 5b, 6 y 7.
 > **Actualizado el 2026-08-30:** las corridas 8 a 13 cerraron **las tres direcciones** y
