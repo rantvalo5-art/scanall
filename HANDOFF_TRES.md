@@ -1,9 +1,11 @@
 # HANDOFF — las direcciones que quedan
 
 > Escrito el **2026-08-28** al cerrar las corridas 5, 5b, 6 y 7.
-> **Actualizado el 2026-08-29:** las corridas 8 a 12 cerraron **las tres** —volatilidad de
-> alts (§2.0.A), eventos de listado (§2.0.B) y patrones de gráfico (§2.0.C)—. Con la última
-> **se completa la décima familia estándar: el mapa de direcciones ya no tiene huecos.**
+> **Actualizado el 2026-08-30:** las corridas 8 a 13 cerraron **las tres direcciones** y
+> además el último hueco de horizonte: volatilidad de alts (§2.0.A), eventos de listado
+> (§2.0.B), patrones de gráfico (§2.0.C) y horizontes > 1 semana (§2.0.D).
+> **El mapa de direcciones ya no tiene huecos — pero sí tiene una RESOLUCIÓN medida, y hay
+> que leerla antes que cualquier otra cosa: está en la §5.**
 > No queda ninguna dirección abierta: quedan **una medición corriendo y tres fechas**.
 >
 > **Este es el punto de entrada.** `HANDOFF_SIGUIENTE.md` es el registro completo de lo
@@ -69,7 +71,7 @@ Diez familias estándar de confirmación de dirección. **Nueve medidas, todas e
 
 | familia | veredicto |
 |---|---|
-| Momentum transversal | 4.140 hipótesis, **0** |
+| Momentum transversal | 4.140 hipótesis, **0** — y la corrida 13 midió que ese 0 descarta ~32%/año bruto, no 10% |
 | Momentum de serie / trend | ingredientes medidos, **0** |
 | Reversión / fade | **la única viva** — forward test 19-oct |
 | Carry (funding) | **0** como señal; y **cash-and-carry cerrado 28-ago**: media −7,23%/año en líquidos (§2.4.A) |
@@ -91,9 +93,9 @@ Diez familias estándar de confirmación de dirección. **Nueve medidas, todas e
 - **Magnitud** (el radar): sobrevive en **cinco** diseños distintos y cuatro regímenes.
   Sigue **sin instrumento** para cobrarse.
 
-### 1.3 Lo que las sesiones del 28 y 29-ago agregaron al método
+### 1.3 Lo que las sesiones del 28-ago al 30-ago agregaron al método
 
-Ocho cosas que cambian cómo se corre lo que sigue:
+Nueve cosas que cambian cómo se corre lo que sigue:
 
 1. **El universo se filtra por CLASE DE ACTIVO, no solo por volumen.** `base200` arrastra
    7 stablecoins/FX y 9 acciones tokenizadas: 9,1% del universo que se lleva **37-44% de
@@ -127,6 +129,10 @@ Ocho cosas que cambian cómo se corre lo que sigue:
    unidades. **A 1h manda el costo; a 1d manda el ruido.** Hay que elegir la resolución
    donde el efecto buscado sea grande contra `max(ruido, costo)`, y las dos se calculan
    **antes** (corrida 12).
+9. **Y estirar el horizonte tampoco es una palanca: es un empate.** A 90d el costo anual
+   cae 13× respecto de 7d, y la precisión cae casi exactamente lo mismo. **El efecto bruto
+   detectable se queda en ~31%/año en todo el rango de 7d a 90d** (corrida 13). Antes de
+   proponer "probemos a un horizonte más largo", esa cuenta ya está hecha.
 
 ---
 
@@ -136,8 +142,9 @@ Eran tres. **Las tres se cerraron el 29-ago** —§2.0.A opciones, §2.0.B lista
 patrones de gráfico— y quedan arriba porque lo que las mató son resultados de método que
 aplican a todo lo que venga.
 
-**Con §2.0.C cierra la décima familia estándar. El mapa de direcciones ya no tiene
-huecos.**
+**Con §2.0.C cierra la décima familia estándar y con §2.0.D el último hueco de horizonte.
+El mapa de direcciones ya no tiene huecos — pero sí tiene una RESOLUCIÓN, y hay que
+declararla (§5).**
 
 **No queda ninguna dirección abierta.** Lo que queda es:
 
@@ -285,6 +292,35 @@ solo en horizontes cortos.
 **Lo que NO queda dicho:** que ninguna implementación posible funcione. Sí queda medido que
 **la estructura no aporta sobre la ruptura** —dos controles independientes—, y eso es un
 resultado sobre la forma funcional, no sobre un juego de umbrales.
+
+---
+
+### 2.0.D Horizontes largos (> 1 semana) — **CERRADA 30-ago (corrida 13)**
+
+**Era el último lugar del mapa donde la respuesta era "no se probó" y no "no está".** El
+veredicto de la corrida 4 dice, textual, *"a horizontes de 4h a 7d"*. Más allá de una
+semana no se había medido nada, y en la literatura el momentum transversal se define a
+1-12 **meses**.
+
+**La hipótesis tenía un argumento real a favor:** el término de costo del harness no
+depende del horizonte, así que se paga 52 veces al año a 7d y **4 veces** a 90d. Era lo
+contrario del problema que mató a 1h en la corrida 12.
+
+**Se midió, y la compensación resulta EXACTA:**
+
+| horizonte | barras | **MDE %/año** | costo %/año | **BRUTO necesario** |
+|---|---|---|---|---|
+| **168h (7d)** | 255 | 22,0 | 10,43 | **32,4** ← calibración |
+| **720h (30d)** | 58 | 30,2 | 2,43 | **32,6** |
+| **2160h (90d)** | 19 | 29,8 | 0,81 | **30,6** |
+
+> **El costo cae 13× y la precisión cae casi lo mismo: el efecto bruto necesario se queda
+> quieto en 30,6-32,6%/año, con 6% de dispersión.** Alargar el horizonte no es una palanca,
+> es un empate. Era la última perilla del mapa y no gira nada.
+
+**Barrido de `k` (la única otra perilla):** `k=20` estaba bien elegido a 7d y algo corto a
+30d. El mejor caso de las dos perillas juntas —`k=40` a 30 días— da **26,4%/año**, todavía
+2,6× el umbral preregistrado de 10%.
 
 ---
 
@@ -476,6 +512,11 @@ PRIMERO de la lista** — lo único que queda que se mide en vez de construirse.
 > una **máscara al azar** dio **p = 0,0495** y **aguantó `sin_top3`**. Mirando un brazo por
 > vez, eso es un descubrimiento.
 
+> **Todo MDE se reporta ANUALIZADO, no en ATR por tenencia.** Comparar un MDE de 24h con
+> uno de 90d en "ATR por tenencia" no significa nada: la misma unidad mide cosas distintas.
+> Y anualizar es lo que dejó ver que el "0 de 4.140" de la corrida 4 descartaba **32%/año
+> bruto y no 10%** (corrida 13).
+
 > **Generar ancho, no pre-filtrar.** Las compuertas son sobre conclusiones, no sobre
 > explorar. El prior propio no aporta; el harness mata barato.
 
@@ -498,6 +539,7 @@ PRIMERO de la lista** — lo único que queda que se mide en vez de construirse.
 | **`opciones/viabilidad.py`** | **foto de los 3 venues de opciones**: volumen, OI y spread ATM por subyacente, todo a nocional USD. El patrón de "medir si el instrumento existe ANTES de medir el efecto" |
 | **`opciones/potencia.py`** | **n, σ, MDE y años necesarios** para un estimador dado, con calibración contra un efecto conocido y la ρ que decide si poolear sirve |
 | `banco/correr_onchain.py` | el patrón de `--nula`: contar el n y el MDE antes de nada |
+| **`banco/horizonte_largo.py`** | **MDE anualizado por horizonte, con el costo en la misma unidad.** La compuerta que hay que correr antes de proponer cualquier horizonte nuevo |
 | **`banco/potencia_graficos.py`** | **la curva MDE(tasa, horizonte) con máscaras al azar.** Dice si una familia se puede medir ANTES de construirle el detector |
 | `banco/graficos.py` | 5 patrones de gráfico con sus tolerancias fijadas, sin lookahead, y su versión con **pivotes barajados** (el control de estructura) |
 | `banco/correr_graficos.py` | el lote de la corrida 12: control de ruptura simple, pivotes barajados, azar, y FDR sobre todo junto |
@@ -512,9 +554,27 @@ corrida y los resultados debajo de la línea. `TRANSVERSAL` (4 corridas), `FUTUR
 
 ## 5. Lo que este repo mide, dicho sin vueltas
 
-El mercado es eficiente respecto de la información que hay en el precio, en las 200 monedas
-más líquidas, a horizontes de horas a semanas. Después de **doce corridas** y **las diez
-familias estándar completas**, eso ya no es un resultado provisorio: es el resultado.
+Después de **trece corridas** y **las diez familias estándar completas**, el resultado es
+éste, y conviene decirlo con la precisión que la corrida 13 midió:
+
+> **No hay un efecto direccional GRANDE —del orden de 30%/año bruto o más— en la
+> información que está en el precio, en las 200 monedas más líquidas, a horizontes de 4h a
+> 90 días.**
+
+**Lo que NO está establecido, y hasta la corrida 13 sonaba como si lo estuviera:** que no
+haya un efecto **modesto**. Con 5 años de historia, el mejor estimador transversal del repo
+tiene una resolución de **26-32%/año bruto**. Un edge real de 8-15%/año **habría sido
+invisible en las trece corridas**.
+
+**Y el motivo no es un defecto del método: es el largo de la muestra.** Con rebalanceo
+semanal hay 255 observaciones independientes en 5 años, y el error estándar de la media no
+baja de ahí por más features que se prueben. Para llevar la resolución a 10%/año harían
+falta **~7× más observaciones**, o sea ~35 años.
+
+> **Eso NO es una invitación a seguir buscando: es lo contrario.** Dice que la pregunta
+> "¿hay un edge modesto?" **no tiene respuesta alcanzable con estos datos**, y que agregar
+> features sobre la misma ventana no mueve el error estándar ni un poco. Lo único que lo
+> mueve es el tiempo.
 
 Lo que se agregó el 28-ago, y que cierra tres escapes que quedaban abiertos:
 
