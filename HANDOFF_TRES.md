@@ -1,6 +1,6 @@
 # HANDOFF TRES — las direcciones que se cerraron
 
-> **ESTE YA NO ES EL PUNTO DE ENTRADA.** El punto de entrada es ****,
+> **ESTE YA NO ES EL PUNTO DE ENTRADA.** El punto de entrada es **`HANDOFF_CUATRO.md`**,
 > que tiene lo pendiente, la resolucion del instrumento y las reglas actualizadas.
 > Este archivo queda como el registro detallado de las cuatro cosas que se cerraron el
 > 29 y 30 de agosto (§2.0.A a §2.0.D).
