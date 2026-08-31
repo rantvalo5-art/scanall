@@ -182,4 +182,81 @@ Ninguno se afloja después de ver un número.
 
 # ────────────────── RESULTADOS (debajo de esta línea) ──────────────────
 
-*(en blanco a propósito hasta que corra la compuerta)*
+**Corrido el 2026-08-30** con `opciones/potencia_transversal.py`.
+
+## Veredicto: **NO SE PUDO MEDIR — la dirección se CIERRA.** Falló por σ, no por n.
+
+La premisa era cierta y **no alcanzó**. Es un cierre limpio: la compuerta que verifica el
+argumento **pasó**, y la que verifica la potencia **falló por 3×**.
+
+### Calibración (§5) — el aparato está validado
+
+| | medido acá | ya publicado |
+|---|---|---|
+| BTC/DVOL bruto, 65 meses no solapados | **+20,50 %/año** | +20,96 (`iv_rv.py`, 5,3 años) |
+| MDE con las últimas 18 barras | **23,5 %/año** | 27,1 (corrida 8) |
+
+Reproduce. La diferencia de 0,46 pp sale de la convención de muestreo mensual (`iv_rv.py`
+toma cada 30ª fila; acá el primer día de cada mes calendario). El número nuevo se puede
+interpretar.
+
+### (P) LA PREMISA — **PASA**
+
+| | |
+|---|---|
+| ρ media entre pares de nombres | **+0,818** (la corrida 8 midió +0,92) |
+| σ(cartera top−bottom) / σ(nombre suelto) | **0,711** |
+| esperado con ρ = +0,82 y σ iguales | 0,603 |
+
+**El diferencing hace lo que se dijo que iba a hacer:** saca el factor común y baja la
+varianza un 29%. El argumento de §1 no era falso.
+
+### (C) POTENCIA — **NO PASA, por 3×**
+
+n = **18** meses no solapados (3 nombres hasta 2025-09, 5 desde 2025-10).
+
+| cartera | σ mensual | **MDE** |
+|---|---|---|
+| top−bottom | 3,59 | **28,4 %/año** |
+| pesos por rank (secundaria) | 3,12 | 24,7 %/año |
+| umbral preregistrado | | **10,0 %/año** |
+
+- Con esta σ harían falta **145 meses (12,1 años)**: faltan 127.
+- Con este n haría falta una σ de 1,26, y la medida es 3,59.
+- **Falla por σ, no por n.** En un año el colector diario suma 12 barras y el MDE baja a
+  ~22%/año: sigue al triple del umbral. **Esto no se arregla esperando.**
+
+### El número que resume la corrida
+
+> **MDE transversal 28,4 %/año contra los 27,1 %/año que la corrida 8 midió sobre BTC
+> solo.** La reducción de varianza es real y es **irrelevante**: no compra
+> medibilidad.
+
+### Por qué la cuenta de §4 dio 10,8 y la medición dio 28,4
+
+Vale anotarlo porque es un error de método reutilizable, no un accidente de estos datos.
+
+1. **La ρ de esta sección cruzada es +0,818, no +0,92.** La de la corrida 8 se midió sobre
+   otro conjunto de nombres y otra ventana. Con +0,818 la reducción esperada ya es 0,603 y
+   no 0,40.
+2. **Y la medida es 0,711, peor que esa.** El motivo es que la cuenta `σ·√(2(1−ρ))` **supone
+   que las σ son iguales entre nombres, y no lo son**: BTC 3,75 · ETH 4,64 · DOGE 4,79 ·
+   SOL 5,58 · XRP 6,50.
+
+> **La lección: una cartera top−bottom no hereda la σ promedio del universo, hereda la de
+> los EXTREMOS — y los extremos de un ranking de IV/RV son sistemáticamente los nombres más
+> volátiles.** Diferenciar dos nombres ruidosos no baja tanto como diferenciar dos
+> promedio. Cualquier cuenta de potencia a priori sobre una cartera long-short tiene que
+> usar la σ de los nombres que la cartera va a ELEGIR, no la del universo.
+
+### Notas de datos
+
+- **HYPE quedó afuera**: `HYPEUSDT` no existe en spot de Binance (400), así que no hay
+  realizada con la que compararle la implícita. Necesitaría otro venue de spot.
+- El panel termina en **2026-07** porque la realizada futura pide 30 días por delante.
+
+### Lo que esto NO cierra
+
+Sigue en pie que **lo único que reabre la dirección es historia**, y el colector diario
+(PR #28) es lo que la junta. Pero ahora está medido que **la vía transversal tampoco la
+destapa**: con la σ de esta cartera hacen falta 12 años, no un par de meses.
