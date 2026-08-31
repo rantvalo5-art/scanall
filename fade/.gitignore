@@ -1,2 +1,11 @@
-# datos bajados de Supabase (se regeneran solos)
+# Datos bajados de Supabase.
+#
+# OJO: NO "se regeneran solos", que es lo que decia este archivo y era falso.
+# `bajar()` ACUMULA: pide solo el tramo nuevo mas un remojo de 8 dias y mergea por
+# id, asi que este directorio nunca pierde filas viejas. Supabase si las pierde:
+# `update_outcomes.py` purga todos los dias lo que pase de RETENTION_DAYS.
+#
+# O sea que para cualquier fecha mas vieja que la retencion, ESTE cache es el unico
+# lugar donde estan los datos del forward test. No borrarlo.
+# Hay una copia en ..\..\scanall_respaldo\fade_cache\ (2026-08-30).
 .cache/

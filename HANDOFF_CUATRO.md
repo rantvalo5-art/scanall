@@ -59,6 +59,21 @@ py -3.13 -u dislocacion.py --analizar         # lo juntado de la corrida 10
 - **Binance `exchangeInfo` se filtra por `status`, no por nombre.** Los deslistados vienen
   con `status == "BREAK"`. Filtrar por nombre los da a todos por vivos.
 
+**Y uno que no es de API pero se cobró el token una vez:** nunca imprimir `e` crudo en un
+`except` que envuelva una llamada a Telegram — el mensaje de una excepción de `requests`
+trae la URL, y la URL de Telegram trae el token en el path. Así se filtró el 2026-08-22, al
+log de Actions de un repo público. Se arregló en `swing/screener.py` el 27-ago y **quedaron
+tres sitios afuera** (`screener.py`, `swing/exit_tracker.py`, `radar/radar.py`), los tres
+corriendo solos; PR #26. Usar `_sin_token()`, que es idéntico en los cuatro archivos. **Un
+`except` que no imprime nada tampoco alcanza: si no hay `try`, el traceback lo escribe igual.**
+
+- **`fade/.cache/` no es un scratch: es un ACUMULADOR, y para las fechas viejas es el
+  único lugar donde están los datos.** `bajar()` pide solo el tramo nuevo y mergea por
+  `id`, así que nunca pierde filas; Supabase sí las pierde, porque `update_outcomes.py`
+  purga todos los días lo que pase de `RETENTION_DAYS`. El `.gitignore` de ese directorio
+  decía "se regeneran solos" y era falso. Copia del 2026-08-30 en
+  `..\scanall_respaldo\fade_cache\`.
+
 **Cachés (grandes, no borrar, todos gitignoreados):** `banco/.kline_cache/` (1,7 GB),
 `.backtest_cache/` (1,77 GB), `banco/.funding_cache/`, `.metrics_cache/`, `.unlock_cache/`,
 `.onchain_cache/`, **`banco/.listados_cache/`** (diarias de los 734 pares USDT que
@@ -117,6 +132,20 @@ en el bid rezagado.
 | **19 oct 2026** | forward test del **fade** (la última hipótesis direccional viva) | `cd fade && py -3.13 evaluar.py` |
 
 El radar necesita `$env:SUPABASE_KEY` antes de correr `medir.py`.
+
+> **Las fechas tenían fecha de vencimiento, y el 2026-08-30 se arregló.**
+> `daytrader_outcomes` —la tabla que lee el forward test del fade— se purgaba sola a los
+> **90 días** (`update_outcomes.py`, `purge_old`, corre a diario; verificado en el log del
+> run `33291504262`). Las alertas del 17-ago se borraban el **~15-nov**, así que el chequeo
+> de las 18 semanas (21-dic-2026) y el de las 69 (13-dic-2027) se quedaban **sin datos, en
+> silencio y sin que nada fallara**. Se subió a **550 días** (PR #27). Todavía no se había
+> purgado nada: la tabla arranca el 25-jun y los 90 días caían el ~23-sep.
+>
+> **La lección general, que no es sobre esta tabla:** un experimento preregistrado a
+> meses o años vista depende de que el dato siga existiendo ese día. Antes de escribir una
+> fecha en un handoff, hay que mirar qué la borra — retención, cuota, un cron que se
+> apaga solo. Acá el radar tiene la suya anotada en `radar/HANDOFF_FORWARD_TEST.md` §2:
+> GitHub deshabilita los cron tras 60 días sin actividad en el repo.
 
 > **`radar/HANDOFF_FORWARD_TEST.md` y `HANDOFF_CIERRE.md` tienen la decisión de cada
 > resultado posible, escrita antes de que existiera un dato. NO AFLOJARLAS.** Ese es el
