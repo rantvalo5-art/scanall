@@ -58,6 +58,45 @@ cd fade && py -3.13 evaluar.py
 Refutar es mucho más rápido que confirmar. Por eso el chequeo de octubre vale la pena y los
 otros dos son opcionales.
 
+### Chequeo del 2026-08-27 — se miró temprano, y NO decide nada
+
+Se corrió `evaluar.py --desde 2026-08-17`, **siete semanas antes de la fecha
+preregistrada**. Queda anotado acá porque un vistazo sin registrar es peor que uno
+registrado.
+
+| | |
+|---|---|
+| alertas nuevas (2026-08-17 → 08-27) | 426 · BREAKOUT 246, EXPLOSION 180 |
+| semanas | **2** de las 9 |
+| 4h, fill 15m, solo perps | +0,746% · las dos semanas positivas (+0,78% / +0,58%) |
+| 24h, fill 15m, solo perps | +0,533%, pero **(b) sin top-3 da −0,052%** |
+| bootstrap por semanas | **no corre**: con k = 2 no hay de dónde remuestrear |
+
+**No es una réplica ni una refutación. Son 2 de 9 semanas, y encima la segunda está a
+mitad de camino** (54 alertas contra 259, y 68 filas todavía con los precios en NULL
+porque los outcomes no maduraron). El chequeo que decide sigue siendo el **2026-10-19**.
+
+> Que los números hayan salido **a favor** es exactamente el motivo para no tocar nada.
+> Es el caso en el que aflojar se siente razonable, y es el caso en el que fabrica el
+> falso positivo. El signo de un vistazo temprano no mueve la fecha.
+
+Además, correr esto en agosto destapó **tres defectos del propio `evaluar.py`**, los tres
+en el camino que el handoff manda ejecutar en octubre. Están corregidos:
+
+1. **El caché devolvía el in-sample disfrazado de forward test.** `bajar()` devolvía
+   `dt_all.json` entero si el archivo existía, sin mirar la fecha. Con ese archivo escrito
+   el 2026-08-17, correr `py -3.13 evaluar.py` el 2026-10-19 habría reimpreso **los datos
+   con los que se construyó la hipótesis**, con las cuatro compuertas en OK y cara de
+   out-of-sample. Ahora el caché es un piso: se pide siempre el tramo nuevo y se re-piden
+   los últimos 8 días, porque las filas recién alertadas entran con `price_4h`/`price_24h`
+   en NULL y se completan después.
+2. **Confundía "no se pudo medir" con "no está".** Con menos de 4 semanas el bootstrap
+   devuelve `nan`, la compuerta (e) sale FALLA por falta de datos, y el script imprimía
+   **`LA REGLA DISPARA`** — que se lee como una muerte. Ahora hay tres estados y antes de
+   las 9 semanas preregistradas emite `TODAVIA NO ALCANZA`, igual que `radar/medir.py`.
+3. **La anon key de fallback está vencida** (401). Sin `SUPABASE_KEY` el script moría con
+   un `HTTPError` crudo; ahora dice qué pasó y de dónde sacar la vigente.
+
 ---
 
 ## 3. Lo que se construyó (y por qué importa más que los cierres)
@@ -87,6 +126,10 @@ Queda para re-chequear en un año. **Lo único que reabre el ítem** es que IV/R
 sostenido arriba de ~1,30 con el premio arriba del 15% de la prima.
 
 ### `fade/evaluar.py` — el forward test de 4.7 en un comando
+
+Corregido el 2026-08-27: caché incremental (antes replayaba el in-sample), el estado
+`TODAVIA NO ALCANZA` separado de `LA REGLA DISPARA`, y `SEM_MIN = 9` cableado para que
+no emita veredicto antes de la fecha preregistrada. Necesita `SUPABASE_KEY`.
 
 ---
 
