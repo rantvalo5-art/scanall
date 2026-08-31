@@ -16,6 +16,12 @@
 >
 > **Antes de proponer cualquier cosa nueva, leer la §2.** Dice con qué precisión mide este
 > repo, y esa precisión es peor de lo que las corridas anteriores dejaban sonar.
+>
+> **Y si la pregunta es "¿qué fuente de información NUEVA se puede probar para detectar
+> dirección?", está contestada aparte en `HANDOFF_FUENTES_NUEVAS.md`** (2026-08-31): son
+> cuatro —skew de opciones, macro/cross-asset, flujos de ETF y texto—, se verificó con grep
+> que ninguna está en el repo, y solo **dos se pueden medir hoy**. Ese documento se abre en
+> frío y trae su propio contexto.
 
 ---
 
