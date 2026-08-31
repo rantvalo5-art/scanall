@@ -35,6 +35,7 @@ falla y se repetirían avisos). SQL:
 import argparse
 import json
 import os
+import re
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -190,6 +191,18 @@ def get_klines_1h(symbol, start_ms, end_ms):
     return rows
 
 
+def _sin_token(e):
+    """Saca el token del mensaje de error antes de imprimirlo.
+
+    El mensaje de una excepcion de requests incluye la URL completa, y la URL de la
+    API de Telegram lleva el token adentro (`/bot<TOKEN>/sendMessage`). Imprimir la
+    excepcion cruda lo escribe en el log de Actions, que en un repo publico lee
+    cualquiera: fue el vector por el que se filtro el token el 2026-08-22.
+    Nunca imprimir `e` directo en un except que envuelva una llamada a Telegram.
+    """
+    return re.sub(r"bot\d{6,12}:[A-Za-z0-9_-]{30,}", "bot***", str(e))
+
+
 def send_telegram(text):
     try:
         r = requests.post(
@@ -200,7 +213,7 @@ def send_telegram(text):
         )
         r.raise_for_status()
     except Exception as e:
-        print(f"  send_telegram error: {e}")
+        print(f"  send_telegram error: {_sin_token(e)}")
 
 
 def record_exit(row, res):

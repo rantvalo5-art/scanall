@@ -11,6 +11,7 @@ Configuración en config.json (raíz del repo). Si falta o está roto, el script
 
 import json
 import os
+import re
 from datetime import datetime, timezone, timedelta
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
@@ -495,12 +496,28 @@ def in_cooldown(symbol, history_tf, last_seen):
     return datetime.now(timezone.utc) - ts < timedelta(minutes=cooldown_minutes)
 
 
+def _sin_token(e):
+    """Saca el token del mensaje de error antes de imprimirlo.
+
+    El mensaje de una excepcion de requests incluye la URL completa, y la URL de la
+    API de Telegram lleva el token adentro (`/bot<TOKEN>/sendMessage`). Imprimir la
+    excepcion cruda lo escribe en el log de Actions, que en un repo publico lee
+    cualquiera: fue el vector por el que se filtro el token el 2026-08-22.
+    Nunca imprimir `e` directo en un except que envuelva una llamada a Telegram.
+    """
+    return re.sub(r"bot\d{6,12}:[A-Za-z0-9_-]{30,}", "bot***", str(e))
+
+
 def send_telegram(text):
-    SESSION.post(
-        f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
-        json={"chat_id": TELEGRAM_CHAT_ID, "text": text},
-        timeout=10,
-    )
+    try:
+        SESSION.post(
+            f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
+            json={"chat_id": TELEGRAM_CHAT_ID, "text": text},
+            timeout=10,
+        )
+    except Exception as e:
+        # Sin encadenar: el traceback original trae el token en la URL.
+        raise RuntimeError(f"send_telegram fallo: {_sin_token(e)}") from None
 
 
 # TF del screener → intervalo de TradingView
@@ -599,7 +616,7 @@ def send_telegram_photo(image_buf, caption):
         )
         r.raise_for_status()
     except Exception as e:
-        print(f"  send_telegram_photo error: {e}")
+        print(f"  send_telegram_photo error: {_sin_token(e)}")
         # Fallback: si falla la imagen, mando solo el texto para no perder la alerta
         try:
             send_telegram(caption)
