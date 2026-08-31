@@ -215,7 +215,23 @@ def patch_outcome(row_id, update):
 
 
 def purge_old():
-    """Borra filas más viejas que RETENTION_DAYS."""
+    """Borra filas más viejas que RETENTION_DAYS.
+
+    OJO ANTES DE BAJARLO. Esta tabla no es solo el tracker: es el dato del forward
+    test del fade, la única hipótesis direccional viva del repo. `HANDOFF_CIERRE.md`
+    preregistró tres fechas —2026-10-19, 2026-12-21 y 2027-12-13— y todas leen las
+    alertas desde 2026-08-17. Con los 90 días que había acá, las del 17-ago se
+    borraban el ~15-nov y los dos últimos chequeos se quedaban sin datos, en
+    silencio y sin que nada fallara. De ahí los 550 días: cubren hasta el chequeo de
+    2027-12-13 con margen.
+
+    El costo medido el 2026-08-30: 14.593 filas para 67 días de alertas (~218/día,
+    ~657 bytes de JSON por fila). A 550 días son ~120-165k filas, del orden de
+    70-100 MB — cómodo contra los 500 MB del free tier de Supabase.
+
+    Si hace falta bajarlo, primero hay que asegurar el dato en otro lado: el cache
+    de `fade/evaluar.py` acumula y no pierde filas viejas, pero es local.
+    """
     purge_before = (datetime.now(timezone.utc) - timedelta(days=RETENTION_DAYS)).isoformat()
     try:
         r = requests.delete(
