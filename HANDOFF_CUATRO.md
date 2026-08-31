@@ -1,13 +1,18 @@
 # HANDOFF — lo que queda pendiente
 
-> Escrito el **2026-08-30**, al cerrar las corridas 8 a 13.
+> Escrito el **2026-08-30**, al cerrar las corridas 8 a 14.
 > **Este es el punto de entrada.** `HANDOFF_TRES.md` pasa a ser el registro de las
 > direcciones que se cerraron; los anteriores (`HANDOFF_SIGUIENTE.md`, `HANDOFF_CIERRE.md`,
 > `HANDOFF_SENALES.md`, `HANDOFF_BASIS.md`) son históricos.
 >
-> **No hay ninguna dirección abierta.** Las diez familias estándar están medidas y el
-> último hueco de horizonte está cerrado. Lo que queda es **una medición sin terminar y
-> tres fechas** — está todo en la §1.
+> **No hay ninguna dirección abierta.** Las diez familias estándar están medidas, el
+> último hueco de horizonte está cerrado y la corrida 14 cerró la última forma funcional
+> sin probar. Lo que queda es **una medición sin terminar y tres fechas** — está todo en
+> la §1.
+>
+> **Y las tres fechas ya no se rompen solas.** El 2026-08-30 se descubrió que la tabla
+> que lee el forward test del fade se purgaba a los 90 días y dejaba sin datos a dos de
+> los tres chequeos preregistrados. Arreglado (§1.2).
 >
 > **Antes de proponer cualquier cosa nueva, leer la §2.** Dice con qué precisión mide este
 > repo, y esa precisión es peor de lo que las corridas anteriores dejaban sonar.
@@ -67,12 +72,12 @@ tres sitios afuera** (`screener.py`, `swing/exit_tracker.py`, `radar/radar.py`),
 corriendo solos; PR #26. Usar `_sin_token()`, que es idéntico en los cuatro archivos. **Un
 `except` que no imprime nada tampoco alcanza: si no hay `try`, el traceback lo escribe igual.**
 
-- **`fade/.cache/` no es un scratch: es un ACUMULADOR, y para las fechas viejas es el
-  único lugar donde están los datos.** `bajar()` pide solo el tramo nuevo y mergea por
-  `id`, así que nunca pierde filas; Supabase sí las pierde, porque `update_outcomes.py`
-  purga todos los días lo que pase de `RETENTION_DAYS`. El `.gitignore` de ese directorio
-  decía "se regeneran solos" y era falso. Copia del 2026-08-30 en
-  `..\scanall_respaldo\fade_cache\`.
+**Y uno más sobre los cachés, porque uno de ellos NO es un scratch:** `fade/.cache/` es un
+**acumulador**, y para las fechas más viejas que la retención es el **único lugar donde
+están los datos**. `bajar()` pide solo el tramo nuevo y mergea por `id`, así que nunca
+pierde filas; Supabase sí las pierde, porque `update_outcomes.py` purga todos los días lo
+que pase de `RETENTION_DAYS`. Su `.gitignore` decía "se regeneran solos" y era falso. Copia
+del 2026-08-30 en `..\scanall_respaldo\fade_cache\`.
 
 **Cachés (grandes, no borrar, todos gitignoreados):** `banco/.kline_cache/` (1,7 GB),
 `.backtest_cache/` (1,77 GB), `banco/.funding_cache/`, `.metrics_cache/`, `.unlock_cache/`,
@@ -95,11 +100,17 @@ huecos en total. **Falta la franja 18:38 → 21:04 UTC.**
 
 ```powershell
 cd banco
-py -3.13 -u dislocacion.py --recolectar --horas 2.5
+py -3.13 -u dislocacion.py --recolectar --horas 2.5   # ARRANCAR 15:38 hora local
 py -3.13 -u dislocacion.py --analizar
 ```
 
 Se reanuda solo: cada corrida escribe su CSV y `--analizar` junta todos.
+
+> ⚠️ **La franja que falta es una banda de HORA DEL DÍA, no 2,5 horas cualesquiera.**
+> Correrla a cualquier hora no completa el ciclo de 24 h: repite horas ya cubiertas y
+> deja el hueco donde está. Hay que arrancar a las **18:38 UTC = 15:38 local (UTC-3)**.
+> Cobertura verificada leyendo los CSV: 29-ago 21:04 → 30-ago 18:38 UTC, con dos huecos
+> de 1,3 y 1,7 min entre corridas.
 
 **El veredicto está en blanco a propósito** en `banco/PREREGISTRO_DISLOCACION.md`. La regla
 de las 24 h se escribió antes de la primera muestra y **no se afloja después de ver el
@@ -154,8 +165,13 @@ El radar necesita `$env:SUPABASE_KEY` antes de correr `medir.py`.
 ### 1.3 Nada más está abierto
 
 Las diez familias estándar están medidas. El último hueco de horizonte (>1 semana) está
-cerrado. **No hay una dirección para elegir.** Si aparece la tentación de agregar una
+cerrado. Y la **corrida 14** cerró la última forma funcional que quedaba sin probar —la
+prima de volatilidad medida de costado— con la premisa **pasando** y la potencia fallando
+por 3×. **No hay una dirección para elegir.** Si aparece la tentación de agregar una
 feature más, leer la §2 primero y después la §6.
+
+Lo único que sigue juntando valor solo es el **colector diario de implícita** (§6.2): no
+abre una dirección hoy, junta el dato que la podría abrir en años.
 
 ---
 
@@ -203,6 +219,7 @@ falta ~7× más observaciones: **~35 años**.
 | **11** | compuerta de patrones de gráfico | **PASA** | la primera compuerta que habilita una corrida |
 | **12** | patrones de gráfico | **cero MEDIDO** | una **ruptura pelada** le gana a las cinco figuras; los pivotes barajados llegan tan lejos como los reales |
 | **13** | horizontes largos | **no se pudo medir** | alargar el horizonte es un **empate**: el costo cae 13× y la precisión cae lo mismo |
+| **14** | prima de vol **transversal** | **no se pudo medir** | la premisa **pasa** (ρ +0,818, σ baja 29%) y **no alcanza**: MDE **28,4%/año** contra los 27,1 de BTC solo |
 
 El detalle está en `HANDOFF_TRES.md` §2.0.A a §2.0.D y en los preregistros
 `banco/PREREGISTRO_{OPCIONES,LISTADOS,DISLOCACION,GRAFICOS,HORIZONTE_LARGO}.md`.
@@ -247,6 +264,17 @@ El detalle está en `HANDOFF_TRES.md` §2.0.A a §2.0.D y en los preregistros
 > **Antes de decir "sumo activos y gano potencia", MEDIR la correlación.** ρ = +0,92 entre
 > el P&L de la straddle de BTC, ETH, SOL y XRP: **4 subyacentes son 1,07 independientes.**
 
+> **Y una cartera long-short no hereda la σ PROMEDIO del universo: hereda la de los
+> EXTREMOS.** La corrida 14 predijo un MDE de 10,8%/año con `σ·√(2(1−ρ))` y midió **28,4**.
+> Esa cuenta supone que las σ son iguales entre nombres y no lo son (BTC 3,75 · ETH 4,64 ·
+> DOGE 4,79 · SOL 5,58 · XRP 6,50), y un ranking de IV/RV **elige sistemáticamente los más
+> volátiles**. Toda cuenta de potencia a priori sobre una long-short tiene que usar la σ de
+> los nombres que la cartera va a **elegir**.
+
+> **Una compuerta que verifica el ARGUMENTO vale aparte de la que verifica la potencia.** En
+> la corrida 14 la premisa pasó y la potencia falló, y eso se lee distinto de que fallen las
+> dos: dice "la idea era buena y el dato no alcanza", no "la idea era mala".
+
 > **El p que decide es el de BLOQUES**, no el binomial. El n efectivo son las SEMANAS.
 
 > **El control va POR BARRA, no por símbolo.** `sin_top3` antes que nada. Dos costos siempre.
@@ -275,6 +303,8 @@ El detalle está en `HANDOFF_TRES.md` §2.0.A a §2.0.D y en los preregistros
 | **`banco/dislocacion.py`** | filo ejecutable entre Binance/OKX/Bybit, con control de tamaño y de skew |
 | **`opciones/viabilidad.py`** | foto de los 3 venues de opciones. El patrón de "medir si el instrumento existe ANTES del efecto" |
 | **`opciones/potencia.py`** | n, σ, MDE, años necesarios, calibración contra un efecto conocido, y la ρ que decide si poolear sirve |
+| **`opciones/potencia_transversal.py`** | la misma compuerta para una cartera LONG-SHORT, más la compuerta (P) que verifica que el diferencing haya removido el factor común |
+| `opciones/juntar_iv.py` | el colector diario de implícita. Idempotente, y **falla fuerte** si ninguna moneda devuelve datos |
 | `banco/graficos.py` | 5 patrones de gráfico sin lookahead + su versión con **pivotes barajados** |
 | `banco/klines.py` | `load_panel(..., tf=, full=, pin=, syms=, mercado=)` |
 | `banco/libro_perp.py` | costos reales del libro, spot y perp apareados |
@@ -289,16 +319,16 @@ El detalle está en `HANDOFF_TRES.md` §2.0.A a §2.0.D y en los preregistros
 ### Lo que haría, en orden
 
 1. **Terminar la corrida 10** (§1.1). Dos horas y media, cierra el único ítem abierto.
-2. **Un cron que guarde la implícita de alts todos los días.** Diez minutos de trabajo,
-   cero mantenimiento. Hoy hay 18 meses de SOL; en un año hay 30. **Solo se puede hacer
-   empezando**, y el costo de no hacerlo es que dentro de un año se esté igual que hoy.
-3. **El test TRANSVERSAL de prima de volatilidad.** La ρ = +0,92 mató el *pooling temporal*
-   de la corrida 8, pero en un test transversal **esa misma ρ es el factor común que se
-   diferencia y desaparece** — que es lo que hace el control por barra en todo el resto del
-   repo. La pregunta pasa de *"¿la prima media es positiva?"* (pide 23 años) a *"¿el
-   subyacente con IV/RV más alto rinde peor que sus pares?"*. Son 5-7 nombres, es flaco,
-   pero es una forma funcional que no se probó y donde el ruido que mata está ausente por
-   construcción.
+   ⚠️ La franja que falta es una banda de **hora del día** (18:38 → 21:04 UTC), así que hay
+   que **arrancar a esa hora**: 15:38 hora local.
+2. ~~**Un cron que guarde la implícita de alts todos los días.**~~ ✅ **HECHO el 2026-08-30**
+   (PR #28): `opciones/juntar_iv.py` + `.github/workflows/iv_diaria.yml`, sembrado con la
+   historia que había. Y apareció un nombre que la corrida 8 no tenía: **DOGE, con 314 días
+   de implícita**.
+3. ~~**El test TRANSVERSAL de prima de volatilidad.**~~ ✅ **CORRIDO Y CERRADO el 2026-08-30
+   (corrida 14).** La premisa **era cierta** —la ρ se diferencia y la varianza baja 29%— y
+   **no alcanzó**: MDE **28,4%/año** contra los **27,1%** que la corrida 8 midió sobre BTC
+   solo. La reducción de varianza es real y es irrelevante. `banco/PREREGISTRO_VOL_TRANSVERSAL.md`.
 4. **Dejar correr las tres fechas** y no tocarlas.
 
 ### Lo que NO haría
