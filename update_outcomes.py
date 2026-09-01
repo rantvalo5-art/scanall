@@ -177,8 +177,17 @@ def compute_outcomes(row):
     klines_24h = [k for k in klines if int(k[0]) <= twentyfour_end_ms]
 
     if klines_4h:
-        update["max_high_4h"] = max(float(k[2]) for k in klines_4h)
-        update["min_low_4h"]  = min(float(k[3]) for k in klines_4h)
+        # CUANDO ocurre cada extremo, no solo cuanto vale. Ver PREREGISTRO_SALIDA.md:
+        # `dt_vivo.py` midio MFE +3,31% contra MAE -3,62% (asimetria 0,91) y un cierre de
+        # -1,63%. Con el max y el min solos NO se puede saber cual llego PRIMERO, y de eso
+        # depende que una regla de salida pueda cobrar algo o no pueda nada. Las velas son
+        # de 1m y ya estan en memoria: no hay request extra ni costo.
+        kh = max(klines_4h, key=lambda k: float(k[2]))
+        kl = min(klines_4h, key=lambda k: float(k[3]))
+        update["max_high_4h"] = float(kh[2])
+        update["min_low_4h"]  = float(kl[3])
+        update["mfe_min_4h"]  = int((int(kh[0]) - alerted_ms) // 60000)
+        update["mae_min_4h"]  = int((int(kl[0]) - alerted_ms) // 60000)
     if klines_24h:
         update["max_high_24h"] = max(float(k[2]) for k in klines_24h)
         update["min_low_24h"]  = min(float(k[3]) for k in klines_24h)
@@ -199,19 +208,47 @@ def compute_outcomes(row):
     return update if update else None
 
 
+# Columnas nuevas de PREREGISTRO_SALIDA.md §2. Si todavia no existen en la tabla,
+# PostgREST rechaza el PATCH ENTERO con un 400 y `patch_outcome` se lo come en su
+# `except` — o sea que TODAS las filas dejarian de actualizarse mientras el workflow
+# sigue saliendo verde en Actions. Ese modo de falla silencioso es peor que el bug que
+# esto viene a arreglar, asi que se degrada solo: si el PATCH falla, se reintenta sin
+# estas claves y se avisa UNA vez.
+CAMPOS_OPCIONALES = ("mfe_min_4h", "mae_min_4h")
+_aviso_columnas = [False]
+
+
 def patch_outcome(row_id, update):
-    """PATCH a Supabase para una sola fila."""
-    try:
+    """PATCH a Supabase para una sola fila, con degradado si faltan columnas nuevas."""
+    def _patch(payload):
         r = requests.patch(
             f"{SUPABASE_URL}/rest/v1/daytrader_outcomes",
             headers=_sb_headers(),
             params={"id": f"eq.{row_id}"},
-            json=update,
+            json=payload,
             timeout=10,
         )
         r.raise_for_status()
+
+    try:
+        _patch(update)
     except Exception as e:
-        print(f"  patch_outcome id={row_id} error: {e}")
+        recorte = {k: v for k, v in update.items() if k not in CAMPOS_OPCIONALES}
+        if len(recorte) == len(update):
+            print(f"  patch_outcome id={row_id} error: {e}")
+            return
+        try:
+            _patch(recorte)
+        except Exception as e2:
+            print(f"  patch_outcome id={row_id} error: {e2}")
+            return
+        if not _aviso_columnas[0]:
+            _aviso_columnas[0] = True
+            print(f"  OJO: la tabla no acepta {list(CAMPOS_OPCIONALES)} — se guarda el"
+                  f" resto y se sigue.\n"
+                  f"       El reloj de PREREGISTRO_SALIDA.md NO arranca hasta correr:\n"
+                  f"       alter table daytrader_outcomes"
+                  f" add column mfe_min_4h int, add column mae_min_4h int;")
 
 
 def purge_old():
