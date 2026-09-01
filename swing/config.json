@@ -229,7 +229,7 @@
     "ENABLED": true,
     "TRACK_ALL_CANDIDATES": false,
     "BATCH_SIZE": 500,
-    "RETENTION_DAYS": 90
+    "RETENTION_DAYS": 550
   },
   "exit_mgmt": {
     "ENABLED": true,

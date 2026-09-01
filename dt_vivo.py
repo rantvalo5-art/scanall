@@ -1,5 +1,18 @@
 """
-DT VIVO — medir el daytrader EN PRODUCCION con el metodo del banco.
+DT VIVO — medir un sistema EN PRODUCCION con el metodo del banco.
+
+    py -3.13 -u dt_vivo.py --sistema daytrader   # outcomes_dump.json
+    py -3.13 -u dt_vivo.py --sistema swing       # screener_outcomes_dump.json
+
+Las dos tablas NO son la misma y el docstring de `screener.py:320` miente al respecto:
+el daytrader escribe a `daytrader_outcomes` (screener.py:354) y el swing a
+`screener_outcomes` (swing/screener.py:339).
+
+OJO CON EL SWING: su filler solo calcula hasta 24h (`swing/update_outcomes.py:158-161`),
+que son los horizontes del DAYTRADER. Un sistema que opera en 1h/4h/1d/1w no se juega en
+24h, asi que lo que se mide del swing es si la entrada se va en contra enseguida — NO su
+tesis. Para medir eso haria falta instrumentar horizontes de dias.
+
 
 Por que existe: los analizadores que ya estan (`dt_analyze.py`, `analyze_bests.py`,
 `find_my_edge.py`) son DESCRIPTIVOS y son de antes del banco. Cuentan win rate y ordenan
@@ -32,15 +45,34 @@ que suman filas y no suman trades.
 El screener es LONG ONLY: no hay una sola rama short en `screener.py`. Todos los retornos
 se leen en largo.
 """
+import argparse
 import json
 import sys
 
 import numpy as np
 import pandas as pd
 
-FUENTE = "outcomes_dump.json"
 COSTO_PCT = 0.20          # ida y vuelta, el mismo de banco/primer_toque.py
-ENTRADAS = ("BREAKOUT", "EXPLOSION", "PREBREAK")
+
+# Taxonomia por sistema. Es la mitad del trabajo: contar una SALIDA o una
+# CONTINUACION como si fuera un trade nuevo es lo que hace que el registro del
+# daytrader parezca 10x mas grande de lo que es.
+SISTEMAS = {
+    "daytrader": {
+        "fuente": "outcomes_dump.json",
+        "entradas": ("BREAKOUT", "EXPLOSION", "PREBREAK"),
+        "salidas": ("FADING",),
+    },
+    # swing/screener.py:326 guarda `history_tf` en la columna `signal_type`, y el
+    # nombre de la variable engana: sus VALORES son nombres de senal, no timeframes
+    # (se ve en swing/screener.py:551, `if alert["history_tf"] not in ("RIDING",
+    # "HOLD")`). El swing no tiene senal de salida: no hay FADING.
+    "swing": {
+        "fuente": "screener_outcomes_dump.json",
+        "entradas": ("BREAKOUT", "PREBREAK", "COILING"),
+        "salidas": (),
+    },
+}
 HORIZONTES = ("15m", "1h", "4h", "24h")
 DEDUP_H = 24              # dos alertas del mismo par dentro de esto son EL MISMO trade
 Z = 2.80                  # 1,96 (alfa 0,05 dos colas) + 0,84 (80% de potencia)
@@ -48,8 +80,8 @@ REPS = 5000
 SEM_MIN = 8               # semanas minimas para que el bootstrap signifique algo
 
 
-def cargar():
-    with open(FUENTE, encoding="utf-8") as f:
+def cargar(fuente):
+    with open(fuente, encoding="utf-8") as f:
         d = json.load(f)
     if isinstance(d, dict):                      # volcados viejos venian {"main": [...]}
         d = next((v for v in d.values() if isinstance(v, list) and v), [])
@@ -204,16 +236,23 @@ def ordena_el_score(D):
 
 
 def main():
-    D = cargar()
+    ap = argparse.ArgumentParser(description="Medir un sistema en vivo")
+    ap.add_argument("--sistema", choices=sorted(SISTEMAS), default="daytrader")
+    ap.add_argument("--fuente", default=None, help="override del JSON de entrada")
+    a = ap.parse_args()
+    cfg = SISTEMAS[a.sistema]
+    ENTRADAS, SALIDAS = cfg["entradas"], cfg["salidas"]
+
+    D = cargar(a.fuente or cfg["fuente"])
     print("=" * 84)
-    print("DAYTRADER EN VIVO — el registro real, con el metodo del banco")
+    print(f"{a.sistema.upper()} EN VIVO — el registro real, con el metodo del banco")
     print("=" * 84)
     print(f"  {len(D):,} filas  |  {D.dt.min():%Y-%m-%d} -> {D.dt.max():%Y-%m-%d}  |  "
           f"{D.semana.nunique()} semanas")
     print("\n  filas por tipo de senal:")
     for s, n in D.signal_type.value_counts().items():
         rol = ("ENTRADA" if s in ENTRADAS else
-               "SALIDA — no es un trade" if s == "FADING" else
+               "SALIDA — no es un trade" if s in SALIDAS else
                "continuacion — no es entrada nueva")
         print(f"    {s:>10} {n:6}   {rol}")
 
@@ -230,9 +269,9 @@ def main():
     recorrido(E)
     ordena_el_score(E)
 
-    R.to_csv("dt_vivo.csv", index=False)
+    R.to_csv(f"dt_vivo_{a.sistema}.csv", index=False)
     print("\n" + "=" * 84)
-    print(f"  {E.semana.nunique()} semanas independientes. -> dt_vivo.csv")
+    print(f"  {E.semana.nunique()} semanas independientes. -> dt_vivo_{a.sistema}.csv")
     print("=" * 84)
     return 0
 

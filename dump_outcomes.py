@@ -3,10 +3,20 @@
 Requiere SUPABASE_KEY en el entorno (anon o service_role — anon alcanza para SELECT).
 En PowerShell: $env:SUPABASE_KEY = "eyJ..."
 """
+import argparse
 import json
 import os
 import sys
+
 import requests
+
+ap = argparse.ArgumentParser(description="Volcar una tabla de outcomes a JSON")
+ap.add_argument("--tabla", default="daytrader_outcomes",
+                help="daytrader_outcomes (root) o screener_outcomes (swing)")
+ap.add_argument("--out", default=None, help="por defecto <tabla>_dump.json")
+args = ap.parse_args()
+SALIDA = args.out or ("outcomes_dump.json" if args.tabla == "daytrader_outcomes"
+                      else f"{args.tabla}_dump.json")
 
 SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or os.environ.get("SUPABASE_ANON_KEY")
@@ -24,7 +34,7 @@ page_size = 1000
 
 while True:
     r = requests.get(
-        f"{SUPABASE_URL}/rest/v1/daytrader_outcomes",
+        f"{SUPABASE_URL}/rest/v1/{args.tabla}",
         headers={**headers, "Range": f"{offset}-{offset + page_size - 1}"},
         params={"select": "*", "order": "alerted_at.desc"},
         timeout=30,
@@ -39,7 +49,7 @@ while True:
         break
     offset += page_size
 
-with open("outcomes_dump.json", "w", encoding="utf-8") as f:
+with open(SALIDA, "w", encoding="utf-8") as f:
     json.dump(all_rows, f, ensure_ascii=False, indent=2)
 
 print(f"\n✓ Guardado outcomes_dump.json — {len(all_rows)} filas")
