@@ -58,16 +58,39 @@ Consecuencias asumidas:
 
 ---
 
-## 2. El dato
+## 2. El dato — YA EXISTÍA, y eso corrige lo que este documento decía
 
-`screener_outcomes` ya tenía `price_7d`, `max_high_7d`, `min_low_7d` y `complete_7d` — 3.483
-filas, todas en `NULL`. El PR #32 escribió el código que las llena y **rellena hacia atrás**,
-así que el registro a 7d no arranca en cero: cubre desde el **2026-06-03**.
+> **Corrección del 2026-09-01**, escrita el mismo día. La primera versión de esta sección
+> decía que las columnas de 7d estaban vacías y que el PR #32 las llenaba. **Era falso.**
 
-**Lo que el backfill NO arregla:** las alertas son las mismas que ya miré. El backfill da
-profundidad de horizonte, **no independencia**.
+`screener_outcomes` **ya tenía los datos de 7d**, y desde antes de esta sesión:
 
----
+| | |
+|---|---|
+| filas con `price_7d` / `max_high_7d` / `min_low_7d` | **3.278 de 3.483 (94,1 %)** |
+| cobertura | **2026-06-03 → 2026-08-24** |
+| quién las llena | **`swing/backfill_7d.py`**, con cron propio cada 6 h (`30 */6 * * *`) |
+
+Ese job existía, corría bien, y su docstring ya explicaba el diseño entero: *"el tracker
+live solo llena checkpoints hasta 24h... el payoff del swing madura a 7d, así que este job
+rellena columnas separadas usando una bandera propia (`complete_7d`)"*.
+
+**El error fue de método, no de código:** se miraron los nulos del dump del *daytrader*
+—donde las columnas de 7d sí están vacías— y se generalizó al swing sin verificarlo. El
+código que el PR #32 agregó a `swing/update_outcomes.py` era duplicación pura de un job que
+ya andaba, y se revirtió.
+
+**Lo que sí queda del PR #32 y hacía falta:** la retención del swing (90 → 550 días).
+
+### ⚠️ Segunda fuga declarada
+
+Diagnosticando la duplicación se imprimió el **retorno bruto mediano a 7d del conjunto
+pooled**. O sea que el signo ya se vio.
+
+No es el estadístico de §4 —que es la media por bloque de 14 días del retorno **neto**, con
+su bootstrap— pero es información sobre el resultado y callarlo sería peor. Se declara acá
+y **no cambia la regla de parada**: el umbral de §4 y la fecha de §3 se escribieron antes y
+quedan como están.
 
 ## 3. La construcción, fijada acá
 
@@ -95,7 +118,7 @@ subestime la varianza y **regale significancia**.
 
 | | |
 |---|---|
-| registro al 2026-09-01 | 90 días = **6,4 bloques** |
+| registro CON 7d resuelto al 2026-09-01 (03-jun → 24-ago) | 82 días = **5,9 bloques** |
 | mínimo del repo | **8 bloques** (`SEM_MIN`) |
 | n objetivo | **10 bloques** = 140 días de registro |
 | → se mira el | **2026-10-21** |

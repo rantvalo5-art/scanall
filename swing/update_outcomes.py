@@ -84,72 +84,6 @@ def fetch_pending_outcomes():
         return []
 
 
-def fetch_pending_7d():
-    """Filas que YA cumplieron 7 dias y todavia no tienen el horizonte largo.
-
-    Va en una consulta APARTE y no mezclada con la de arriba a proposito: aquella
-    filtra `outcomes_complete=false`, y una fila se marca completa a las 24h — o sea
-    que si el 7d colgara de ese mismo filtro NUNCA se calcularia. Son dos ciclos de
-    vida distintos sobre la misma fila.
-
-    El filtro por fecha es lo que evita el trabajo al pedo: sin el, cada corrida
-    traeria las ~270 filas que todavia estan madurando y les pediria klines para nada.
-    """
-    corte = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-    try:
-        r = requests.get(
-            f"{SUPABASE_URL}/rest/v1/screener_outcomes",
-            headers={**_sb_headers(), "Prefer": ""},
-            params={
-                "select": "id,alerted_at,symbol,entry_price,complete_7d",
-                "complete_7d": "is.false",
-                "alerted_at": f"lt.{corte}",
-                "order": "alerted_at.asc",
-                "limit": str(BATCH_SIZE),
-            },
-            timeout=15,
-        )
-        r.raise_for_status()
-        return r.json()
-    except Exception as e:
-        print(f"fetch_pending_7d error: {e}")
-        return []
-
-
-def compute_7d(row):
-    """price_7d / max_high_7d / min_low_7d, con velas de 15m.
-
-    15m y no 1m: 7 dias en 1m son 10.080 velas = 11 requests por fila; en 15m son 672
-    = UN request. Para un horizonte de una semana esa resolucion sobra, y la diferencia
-    es la que hace que el relleno hacia atras de 90 dias sea viable.
-    """
-    alerted = datetime.fromisoformat(row["alerted_at"].replace("Z", "+00:00"))
-    fin = alerted + timedelta(days=7)
-    if datetime.now(timezone.utc) < fin:
-        return None
-    fin_ms = int(fin.timestamp() * 1000)
-    # Se pide un poco MAS ALLA de `fin` a proposito: `price_at` busca la vela que
-    # CONTIENE el instante, y si el rango corta justo en el borde esa vela no viene y
-    # devuelve None. El margen se descarta despues para el max/min.
-    ks = get_klines_range(row["symbol"], int(alerted.timestamp() * 1000),
-                          fin_ms + 30 * 60 * 1000, interval="15m")
-    if not ks:
-        return None
-    p7 = price_at(ks, fin_ms)
-    if p7 is None:
-        return None
-    dentro = [k for k in ks if int(k[0]) <= fin_ms]   # el recorrido es de la VENTANA
-    if not dentro:
-        return None
-    return {
-        "price_7d": p7,
-        "max_high_7d": max(float(k[2]) for k in dentro),
-        "min_low_7d": min(float(k[3]) for k in dentro),
-        "complete_7d": True,
-        "last_updated": datetime.now(timezone.utc).isoformat(),
-    }
-
-
 def get_klines_range(symbol, start_ms, end_ms, interval="1m"):
     """Obtiene klines en un rango específico. interval=1m da el detalle más fino
     para calcular precios exactos en checkpoints y máximos/mínimos intermedios.
@@ -334,31 +268,8 @@ def main():
         print(f"  {row['symbol']} ({row['id']}) → {' '.join(diffs) if diffs else 'min/max only'}"
               + (" [COMPLETE]" if update.get("outcomes_complete") else ""))
 
-    # ── horizonte de 7 dias ───────────────────────────────────────────────────
-    # El swing opera en 1h/4h/1d/1w y hasta ahora se media hasta 24h — los horizontes
-    # del DAYTRADER. `dt_vivo.py --sistema swing` midio los cuatro y los cuatro caen
-    # DENTRO del MDE: no es que el swing pierda, es que no se lo puede medir en su
-    # propio horizonte porque nadie lo estaba guardando.
-    #
-    # Las columnas price_7d/max_high_7d/min_low_7d/complete_7d YA EXISTEN en la tabla
-    # (estan en las 3.483 filas, todas en NULL). No hace falta ningun ALTER TABLE: solo
-    # faltaba el codigo. Y como existen, esto RELLENA HACIA ATRAS los 90 dias que ya
-    # hay, asi que el registro a 7d no arranca de cero.
-    p7 = fetch_pending_7d()
-    print(f"\n  {len(p7)} alertas pendientes de 7d")
-    hechas = 0
-    for row in p7:
-        u = compute_7d(row)
-        if not u:
-            continue
-        patch_outcome(row["id"], u)
-        hechas += 1
-        ep = float(row["entry_price"]) if row.get("entry_price") else 0
-        pct = (u["price_7d"] / ep - 1) * 100 if ep and u.get("price_7d") else 0
-        print(f"  {row['symbol']} ({row['id']}) → price_7d={pct:+.2f}% [7D]")
-
     purge_old()
-    print(f"Done. Updated: {updated}, completed: {completed}, 7d: {hechas}")
+    print(f"Done. Updated: {updated}, completed: {completed}")
 
 
 if __name__ == "__main__":
