@@ -25,6 +25,7 @@ perillas. Todo eso se midio y no compraba nada.
 """
 import argparse
 import os
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -287,6 +288,18 @@ def guardar(F):
     print(f"supabase: {ok} filas guardadas en {TABLA} ({ahora})", file=sys.stderr)
 
 
+def _sin_token(e):
+    """Saca el token del mensaje de error antes de imprimirlo.
+
+    El mensaje de una excepcion de requests incluye la URL completa, y la URL de la
+    API de Telegram lleva el token adentro (`/bot<TOKEN>/sendMessage`). Imprimir la
+    excepcion cruda lo escribe en el log de Actions, que en un repo publico lee
+    cualquiera: fue el vector por el que se filtro el token el 2026-08-22.
+    Nunca imprimir `e` directo en un except que envuelva una llamada a Telegram.
+    """
+    return re.sub(r"bot\d{6,12}:[A-Za-z0-9_-]{30,}", "bot***", str(e))
+
+
 def texto(F_top, k):
     F = F_top.reset_index(drop=True)
     out = [f"RADAR — {k} monedas con mas probabilidad de MOVERSE ({HORIZONTE_H}h)",
@@ -350,10 +363,16 @@ def main():
         if not tok or not chat:
             print("\n(sin TELEGRAM_TOKEN/TELEGRAM_CHAT_ID: no se envio)", file=sys.stderr)
             return
-        r = requests.post(f"https://api.telegram.org/bot{tok}/sendMessage",
-                          json={"chat_id": chat, "text": f"```\n{t}\n```",
-                                "parse_mode": "Markdown"}, timeout=20)
-        print(f"\n(telegram: HTTP {r.status_code})", file=sys.stderr)
+        try:
+            r = requests.post(f"https://api.telegram.org/bot{tok}/sendMessage",
+                              json={"chat_id": chat, "text": f"```\n{t}\n```",
+                                    "parse_mode": "Markdown"}, timeout=20)
+            print(f"\n(telegram: HTTP {r.status_code})", file=sys.stderr)
+        except Exception as e:
+            # El mensaje de la excepcion trae la URL, y la URL trae el token. Este
+            # workflow corre cada 4h en un repo publico: sin esto, un error de red
+            # escribe el token en el log de Actions.
+            print(f"\n(telegram fallo: {_sin_token(e)})", file=sys.stderr)
 
 
 if __name__ == "__main__":
