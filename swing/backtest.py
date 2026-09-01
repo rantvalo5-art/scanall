@@ -160,11 +160,12 @@ def get_top_pairs_today(min_quote_vol, top_n=MAX_PAIRS):
 
 def _snapshot_window(headers, tabla, campo, cursor_dt, win_end, runs_to_pairs,
                      all_symbols):
-    """Una ventana de una de las dos tablas de universo. Devuelve cuantos runs sumo.
+    """Una ventana de una de las dos fuentes de universo. Devuelve cuantos runs sumo.
 
     `screener_runs` trae UNA fila por corrida con los simbolos en un array
-    (`symbols`); `screener_pairs_snapshot` traia UNA FILA POR PAR por corrida
-    (`symbol`). Se paginan igual, pero la nueva pagina ~300x mas barato.
+    (`symbols`); `screener_pairs_snapshot` es una VISTA que expande ese array a una
+    fila por par (`symbol`). Se paginan igual, pero la tabla sin expandir manda ~300x
+    menos filas para el mismo rango.
     """
     PAGE = 1000
     offset = 0
@@ -216,17 +217,32 @@ def get_pairs_from_snapshot(start_dt, end_dt):
     """Universo de pares vigente en cada corrida, para no backtestear con sesgo de
     supervivencia.
 
-    LEE LAS DOS TABLAS, y eso NO es redundancia: el 2026-08-27 el writer se reescribio
-    (commit b9d74c0) de `screener_pairs_snapshot` —una fila por PAR por corrida— a
-    `screener_runs` —una fila por corrida con los simbolos en un array—. O sea que:
+    QUE ES CADA FUENTE, porque no es obvio y ya indujo a error una vez:
 
-        antes del 2026-08-27  ->  solo esta en screener_pairs_snapshot
-        desde  el 2026-08-27  ->  solo esta en screener_runs
+        screener_runs            TABLA. Una fila por corrida, con los simbolos en un
+                                 array (`symbols`). Es lo que escribe el screener
+                                 desde el 2026-08-27 (commit b9d74c0). Medida el
+                                 2026-09-01: 21.498 filas, 36 MB.
+        screener_pairs_snapshot  VISTA, no tabla. Expande ese array a una fila por
+                                 par (`symbol`), que es el esquema que este lector
+                                 usaba antes. Un DELETE sobre ella falla con
+                                 55000 "cannot delete from view".
 
-    Leer solo la nueva deja sin universo a todo lo anterior, y el llamador NO avisa: cae
-    callado a `get_top_pairs_today()`, que es exactamente el sesgo de supervivencia que
-    esta funcion existe para evitar. Se prueba la nueva primero y se cae a la vieja solo
-    cuando la ventana viene vacia.
+    Por que se pide `screener_runs` primero: es la MISMA informacion sin expandir, asi
+    que una corrida de ~300 pares es 1 fila en vez de 300. Con paginas de 1000, eso es
+    ~300x menos requests para el mismo rango. Es una mejora de costo, no de cobertura.
+
+    La vista queda como fallback barato y NO como una fuente que cubra otro tramo de
+    tiempo. Quien escribio esto no leyo su definicion: si es un `unnest` sobre
+    `screener_runs` —que es lo que sugiere el error de arriba— las dos devuelven
+    exactamente lo mismo y el fallback no se usa nunca. Se deja porque no cuesta nada,
+    no porque este verificado que aporte algo.
+
+    OJO CON EL RANGO — esta si es una limitacion real: `screener_runs` retiene 30 dias
+    (`SNAPSHOT_RETENTION_DAYS`), asi que para cualquier ventana mas vieja NO HAY
+    universo, y el llamador cae a `get_top_pairs_today()`, que es exactamente el sesgo
+    de supervivencia que esta funcion existe para evitar. Por eso, si las dos fuentes
+    vuelven vacias, esto lo DICE en vez de degradar en silencio.
     """
     if not SUPABASE_KEY:
         print("  [snapshot] SUPABASE_KEY no seteada, salteando snapshots.")
