@@ -159,7 +159,76 @@ def get_top_pairs_today(min_quote_vol, top_n=MAX_PAIRS):
     return [x["symbol"] for x in pairs[:top_n]]
 
 
+def _snapshot_window(headers, tabla, campo, cursor_dt, win_end, runs_to_pairs,
+                     all_symbols):
+    """Una ventana de una de las dos tablas de universo. Devuelve cuantos runs sumo.
+
+    `screener_runs` trae UNA fila por corrida con los simbolos en un array
+    (`symbols`); `screener_pairs_snapshot` traia UNA FILA POR PAR por corrida
+    (`symbol`). Se paginan igual, pero la nueva pagina ~300x mas barato.
+    """
+    PAGE = 1000
+    offset = 0
+    sumados = 0
+    while True:
+        params = {
+            "select": f"run_at,{campo}",
+            "run_at": f"gte.{cursor_dt.isoformat()}",
+            "and": f"(run_at.lt.{win_end.isoformat()})",
+            "limit": PAGE,
+            "offset": offset,
+            "order": "run_at.asc",
+        }
+        rows = None
+        for attempt in range(3):
+            try:
+                r = requests.get(
+                    f"{SUPABASE_URL}/rest/v1/{tabla}",
+                    headers=headers, params=params, timeout=30,
+                )
+                r.raise_for_status()
+                rows = r.json()
+                break
+            except Exception as e:
+                wait = 2 ** attempt
+                print(f"  [snapshot] error {tabla} {cursor_dt.date()} off={offset} "
+                      f"(intento {attempt+1}/3): {e}; reintentando en {wait}s")
+                time.sleep(wait)
+        if rows is None:
+            print(f"  [snapshot] ventana {cursor_dt.date()} de {tabla} abortada tras "
+                  f"reintentos; sigo con la siguiente")
+            break
+        if not rows:
+            break
+        for row in rows:
+            syms = row[campo] if campo == "symbols" else [row[campo]]
+            if not syms:
+                continue
+            runs_to_pairs.setdefault(row["run_at"], []).extend(syms)
+            all_symbols.update(syms)
+            sumados += 1
+        if len(rows) < PAGE:
+            break
+        offset += PAGE
+    return sumados
+
+
 def get_pairs_from_snapshot(start_dt, end_dt):
+    """Universo de pares vigente en cada corrida, para no backtestear con sesgo de
+    supervivencia.
+
+    LEE LAS DOS TABLAS, y eso NO es redundancia: el 2026-08-27 el writer se reescribio
+    (commit b9d74c0) de `screener_pairs_snapshot` —una fila por PAR por corrida— a
+    `screener_runs` —una fila por corrida con los simbolos en un array—. O sea que:
+
+        antes del 2026-08-27  ->  solo esta en screener_pairs_snapshot
+        desde  el 2026-08-27  ->  solo esta en screener_runs
+
+    Leer solo la nueva deja sin universo a todo lo anterior, y el llamador NO avisa: cae
+    callado a `get_top_pairs_today()`, que es exactamente el sesgo de supervivencia que
+    esta funcion existe para evitar. Se prueba la nueva primero y se cae a la vieja solo
+    cuando la ventana viene vacia.
+    """
     if not SUPABASE_KEY:
         print("  [snapshot] SUPABASE_KEY no seteada, salteando snapshots.")
         return {}, set()
@@ -167,51 +236,29 @@ def get_pairs_from_snapshot(start_dt, end_dt):
     headers = {"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}"}
     all_symbols = set()
     runs_to_pairs = {}
-    PAGE = 1000
     WINDOW_HOURS = 24
+    usadas = set()
     cursor_dt = start_dt
     while cursor_dt < end_dt:
         win_end = min(cursor_dt + timedelta(hours=WINDOW_HOURS), end_dt)
-        offset = 0
-        while True:
-            params = {
-                "select": "run_at,symbol",
-                "run_at": f"gte.{cursor_dt.isoformat()}",
-                "and": f"(run_at.lt.{win_end.isoformat()})",
-                "limit": PAGE,
-                "offset": offset,
-                "order": "run_at.asc",
-            }
-            rows = None
-            for attempt in range(3):
-                try:
-                    r = requests.get(
-                        f"{SUPABASE_URL}/rest/v1/screener_pairs_snapshot",
-                        headers=headers, params=params, timeout=30,
-                    )
-                    r.raise_for_status()
-                    rows = r.json()
-                    break
-                except Exception as e:
-                    wait = 2 ** attempt
-                    print(f"  [snapshot] error {cursor_dt.date()} off={offset} (intento {attempt+1}/3): {e}; reintentando en {wait}s")
-                    time.sleep(wait)
-            if rows is None:
-                print(f"  [snapshot] ventana {cursor_dt.date()} abortada tras reintentos; sigo con la siguiente")
-                break
-            if not rows:
-                break
-            for row in rows:
-                runs_to_pairs.setdefault(row["run_at"], []).append(row["symbol"])
-                all_symbols.add(row["symbol"])
-            if len(rows) < PAGE:
-                break
-            offset += PAGE
-        print(f"  [snapshot] ventana {cursor_dt.date()} ok ({len(all_symbols)} símbolos acum)")
+        n = _snapshot_window(headers, "screener_runs", "symbols",
+                             cursor_dt, win_end, runs_to_pairs, all_symbols)
+        if n:
+            usadas.add("screener_runs")
+        else:
+            n = _snapshot_window(headers, "screener_pairs_snapshot", "symbol",
+                                 cursor_dt, win_end, runs_to_pairs, all_symbols)
+            if n:
+                usadas.add("screener_pairs_snapshot")
+        print(f"  [snapshot] ventana {cursor_dt.date()} ok ({len(all_symbols)} "
+              f"símbolos acum)")
         cursor_dt = win_end
-    print(f"  [snapshot] {len(runs_to_pairs)} runs distintos, {len(all_symbols)} símbolos únicos")
+    print(f"  [snapshot] {len(runs_to_pairs)} runs distintos, {len(all_symbols)} "
+          f"símbolos únicos | tablas: {', '.join(sorted(usadas)) or 'NINGUNA'}")
+    if not runs_to_pairs:
+        print("  [snapshot] OJO: ninguna de las dos tablas devolvio filas para este "
+              "rango. El backtest va a caer a los pares de HOY = sesgo de supervivencia.")
     return runs_to_pairs, all_symbols
-
 
 def get_klines_range(symbol, interval, start_ms, end_ms):
     all_rows = []
