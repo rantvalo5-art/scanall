@@ -444,8 +444,14 @@ def lote_rankings(TB, rankings, k=20, objetivos=("largo", "corto", "magnitud"),
         # el signo no puede depender de la normalizacion (ver el comentario de `tablero`)
         if not (r["spread_crudo"] > 0):
             return f"ARTEFACTO DE ESCALA (atr_ratio {r['atr_ratio']:.2f})"
-        if mde is not None and abs(r["spread"] - ctrl.get(r["objetivo"], 0.0)) < mde:
-            return f"dentro del MDE del azar (±{mde:.3f})"
+        # `mde` puede ser un escalar o un dict POR OBJETIVO, y para `magnitud` tiene que
+        # ser lo segundo: `y_magnitud` = (runup - caida)/atr no esta en la misma escala
+        # que `y_largo` = ret/atr. Medido en la corrida 15 sobre el mismo panel: MDE
+        # 0,343 ATR en largo y corto, **6,16 en magnitud** — 18x. Pasar el escalar de
+        # largo/corto deja la compuerta de magnitud practicamente inerte.
+        m = mde.get(r["objetivo"]) if isinstance(mde, dict) else mde
+        if m is not None and abs(r["spread"] - ctrl.get(r["objetivo"], 0.0)) < m:
+            return f"dentro del MDE del azar (±{m:.3f})"
         if not r["fdr_ok"]:
             return f"muere en la correccion (FDR q={q})"
         if not (r["sin_top3"] > 0):
@@ -462,8 +468,11 @@ def lote_rankings(TB, rankings, k=20, objetivos=("largo", "corto", "magnitud"),
 
     if mostrar:
         print("\n" + "=" * 104)
-        print(f"RANKING TRANSVERSAL — {len(D)} brazos | top-k={k} | costo {costo:.2f}%"
-              f"{f' | MDE ±{mde:.3f} ATR' if mde is not None else ''}")
+        if isinstance(mde, dict):
+            et = " | MDE " + " ".join(f"{o}±{v:.3f}" for o, v in mde.items())
+        else:
+            et = f" | MDE ±{mde:.3f} ATR" if mde is not None else ""
+        print(f"RANKING TRANSVERSAL — {len(D)} brazos | top-k={k} | costo {costo:.2f}%{et}")
         print("  spread = media semanal de (top-k − universo de la MISMA barra), en ATR")
         print("=" * 104)
         for o in objetivos:
