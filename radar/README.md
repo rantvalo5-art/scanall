@@ -119,14 +119,32 @@ para escribir con la anon key.
 
 ### 2. El cron
 
-`.github/workflows/radar.yml` corre **cada 4 horas** (00:10, 04:10, … UTC) y guarda el
-universo entero más manda el top-8 por Telegram. Usa los secrets que ya tenés configurados:
+`.github/workflows/radar.yml` **intenta cada 2 horas** y guarda el universo entero. Manda
+el top-8 por Telegram solo en las corridas de hora par múltiplo de 4 (00:10, 04:10, … UTC),
+así el celular no suena el doble. Usa los secrets que ya tenés configurados:
 `SUPABASE_KEY`, `DAY_TELEGRAM_TOKEN`, `DAY_TELEGRAM_CHAT_ID`.
 
-**La cadencia tiene que ser igual al horizonte.** Con `paso = horizonte = 4h` las barras
-no se solapan y el n contado es el n real. Correrlo cada hora con horizonte de 4h daría
-corridas solapadas, y el forward test heredaría exactamente el defecto que el resto del
-repo arrastra por contar entradas solapadas como si fueran independientes.
+**Lo que tiene que cumplir `paso = horizonte` es la MEDICIÓN, no el cron.** Dos corridas a
+menos de 4h comparten futuro, y contarlas como dos observaciones infla el n aparente — el
+defecto que el resto del repo arrastra por contar entradas solapadas como si fueran
+independientes. Eso ya lo garantiza `medir.py`, que de-solapa y se queda con la primera de
+cada grupo.
+
+La primera versión pedía 6 corridas por día a `:10` y confiaba en que llegaran espaciadas.
+**No llegan.** Medido sobre los primeros 7,5 días en vivo (29 corridas, 28-ago → 4-sep):
+
+| | |
+|---|---|
+| entrega de GitHub | **65%** de las pedidas (saltea 2 de cada 6) |
+| atraso contra el slot `:10` | mediana **2,15h**, p90 3,19h, máximo 3,95h |
+
+Con dos horas de atraso mediano sobre un espaciado nominal de cuatro, todos los días un
+par terminaba a ~3h20m y el de-solape lo descartaba, correctamente: **23 barras útiles de
+45 pedidas, 51%**. Pedir *menos* seguido (cada 6h) empeora esto — serían ~2,6 corridas por
+día, y un atraso de hasta 4h seguiría produciendo pares sub-4h. Pedir *más* seguido lo
+arregla, porque el de-solape elige el subconjunto limpio. Elegir por hora de reloj no
+depende del resultado de ninguna corrida, así que densificar el muestreo no mete sesgo:
+solo tapa los huecos que deja el scheduler.
 
 Para mirarlo cuando quieras, corrélo a mano — sin `--supabase` no ensucia nada.
 
@@ -137,7 +155,16 @@ py -3.13 -u medir.py
 ```
 
 Lee lo guardado, reconstruye con velas posteriores lo que **efectivamente** pasó, y lo
-compara contra los números preregistrados:
+compara contra los números preregistrados.
+
+**Compara sobre los 46 pares de `deriv46`, no sobre el universo que el radar mira.** El
+`+0,511` se midió sobre ese pin congelado; el radar en producción mira el ranking de
+volumen de hoy, ~70 pares que rotan, y **el 79% de lo que elige cae fuera de esos 46**. Sin
+restringir, el spread en vivo da +2,25 — el 441% de lo preregistrado — y eso no es una
+réplica espectacular sino una comparación inválida: `n_surge` llega a 153× en un par recién
+listado, algo que 46 perpetuos establecidos no pueden producir. `medir.py` reporta el
+universo desplegado igual, como **descriptivo y sin línea base**, porque es lo que el radar
+hace de verdad y hay que verlo — pero el veredicto sale de la comparación restringida.
 
 | | medido antes | en vivo |
 |---|---|---|
@@ -145,14 +172,27 @@ compara contra los números preregistrados:
 | múltiplo de camino | 1,21× | ? |
 | tasa de acierto | 62,6% | ? |
 
-**La regla de parada está escrita en `medir.py` antes de que existan datos:**
+**La regla de parada está escrita en `medir.py` antes de que existan datos**, y no es un
+número de semanas: es el **MDE**, lo más chico que se puede distinguir de cero con los
+datos que hay. `medir.py` lo recalcula en cada corrida con el sd y la autocorrelación del
+propio dato acumulado, y dice una de tres cosas:
 
-- Con menos de **8 semanas** no concluye nada. La unidad independiente es la semana, no
-  la corrida: 6 corridas por día durante 10 días no son 60 datos.
-- Si a las 8 semanas el spread es **≤ 0**, no replicó y el radar se apaga.
-- Entre 0 y +0,5 se reporta como **réplica débil** y sigue vivo: la primera medición de
-  cualquier cosa exagera, porque se encontró mirando, y lo que se encuentra mirando es la
-  parte alta del ruido.
-- **No se toca `n_surge` ni `k` por lo que salga acá.** Ajustar el screener con el
-  resultado del forward test convierte el out-of-sample en in-sample, y después no queda
-  ninguna ventana limpia para volver a preguntar.
+- **observado > MDE, positivo** → replicó. Te dice además qué porcentaje del tamaño
+  preregistrado alcanzó: si es la mitad es lo normal y sigue siendo una réplica, porque la
+  primera medición de cualquier cosa exagera — se encontró mirando, y lo que se encuentra
+  mirando es la parte alta del ruido. Acción: **no tocar nada.**
+- **observado < −MDE** → no replicó, el radar se apaga.
+- **cae dentro del MDE** → todavía no alcanza, y te calcula cuántos días faltan **a la
+  cadencia real medida**, no a la que pide el cron. Esto **no es "no está"**, es "no se
+  pudo medir": son cosas distintas y confundirlas ya cerró mal dos familias en este repo.
+
+La unidad con potencia es la **barra**, no la semana, y no son 4h de datos por barra sino
+menos: el spread se parece a sí mismo de una barra a la siguiente (+0,449 en historia), así
+que `medir.py` divide el n contado por el factor de inflación de varianza (**4,24×**) antes
+de calcular nada. Las semanas se muestran igual, para mirar consistencia. El
+`SEM_MIN = 8` original venía de copiar el umbral de `banco/lote.py`, que existía por una
+razón que acá no aplica — allá las entradas **sí** se solapan.
+
+**No se toca `n_surge` ni `k` por lo que salga acá.** Ajustar el screener con el resultado
+del forward test convierte el out-of-sample en in-sample, y después no queda ninguna
+ventana limpia para volver a preguntar.
