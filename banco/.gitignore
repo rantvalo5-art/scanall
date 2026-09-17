@@ -9,3 +9,12 @@
 rank_graficos_*.csv
 potencia_graficos_*.csv
 *.log
+
+# muestreo de libro entre venues (corrida 10): ~470 MB de CSV crudo que se
+# regenera con `dislocacion.py --muestrear`. El resultado vive en el preregistro.
+.dislocacion/
+
+# cache de las dos tablas de Farside (corrida 16) y de las cinco series de
+# Yahoo (corrida 15). Se rebajan solas y no son el dato: son la copia local.
+.etf_cache/
+.macro_cache/

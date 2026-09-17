@@ -51,3 +51,6 @@ banco/.funding_cache/
 banco/.unlock_cache/
 banco/.aggtrades_cache/
 banco/.onchain_cache/
+
+# cache del baseline del swing (se regenera solo)
+.baseline_cache/
