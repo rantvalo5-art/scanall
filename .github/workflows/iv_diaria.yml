@@ -54,14 +54,29 @@ jobs:
         # cambie, el workflow quede en verde durante meses y el dato no se guarde.
         run: python juntar_iv.py --dias 7
 
+      - name: Juntar el skew del dia
+        working-directory: opciones
+        # El NIVEL de implicita (lo de arriba) y su INCLINACION son dos cosas
+        # distintas: la corrida 8 midio el nivel, y el skew no esta en ninguna parte
+        # del repo. Va en el mismo cron porque es la misma cadencia y el mismo dato
+        # perecedero — la cadena vencida no se puede recuperar de ningun venue.
+        run: python juntar_skew.py
+
       - name: Commitear lo nuevo
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add opciones/iv_diaria
+          git add opciones/iv_diaria opciones/skew_diario
           if git diff --cached --quiet; then
             echo "sin filas nuevas (el venue todavia no publico el dia): nada que commitear"
           else
-            git commit -m "iv: implicita del $(date -u +%Y-%m-%d)"
-            git push
+            git commit -m "iv: implicita y skew del $(date -u +%Y-%m-%d)"
+            # `prima_radar.yml` empuja cada 2h contra el mismo repo: si entro en el
+            # medio, rebasear y reintentar. Los CSV son append idempotente.
+            for i in 1 2 3; do
+              git pull --rebase --autostash && git push && exit 0
+              sleep 5
+            done
+            echo "no se pudo pushear despues de 3 intentos" >&2
+            exit 1
           fi
