@@ -123,6 +123,68 @@ se ve a los 12 días. Por eso conviene mirar temprano y seguido en vez de espera
 `medir.py` calcula el MDE **en cada corrida** con los datos que hay, así que no hace falta
 seguir el calendario a rajatabla: corrélo cuando quieras y él te dice si ya alcanza.
 
+### 4.1. Esas fechas suponían 6 barras por día. No llegaban 6. (medido el 2026-09-04)
+
+El calendario de arriba se calculó en barras y se pasó a días dividiendo por la cadencia
+**nominal** del cron, 6/día. La real, sobre los primeros 7,5 días en vivo:
+
+| | |
+|---|---|
+| corridas programadas que GitHub entregó | **29 de 45 = 65%** |
+| atraso contra el slot `:10` | mediana **2,15h**, p90 3,19h, máximo 3,95h |
+| barras que sobreviven al de-solape | **23 de 45 = 51%** |
+
+Con dos horas de atraso mediano sobre un espaciado nominal de cuatro, todos los días un
+par de corridas terminaba a ~3h20m y el de-solape lo descartaba, correctamente. O sea que
+**el reloj corría a la mitad de velocidad** y las fechas de arriba estaban optimistas por
+~2×.
+
+Arreglado densificando el muestreo, no aflojando el criterio: el cron ahora **intenta cada
+2h** y el de-solape elige el subconjunto espaciado 4h (ver `README.md` §2). Elegir por hora
+de reloj no depende del resultado de ninguna corrida, así que no mete sesgo.
+
+**Igual, no vuelvas a confiar en la fecha.** `medir.py` ahora calcula los días que faltan
+**a la cadencia real que mide en el propio dato**, no a la nominal. La tabla de arriba es
+indicativa; el script es el que manda.
+
+### 4.2. El radar NO mira el universo sobre el que se preregistró el número (2026-09-05)
+
+La primera corrida real de `medir.py` dio **+2,25 de spread — el 441% de lo preregistrado**,
+con el múltiplo al doble (2,44× contra 1,21×) y la tasa en 89%. Un forward test que vuelve
+4,4 veces más grande que lo medido no es una réplica espectacular: es una señal de que se
+está midiendo otra cosa.
+
+No era lookahead — `n_surge` se calcula sobre la vela 03:00–04:00 y `camino` sobre
+05:00–09:00, con una hora de hueco — ni outliers: la mediana del spread por barra (+2,20)
+es casi igual a la media, y winsorizando `y` a 8 todavía queda +1,64.
+
+**Era el universo.** El `+0,511` se midió sobre el pin `deriv46`: 46 pares con perpetuo
+desde 2021, congelados. El radar en producción mira el ranking de volumen de **hoy**:
+
+| | |
+|---|---|
+| pares por barra | ~70, no 46 |
+| símbolos distintos en 8 días | **137** |
+| presentes en las 24 barras | **35** |
+| elegidos que caen fuera de los 46 | **79%** |
+| `n_surge` máximo del top-8 | **153×** |
+
+Un `n_surge` de 153 no lo puede producir un perpetuo establecido: es la firma de un listado
+nuevo o de un evento violento. El radar está eligiendo, cuatro de cada cinco veces, en la
+**cola nueva e ilíquida** — exactamente donde el `README.md` declara que la calibración no
+se puede extrapolar y donde `banco/libro.py` mide costos reales de 1,5× a 6,3× lo que asume
+el banco. El spread grande no es plata: es la cola cobrándose por adelantado.
+
+Restringido a los 46 y re-rankeando el top-8 adentro, que es la misma pregunta que se
+preregistró, da **+0,83**. `medir.py` ahora reporta las dos cosas y **el veredicto sale de
+la restringida**; la desplegada queda como descriptiva, marcada como sin línea base.
+
+**Ojo con esto**, porque es la trampa que el repo ya conoce: restringir el universo después
+de ver los datos es análisis elegido a posteriori. Se sostiene acá por dos razones y
+conviene dejarlas escritas: la restricción la manda el preregistro, no el resultado, y
+**baja** el número (de +2,25 a +0,83) en vez de subirlo. Si alguna vez se afloja en la
+dirección contraria, no vale.
+
 ---
 
 ## 5. La decisión — fijada el 2026-08-27, antes de que existiera un solo dato
