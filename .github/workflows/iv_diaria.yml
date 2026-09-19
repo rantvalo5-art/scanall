@@ -1,0 +1,67 @@
+name: IV diaria (opciones)
+
+# JUNTA LA VOLATILIDAD IMPLICITA TODOS LOS DIAS, Y ESO ES TODO LO QUE HACE.
+#
+# La corrida 8 (`banco/PREREGISTRO_OPCIONES.md`) cerro la direccion de vender
+# volatilidad en alts por POTENCIA, no por el efecto: el instrumento existe y cruzar
+# cuesta 1-2% de la prima, pero en agosto de 2026 solo habia 18 meses de implicita
+# para SOL y 10 para XRP. Con n = 18 meses el MDE da 39%/anio contra un umbral
+# preregistrado de 10%, y BTC —cuyo efecto esta medido y es conocido— da 27,1% con
+# esa misma ventana.
+#
+# Lo unico que reabre esa direccion es HISTORIA, y la historia solo se puede EMPEZAR
+# a juntar: los venues sirven una ventana limitada y lo que no se guardo hoy no esta
+# manana. Por eso esto es un cron y no un script que se corre cuando hace falta. El
+# costo de no tenerlo es que dentro de un anio se este igual que hoy.
+#
+# Solo se guarda la implicita, a proposito: la realizada sale de klines de Binance,
+# que estan completos hacia atras y se pueden bajar cualquier dia.
+#
+# Son ~200 bytes por dia. No necesita secrets: es data publica de Bybit y Deribit.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 01:20 UTC: el DVOL de Deribit cierra su vela diaria a las 00:00, asi que a esta
+    # hora el dia anterior ya esta completo. El colector pide 7 dias hacia atras en
+    # cada corrida, asi que un par de dias salteados se recuperan solos.
+    - cron: "20 1 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  juntar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install requests "pandas==2.2.3"
+
+      - name: Juntar la implicita del dia
+        working-directory: opciones
+        # El script sale con codigo 1 si NINGUNA moneda devuelve datos. Eso es a
+        # proposito: la forma en que esto se muere en silencio es que el endpoint
+        # cambie, el workflow quede en verde durante meses y el dato no se guarde.
+        run: python juntar_iv.py --dias 7
+
+      - name: Commitear lo nuevo
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add opciones/iv_diaria
+          if git diff --cached --quiet; then
+            echo "sin filas nuevas (el venue todavia no publico el dia): nada que commitear"
+          else
+            git commit -m "iv: implicita del $(date -u +%Y-%m-%d)"
+            git push
+          fi
