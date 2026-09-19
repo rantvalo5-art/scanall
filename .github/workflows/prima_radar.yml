@@ -1,0 +1,68 @@
+name: Prima del radar (opciones)
+
+# GUARDA LO QUE COSTABA EL STRADDLE CORTO CADA VEZ QUE EL RADAR MIRA.
+#
+# El unico hallazgo vivo del repo es que se puede predecir MAGNITUD, y no se puede
+# cobrar: magnitud no dice direccion, y lo que paga por movimiento sin direccion es un
+# straddle. Falta el precio de ese straddle EN EL MOMENTO del disparo, que es el dato
+# que se evapora cada 4h. Detalle y numeros en `opciones/prima_radar.py`.
+#
+# LA CADENCIA SE APAREA CON EL RADAR, no con el dia. `radar.yml` intenta cada 2h y
+# de-solapa a 4h al medir; una foto diaria no contesta "que costaba la opcion en ESA
+# barra". Por eso :12 de cada hora par — dos minutos despues del slot del radar, para
+# que la foto quede del lado de aca de la barra y no antes.
+#
+# Son ~9 filas por corrida (6 monedas x 2 venues, las que tengan cadena corta). No
+# necesita secrets: Bybit y OKX son publicas.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "12 */2 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  foto:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install requests "pandas==2.2.3"
+
+      - name: Sacar la foto
+        working-directory: opciones
+        # Sale con codigo 1 si NINGUNA moneda devuelve un vencimiento corto: la forma
+        # en que esto se muere sin que nadie se entere es quedar en verde meses sin
+        # guardar nada.
+        run: python prima_radar.py
+
+      - name: Commitear lo nuevo
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add opciones/prima_radar
+          if git diff --cached --quiet; then
+            echo "sin filas nuevas: nada que commitear"
+          else
+            git commit -m "prima: foto del $(date -u +%Y-%m-%dT%H:%MZ)"
+            # Corre cada 2h y comparte repo con `iv_diaria.yml`: si el otro cron
+            # empujo mientras tanto, rebasear y reintentar en vez de fallar. El CSV
+            # es append idempotente, asi que rebasear no puede romper nada.
+            for i in 1 2 3; do
+              git pull --rebase --autostash && git push && exit 0
+              sleep 5
+            done
+            echo "no se pudo pushear despues de 3 intentos" >&2
+            exit 1
+          fi
