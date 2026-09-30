@@ -23,7 +23,9 @@ COBERTURA, medida el 2026-09-19 (no de memoria):
 Las unidades: los dos venues sirven la IV en FRACCION (0,3701 = 37,01%). Aca se pasa a
 % para igualar la escala de `iv_diaria/`, que ya guarda %.
 """
+import os
 import re
+import time
 
 import pandas as pd
 import requests
@@ -38,18 +40,62 @@ MONEDAS = ["BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE"]
 COLS = ["venue", "moneda", "vence", "dias", "strike", "tipo", "iv", "delta",
         "iv_bid", "iv_ask", "mark", "subyacente", "oi"]
 
+# HOSTS DE BYBIT, y viven aca porque los usan los DOS colectores (`juntar_iv.py` y
+# `juntar_skew.py` via este modulo). `api.bybit.com` devuelve 403 (Forbidden) desde las
+# IPs de EE.UU., que es donde corren los runners de GitHub — el mismo geo-bloqueo que
+# Binance sirve como 451 y que ya esta arreglado en `radar/radar.py`. Del 2026-09-20 al
+# 09-30 el cron diario fallo once veces seguidas por esto, y local nunca se vio porque la
+# maquina de desarrollo esta fuera de EE.UU.
+#
+# `api.bytick.com` es el dominio alterno oficial de Bybit, misma API; los otros dos son
+# mirrors regionales. Se usa el primero que responda y el log dice cual fue. Se puede
+# forzar uno con la env var BYBIT_API.
+BYBIT_HOSTS = ["https://api.bytick.com", "https://api.bybit.com",
+               "https://api.bybit.nl", "https://api.byhkbit.com"]
+BYBIT = BYBIT_HOSTS[0]
 
-def _get(url, params, intentos=3):
+_ULTIMO_ERROR = [None]
+
+
+def _get(url, params=None, intentos=3):
+    """Devuelve el JSON o None, y guarda el motivo en `_ULTIMO_ERROR`.
+
+    Antes esto se tragaba la excepcion entera sin siquiera imprimirla, asi que un 403 se
+    volvia "no hay cadena para esta moneda" — indistinguible de un dia flojo. Y
+    reintentaba tres veces cualquier error, incluido el geo-bloqueo, que no se arregla
+    reintentando.
+    """
     for i in range(intentos):
         try:
             r = S.get(url, params=params, timeout=45)
-            r.raise_for_status()
-            return r.json()
-        except Exception:
-            if i == intentos - 1:
-                return None
-            import time
+            if r.status_code == 200:
+                return r.json()
+            _ULTIMO_ERROR[0] = f"HTTP {r.status_code} {r.text[:120]}"
+            if r.status_code in (418, 429):
+                time.sleep(2 ** i)
+            else:
+                return None          # 403, 451 y demas no se arreglan reintentando
+        except Exception as e:
+            _ULTIMO_ERROR[0] = f"{type(e).__name__}: {str(e)[:120]}"
             time.sleep(1.5 * (i + 1))
+    return None
+
+
+def elegir_bybit():
+    """Primer host de Bybit que responda al ping. Devuelve la base, o None si ninguno.
+
+    No corta el proceso a proposito: OKX y Deribit son fuentes independientes y su dato
+    se guarda igual aunque Bybit este bloqueado. Ese acoplamiento es el que tiro 11 dias
+    de DVOL y 11 de skew.
+    """
+    global BYBIT
+    forzado = os.environ.get("BYBIT_API")
+    for base in ([forzado] if forzado else BYBIT_HOSTS):
+        if _get(f"{base}/v5/market/time") is not None:
+            BYBIT = base
+            print(f"bybit api: {base}", flush=True)
+            return base
+        print(f"  {base} no responde ({_ULTIMO_ERROR[0]})", flush=True)
     return None
 
 
@@ -68,7 +114,7 @@ def _f(x, escala=1.0):
 
 def bybit(moneda, ahora):
     """`/v5/market/tickers?category=option`. Simbolo: BTC-25SEP26-170000-P-USDT."""
-    r = _get("https://api.bybit.com/v5/market/tickers",
+    r = _get(f"{BYBIT}/v5/market/tickers",
              {"category": "option", "baseCoin": moneda})
     lst = ((r or {}).get("result") or {}).get("list") or []
     filas = []

@@ -49,13 +49,19 @@ jobs:
 
       - name: Juntar la implicita del dia
         working-directory: opciones
-        # El script sale con codigo 1 si NINGUNA moneda devuelve datos. Eso es a
-        # proposito: la forma en que esto se muere en silencio es que el endpoint
+        # El script sale con codigo 1 solo si NINGUNA de las dos fuentes devuelve datos.
+        # Eso es a proposito: la forma en que esto se muere en silencio es que el endpoint
         # cambie, el workflow quede en verde durante meses y el dato no se guarde.
+        # Si una sola fuente falla, guarda lo que hay y emite un ::warning::.
         run: python juntar_iv.py --dias 7
 
       - name: Juntar el skew del dia
         working-directory: opciones
+        # `always()` porque el skew no depende de la implicita y es el dato MAS
+        # perecedero de los dos: la cadena vencida no se puede recuperar de ningun
+        # venue, mientras que la implicita tiene ~25 dias de ventana. Acoplarlo al paso
+        # anterior costo 11 dias de skew que no vuelven (2026-09-20 -> 09-30).
+        if: always()
         # El NIVEL de implicita (lo de arriba) y su INCLINACION son dos cosas
         # distintas: la corrida 8 midio el nivel, y el skew no esta en ninguna parte
         # del repo. Va en el mismo cron porque es la misma cadencia y el mismo dato
@@ -63,6 +69,12 @@ jobs:
         run: python juntar_skew.py
 
       - name: Commitear lo nuevo
+        # `always()` porque commitear NO es parte de juntar. Del 2026-09-20 al 09-30 este
+        # paso no corrio once veces seguidas —Bybit daba 403 y el colector salia 1— y con
+        # el se fueron las 16 filas diarias de DVOL que Deribit si estaba devolviendo.
+        # El dato que ya esta en el disco se guarda, y el run igual queda rojo si el
+        # colector fallo de verdad: el estado del job no lo decide este paso.
+        if: always()
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
