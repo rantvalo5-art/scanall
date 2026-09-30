@@ -71,6 +71,16 @@ def main():
     print(f"skew_diario — {ahora:%Y-%m-%d %H:%M} UTC"
           f"{'  (solo mirar, no escribe)' if a.ver else ''}\n", flush=True)
 
+    # Elegir el host de Bybit ANTES de la primera cadena, y que el log diga cual fue.
+    # Si ninguno responde no se corta: OKX es independiente y sirve BTC/ETH igual. Eso
+    # importa porque el skew es el dato mas perecedero del repo —la cadena vencida no se
+    # puede recuperar de ningun venue— y por acoplarlo al colector de implicita se
+    # perdieron los 11 dias del 2026-09-20 al 09-30.
+    if cadena.elegir_bybit() is None:
+        print("::warning title=Bybit caido::Ningun host de Bybit responde "
+              f"({cadena._ULTIMO_ERROR[0]}). Se junta solo el skew de OKX (BTC/ETH).",
+              flush=True)
+
     nuevas, medidas = 0, 0
     for m in cadena.MONEDAS:
         C = cadena.bajar(m, ahora)

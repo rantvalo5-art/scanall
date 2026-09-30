@@ -1,2 +1,3 @@
 fecha,moneda,venue,vence,dias,rr25,mariposa25,iv_atm,iv_put25,iv_call25,delta_put,delta_call,oi_calls,oi_puts,n,subyacente
 2026-09-19,DOGE,bybit,2026-10-30,40.44,-2.99,3.345,69.75,71.6,74.59,-0.2098,0.2241,532800.0,49200.0,42,0.08836
+2026-09-30,DOGE,bybit,2026-10-30,29.57,-2.54,1.9,75.99,76.62,79.16,-0.2729,0.2267,863400.0,176500.0,44,0.09469

@@ -24,6 +24,13 @@ Se guarda lo perecedero.
     py -3.13 -u juntar_iv.py --sembrar    # primera vez: baja toda la historia que haya
     py -3.13 -u juntar_iv.py --dias 30    # ventana explicita al completar
 
+CUANTO SE PUEDE RECUPERAR, medido el 2026-09-30 y no supuesto. La frase de arriba ("lo que
+no se guardo hoy no esta manana") es la razon de ser de este cron y sigue siendo cierta a
+la larga, pero hay un colchon: `historical-volatility` de Bybit sirve la ventana horaria
+completa de los ultimos ~25 dias (600 filas por request), y el DVOL de Deribit llega a
+2021. O sea que un cron caido se recupera con `--dias 30` mientras no pase de un mes. Eso
+es lo que salvo los 11 dias del 2026-09-20 al 09-30. Mas alla de eso, no hay vuelta.
+
 Sale a `opciones/iv_diaria/<fuente>_<MONEDA>.csv`, una fila por dia, append idempotente
 por fecha: correrlo dos veces el mismo dia no duplica nada.
 """
@@ -33,7 +40,14 @@ import sys
 import time
 
 import pandas as pd
-import requests
+
+# El cliente HTTP, la lista de hosts de Bybit y la eleccion de host viven en `cadena.py`
+# porque los usan los DOS colectores de este directorio, y el geo-bloqueo les pega igual a
+# los dos. Ver el comentario de `cadena.BYBIT_HOSTS` para el 403 de los runners. Se importa
+# el modulo y no `BYBIT`, porque `elegir_bybit()` reasigna esa global y una copia queda
+# vieja.
+import cadena
+from cadena import _ULTIMO_ERROR, _get, elegir_bybit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SALIDA = os.path.join(HERE, "iv_diaria")
@@ -47,22 +61,6 @@ CANDIDATOS = ("BTC ETH SOL XRP DOGE BNB LTC ADA AVAX LINK TON TRX HYPE PEPE SUI 
 # Deribit publica un indice de vol implicita a 30d (el DVOL, el "VIX de cripto") solo
 # para BTC y ETH. Es la serie larga —2021 en adelante— y la que uso `iv_rv.py`.
 DVOL = ["BTC", "ETH"]
-
-S = requests.Session()
-S.headers.update({"User-Agent": "Mozilla/5.0"})
-
-
-def _get(url, params, intentos=3):
-    for i in range(intentos):
-        try:
-            r = S.get(url, params=params, timeout=45)
-            r.raise_for_status()
-            return r.json()
-        except Exception as e:
-            if i == intentos - 1:
-                print(f"    ! {url}: {type(e).__name__} {str(e)[:80]}", flush=True)
-                return None
-            time.sleep(1.5 * (i + 1))
 
 
 def bybit_iv(moneda, desde, hasta):
@@ -78,7 +76,7 @@ def bybit_iv(moneda, desde, hasta):
     filas, fin, vacias = [], hasta, 0
     while fin > desde:
         ini = max(fin - pd.Timedelta(days=25), desde)
-        r = _get("https://api.bybit.com/v5/market/historical-volatility",
+        r = _get(f"{cadena.BYBIT}/v5/market/historical-volatility",
                  {"category": "option", "baseCoin": moneda, "quoteCoin": "USDT",
                   "period": "30", "startTime": int(ini.timestamp() * 1000),
                   "endTime": int(fin.timestamp() * 1000)})
@@ -173,17 +171,21 @@ def main():
     modo = "SEMBRANDO (historia completa)" if a.sembrar else f"completando {a.dias}d"
     print(f"iv_diaria — {modo} — hasta {hasta:%Y-%m-%d %H:%M} UTC\n", flush=True)
 
-    total_nuevas, con_datos = 0, 0
+    total_nuevas, con_datos, dvol_ok = 0, 0, 0
     print("bybit (indice 30d):", flush=True)
-    for m in CANDIDATOS:
-        d = bybit_iv(m, desde, hasta)
-        if d.empty:
-            continue
-        nuevas, tot = guardar("bybit", m, d)
-        total_nuevas += nuevas
-        con_datos += 1
-        print(f"  {m:6} +{nuevas:4} filas   total {tot:5}   "
-              f"{d['fecha'].min():%Y-%m-%d} -> {d['fecha'].max():%Y-%m-%d}", flush=True)
+    if elegir_bybit() is None:
+        print(f"  ningun host de Bybit responde. Ultimo error: {_ULTIMO_ERROR[0]}",
+              flush=True)
+    else:
+        for m in CANDIDATOS:
+            d = bybit_iv(m, desde, hasta)
+            if d.empty:
+                continue
+            nuevas, tot = guardar("bybit", m, d)
+            total_nuevas += nuevas
+            con_datos += 1
+            print(f"  {m:6} +{nuevas:4} filas   total {tot:5}   "
+                  f"{d['fecha'].min():%Y-%m-%d} -> {d['fecha'].max():%Y-%m-%d}", flush=True)
 
     print("\nderibit (DVOL):", flush=True)
     for m in DVOL:
@@ -192,19 +194,37 @@ def main():
             continue
         nuevas, tot = guardar("deribit", m, d)
         total_nuevas += nuevas
+        dvol_ok += 1
         print(f"  {m:6} +{nuevas:4} filas   total {tot:5}   "
               f"{d['fecha'].min():%Y-%m-%d} -> {d['fecha'].max():%Y-%m-%d}", flush=True)
 
-    print(f"\n{total_nuevas} filas nuevas · {con_datos} monedas con opciones en bybit")
+    print(f"\n{total_nuevas} filas nuevas · {con_datos} monedas con opciones en bybit · "
+          f"{dvol_ok} de {len(DVOL)} DVOL")
 
-    # Que el cron falle fuerte si dejo de juntar. Una corrida que no agrega nada y no
-    # encuentra ninguna moneda es la forma en que esto se muere en silencio: el
-    # workflow queda en verde durante meses y el dato no se esta guardando.
-    if con_datos == 0:
-        print("FATAL: ninguna moneda devolvio datos. Revisar quoteCoin=USDT y el "
-              "endpoint de bybit antes de asumir que no hay opciones listadas.",
-              file=sys.stderr)
+    # QUE FALLA Y QUE NO, y esto ya se equivoco una vez en la direccion caraque:
+    #
+    # El `exit 1` original saltaba cuando Bybit no devolvia nada, y estaba bien pensado
+    # —la forma en que un colector se muere es quedando en verde durante meses— pero
+    # estaba DEMASIADO ARRIBA: mataba el paso que commitea, asi que las 16 filas diarias
+    # de DVOL que SI se bajaban se tiraban a la basura. Once dias asi.
+    #
+    # Ahora la regla es por fuente. Si una responde y la otra no, se guarda lo que hay y
+    # se avisa fuerte (`::warning::` lo pinta en el resumen del run, no solo en el log).
+    # Solo se corta cuando NINGUNA de las dos junto nada, que es el caso que de verdad
+    # significa "esto dejo de funcionar".
+    if con_datos == 0 and dvol_ok == 0:
+        print("FATAL: ninguna de las dos fuentes devolvio datos. Ultimo error: "
+              f"{_ULTIMO_ERROR[0]}", file=sys.stderr)
         sys.exit(1)
+
+    if con_datos == 0:
+        print("::warning title=Bybit caido::Bybit no devolvio ninguna moneda "
+              f"({_ULTIMO_ERROR[0]}). Se guardo solo el DVOL de Deribit. La implicita de "
+              "alts es lo unico que reabre la corrida 8 y es lo que se esta perdiendo.",
+              flush=True)
+    if dvol_ok == 0:
+        print("::warning title=Deribit caido::Deribit no devolvio DVOL "
+              f"({_ULTIMO_ERROR[0]}). Se guardo solo el indice de Bybit.", flush=True)
 
 
 if __name__ == "__main__":

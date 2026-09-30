@@ -1,2 +1,3 @@
 fecha,moneda,venue,vence,dias,rr25,mariposa25,iv_atm,iv_put25,iv_call25,delta_put,delta_call,oi_calls,oi_puts,n,subyacente
 2026-09-19,ETH,bybit,2026-10-30,40.44,-1.8,1.39,49.17,49.66,51.46,-0.2567,0.2526,12658.3,15439.3,48,2637.48
+2026-09-30,ETH,bybit,2026-10-30,29.57,0.84,1.45,47.36,49.23,48.39,-0.2753,0.2361,22724.7,21466.2,48,2691.58
