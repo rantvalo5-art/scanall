@@ -5,7 +5,7 @@ Es lo UNICO de este repo que cruzo su regla de parada escrita y despues
 sobrevivio a todo lo que se le tiro encima. Este script re-corre la evaluacion
 completa sobre datos frescos, que es como se hace el forward test:
 
-    $env:SUPABASE_KEY = "<anon key>"    # la de fallback esta vencida (401)
+    $env:SUPABASE_KEY = "<anon key>"    # requerido: ya no hay fallback en el codigo
     py -3.13 evaluar.py                 # baja lo que falte y evalua
     py -3.13 evaluar.py --desde 2026-08-17   # SOLO out-of-sample, sin el in-sample
 
@@ -37,14 +37,20 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 CACHE = os.path.join(HERE, ".cache")
 FUNDING = os.path.join(os.path.dirname(HERE), "basis", ".funding_cache")
 URL = "https://ecgdswroygkfckkaguxp.supabase.co"
-KEY = os.environ.get("SUPABASE_KEY") or (
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9."
-    "eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjZ2Rzd3JveWdrZmNra2FndXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1MTUyNzEsImV4cCI6MjA4OTA5MTI3MX0."
-    "N_qJsJWTJaqRHpugzlnRTpoZI84mUoctt3RKmUshIrU")
+# SIN FALLBACK HARDCODEADO, a proposito. Aca habia una anon key literal, y `scanall` es
+# un repo PUBLICO: estaba pusheada en `banco/primer-toque` y la leia cualquiera. Estaba
+# vencida (401), asi que no servia para entrar — pero tampoco servia para correr el
+# script, o sea que era el peor de los dos mundos: riesgo sin utilidad. Si falta la env
+# var, el script dice como cargarla y corta.
+KEY = os.environ.get("SUPABASE_KEY")
 
 AYUDA_KEY = r'''  La vigente esta en la memoria del proyecto. Cargarla sin imprimirla:
 
   $env:SUPABASE_KEY = (Select-String -Path "$env:USERPROFILE\.claude\projects\C--Users-asd-scancrypto-scanall\memory\reference-supabase-anon-key.md" -Pattern 'eyJ[A-Za-z0-9_.\-]+' -AllMatches).Matches[0].Value
+
+  OJO CON ESA RUTA: dice `scancrypto` y no `Pictures`. Es el directorio de memoria del
+  proyecto VIEJO, y es donde el archivo esta de verdad (verificado el 2026-09-30). La
+  memoria de este proyecto tiene otra ruta y no lo tiene.
 '''
 
 EXTENSION = ["EXPLOSION", "BREAKOUT"]
@@ -59,6 +65,8 @@ RNG = np.random.default_rng(11)
 
 def _pedir(desde):
     """Una pasada paginada sobre daytrader_outcomes."""
+    if not KEY:
+        raise SystemExit(f"\nFALTA SUPABASE_KEY. Ya no hay fallback en el codigo.\n{AYUDA_KEY}")
     h = {"apikey": KEY, "Authorization": f"Bearer {KEY}"}
     rows, off = [], 0
     while True:
@@ -71,8 +79,8 @@ def _pedir(desde):
                          params=params, timeout=60)
         if r.status_code in (401, 403):
             raise SystemExit(
-                f"\nSupabase devolvio {r.status_code}: la anon key de fallback esta "
-                f"vencida o rotada.\n{AYUDA_KEY}")
+                f"\nSupabase devolvio {r.status_code}: la anon key esta vencida o "
+                f"rotada.\n{AYUDA_KEY}")
         r.raise_for_status()
         b = r.json()
         if not b:
