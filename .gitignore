@@ -54,3 +54,23 @@ banco/.onchain_cache/
 
 # cache del baseline del swing (se regenera solo)
 .baseline_cache/
+
+# --- Crudos de backtest en la RAIZ (16 MB, regenerables) ---
+# Se separan a proposito de `banco/*.csv`, que SI se trackean: esos son el RESULTADO
+# medido de una corrida, y el preregistro de al lado los cita. Estos son el volcado
+# crudo del que salio el resultado, y se regeneran corriendo `backtest.py` de nuevo.
+bt_*.json
+bt_*.csv
+rank_c0*.csv
+rank_cruces*.csv
+mediana_gate_*.csv
+P5_gate_*.csv
+dt_vivo*.csv
+scratchpad_syms.json
+edge_analysis.png
+
+# Copia byte a byte de `screener.py`, con otro nombre. No es un fork del daytrader.
+screenerDaytrader.py
+# Salidas huerfanas de una corrida suelta de `fade/` (2,8 MB): nada del repo las lee,
+# `evaluar.py` no las menciona, y los .log de al lado ya estaban ignorados.
+fade/puente*.json
