@@ -185,6 +185,45 @@ conviene dejarlas escritas: la restricción la manda el preregistro, no el resul
 **baja** el número (de +2,25 a +0,83) en vez de subirlo. Si alguna vez se afloja en la
 dirección contraria, no vale.
 
+### 4.3. REPLICÓ (medido el 2026-09-30, sin aflojar nada)
+
+`py -3.13 -u medir.py`, 109 barras de-solapadas del 2026-08-27 al 09-30, 8.982 filas.
+El veredicto sale de la columna restringida a `deriv46`, como manda §4.2.
+
+| | preregistrado (251 sem) | en vivo (6 sem) |
+|---|---|---|
+| spread (ATR base) | +0,511 | **+0,649** |
+| múltiplo de camino | 1,21× | 1,29× |
+| tasa de acierto | 62,6 % | 69,4 % |
+| línea base | 49,5 % | 49,3 % |
+| pares por barra | 46 | 34 |
+| barras > 0 | — | **90 %** |
+
+```
+observado +0,627 por barra   MDE actual ±0,334   (109 barras / 4,24 = 25,7 efectivas)
+REPLICO: +0,627 supera el MDE, y es el 123% del +0,511 preregistrado.
+```
+
+**Es el Caso C de §5, y el primer resultado de este repo que sobrevive un forward test de
+verdad.** La acción que corresponde es la que §5 fijó en agosto: **no tocar nada del
+radar**. Lo que se abre es §6, que no es tunear.
+
+**Y dio MÁS grande que lo preregistrado, que no es mejor noticia que dar igual** — lo
+esperable era menos, porque la primera medición siempre exagera. Con el MDE apenas
+superado (+0,627 contra ±0,334) el intervalo todavía abarca el +0,511, así que no hay
+nada que explicar. Si se sostiene arriba con más barras, ahí sí hay que preguntar por qué.
+
+**Lo que confirma §4.1 de paso:** de 175 corridas entregadas, el de-solape se quedó con
+110. O sea que el densificado a cada 2h funcionó —hay barras para elegir— pero la
+cadencia real sigue siendo ~2/3 de la nominal, y el MDE se calculó sobre las 25,7 barras
+efectivas, no sobre las 109 crudas.
+
+**Lo que sigue sin ser buena noticia:** en el universo desplegado el spread es +4,220
+(2,43×, tasa 86,9 %) y el **86 % de los elegidos cae fuera de los 46**. Eso es la cola
+nueva e ilíquida, donde `banco/libro.py` mide costos reales de 1,5× a 6,3× lo que asume
+el banco. El número grande no es plata: es la cola cobrándose por adelantado. Sigue
+marcado como descriptivo y sin línea base.
+
 ---
 
 ## 5. La decisión — fijada el 2026-08-27, antes de que existiera un solo dato
