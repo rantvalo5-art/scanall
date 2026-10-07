@@ -104,7 +104,11 @@ def guardar(moneda, filas):
     viejo = pd.read_csv(p, parse_dates=["ts"]) if os.path.exists(p) else None
     todo = nuevo if viejo is None or viejo.empty else \
         pd.concat([viejo, nuevo], ignore_index=True)
-    todo["ts"] = pd.to_datetime(todo["ts"])
+    # El CSV se escribe con la `Z`, asi que al releerlo `parse_dates` devuelve una
+    # columna tz-aware, mientras que la fila nueva llega naive (ver `main`). Sin el
+    # `utc=True` el concat de las dos revienta con "Cannot mix tz-aware with tz-naive"
+    # y el colector se moria en toda corrida menos la que crea el archivo.
+    todo["ts"] = pd.to_datetime(todo["ts"], utc=True).dt.tz_localize(None)
     todo = todo.drop_duplicates(["ts", "venue"], keep="first").sort_values(["ts", "venue"])
     todo.to_csv(p, index=False, date_format="%Y-%m-%dT%H:%M:%SZ")
     return len(todo) - (0 if viejo is None else len(viejo)), len(todo)
