@@ -59,9 +59,15 @@ def foto(C, venue):
     """IV ATM y prima del straddle del vencimiento mas corto, mas la IV a 30d de contexto.
 
     El straddle sale en % del subyacente —(call + put) / spot— que es la unidad en la
-    que se compara contra el camino que mide el radar. Solo Bybit sirve `markPrice`;
-    en OKX la columna queda vacia a proposito y no se inventa con un Black-Scholes
-    propio: un precio estimado por mi no es lo que se paga.
+    que se compara contra el camino que mide el radar.
+
+    Bybit sirve `markPrice` directo. OKX no sirve precio en `opt-summary`, y por eso la
+    columna estuvo vacia hasta el 2026-10-07 — con el agregado de que el 403 de Bybit
+    desde los runners dejaba al cron guardando filas SIN la unica columna por la que
+    existe. Ahora el precio de OKX sale del bid y el ask vivos de `/market/tickers`
+    (`cadena._okx_precios`), que siguen siendo lo que se paga y no un Black-Scholes
+    propio. Lo que no se hace es poolear: `okx` (settle en moneda, libro angosto) y
+    `okx_um` (settle en USD, libro 60-115% de ancho) son dos venues separados.
     """
     V = C[C.venue == venue]
     if V.empty:
@@ -133,7 +139,7 @@ def main():
             print(f"  {m:5} sin cadena", flush=True)
             continue
         filas = []
-        for v in ("bybit", "okx"):
+        for v in ("bybit", "okx", "okx_um"):
             f = foto(C, v)
             if f is None:
                 continue
