@@ -219,6 +219,12 @@ y las 5 de `okx_ETH.csv` del 09-19 al 10-07 se midieron sobre ese eje.** La huel
 que se parte al medio cuando se dejan de poolear las dos familias: 132-164 antes, 72-82
 después. La del 10-04 de ETH quedó con `mariposa25 = -41,15` e `iv_atm = 88,17%`.
 
+**Esas 10 filas se BORRARON el 2026-10-08**, y la serie de OKX arranca limpia ese día. El
+criterio es el que ya estaba escrito en `cadena._cerca`: *"preferible una fila faltante que
+una fila que miente"*. No se recalcularon de la cadena histórica porque no existe —
+`opt-summary` sirve la cadena viva y nada más, que es la premisa de §1. Siguen en el
+historial de git si alguien quiere verlas.
+
 Las filas de Bybit no están afectadas: ahí `delta` es el Black-Scholes y siempre lo fue.
 
 ### Lo que hay, en filas con precio
