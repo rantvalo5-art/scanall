@@ -5,10 +5,15 @@ POR QUE ESTO EXISTE SEPARADO. Lo usan dos colectores con cadencias distintas
 (`juntar_skew.py` una vez por dia, `prima_radar.py` cada 2h) y la unica forma de que
 midan lo mismo es que bajen y normalicen la cadena con el mismo codigo.
 
-EL PUNTO QUE ABARATA TODO: Bybit (`markIv`, `delta`) y OKX (`markVol`, `delta`) sirven
-el delta CALCULADO. O sea que el risk reversal a 25 delta sale eligiendo el instrumento
-cuyo delta esta mas cerca del objetivo, SIN interpolar el smile — que es la parte que
-normalmente ensucia esta medicion y la que hace que dos implementaciones no coincidan.
+EL PUNTO QUE ABARATA TODO: Bybit (`markIv`, `delta`) y OKX (`markVol`, `deltaBS`)
+sirven el delta CALCULADO. O sea que el risk reversal a 25 delta sale eligiendo el
+instrumento cuyo delta esta mas cerca del objetivo, SIN interpolar el smile — que es
+la parte que normalmente ensucia esta medicion y la que hace que dos
+implementaciones no coincidan.
+
+DE OKX HAY QUE PEDIR `deltaBS`, no `delta`: en la familia de settle en moneda el
+segundo viene denominado en moneda y cruza 0,50 en K≈S/2, no en el dinero. Estuvo
+mal del 2026-09-19 al 10-07 y se lo llevo puesto a las tres filas de skew de OKX.
 
 Deribit queda afuera a proposito: `get_book_summary_by_currency` trae `mark_iv` pero NO
 trae delta, y pedir greeks instrumento por instrumento son ~1000 requests por corrida.
@@ -39,6 +44,27 @@ MONEDAS = ["BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE"]
 
 COLS = ["venue", "moneda", "vence", "dias", "strike", "tipo", "iv", "delta",
         "iv_bid", "iv_ask", "mark", "subyacente", "oi"]
+
+# LAS DOS FAMILIAS DE OKX, que `opt-summary` devuelve MEZCLADAS bajo el mismo `uly` y
+# que hasta hoy se apilaban como un solo venue:
+#
+#     BTC-USD-...      settle BTC   cotiza en fraccion del subyacente
+#     BTC-USD_UM-...   settle USD   cotiza en USD
+#
+# Medido el 2026-10-07 sobre el vencimiento de 0,32 dias, el ancho relativo del ATM:
+#
+#     BTC   inversa  call 3,1%  put 3,4%      _UM  call  61,7%  put  63,9%
+#     ETH   inversa  call 4,1%  put 7,8%      _UM  call 107,0%  put 114,7%
+#     SOL   no existe inversa                 _UM  call  64,8%  put  76,0%
+#
+# Las dos coinciden en el precio del straddle (BTC 0,6200% contra 0,6133%; ETH 0,6300%
+# contra 0,6264%), asi que no es que una miente: es que en la de USD no hay nadie del
+# otro lado. Por eso se guardan como venues DISTINTOS. Poolearlas ensucia el ancho del
+# libro, que es justo la columna que dice si un resultado es ejecutable — y es lo que
+# venia pasando: los `spread_iv` de 12 a 27 puntos de IV que `prima_radar` guardo para
+# OKX salen de promediar las dos familias, no de un libro real.
+OKX_FAM = {"": "okx", "_UM": "okx_um"}
+OKX_INST = re.compile(r"^[A-Z]+-USD(_UM)?-(\d{6})-(\d+(?:\.\d+)?)-([CP])$")
 
 # HOSTS DE BYBIT, y viven aca porque los usan los DOS colectores (`juntar_iv.py` y
 # `juntar_skew.py` via este modulo). `api.bybit.com` devuelve 403 (Forbidden) desde las
@@ -141,35 +167,79 @@ def bybit(moneda, ahora):
     return pd.DataFrame(filas, columns=COLS) if filas else _vacia()
 
 
+def _okx_precios(moneda):
+    """El `mark` que `opt-summary` NO trae: el medio del libro vivo de
+    `/market/tickers`, en USD por unidad de subyacente (la unidad del `markPrice` de
+    Bybit, para que las dos columnas se comparen sin convertir nada despues).
+
+    Sigue sin inventarse un precio con un Black-Scholes propio —eso seguiria no siendo
+    lo que se paga—: son el bid y el ask publicados. Una sola request por moneda trae
+    las dos familias. Devuelve {(venue, vto, strike, tipo): (medio_crudo, ancho)}, con
+    el medio en la unidad en que cotiza cada familia; la conversion a USD se hace en
+    `okx()`, que es donde esta el forward.
+    """
+    r = _get("https://www.okx.com/api/v5/market/tickers",
+             {"instType": "OPTION", "uly": f"{moneda}-USD"})
+    out = {}
+    for k in (r or {}).get("data") or []:
+        m = OKX_INST.match(str(k.get("instId", "")))
+        if not m:
+            continue
+        bid, ask = _f(k.get("bidPx")), _f(k.get("askPx"))
+        if not (bid > 0 and ask > 0):
+            continue          # sin las dos patas no hay medio, y un lado solo miente
+        clave = (OKX_FAM[m.group(1) or ""], m.group(2), _f(m.group(3)), m.group(4))
+        out[clave] = (bid + ask) / 2
+    return out
+
+
 def okx(moneda, ahora):
-    """`/api/v5/public/opt-summary`. instId trae un sufijo variable (`BTC-USD_UM-...`),
-    asi que la fecha y el tipo se sacan por PATRON, no por posicion: el dia que OKX le
-    agregue otro segmento, esto sigue andando en vez de romperse en silencio."""
+    """`/api/v5/public/opt-summary` + `/market/tickers`, separadas por familia.
+
+    El instId trae un sufijo variable (`BTC-USD_UM-...`), asi que la fecha y el tipo se
+    sacan por PATRON y no por posicion: el dia que OKX le agregue otro segmento, esto
+    sigue andando en vez de romperse en silencio. Ese mismo sufijo es el que distingue
+    las dos familias (ver `OKX_FAM`), que antes se apilaban juntas.
+    """
     r = _get("https://www.okx.com/api/v5/public/opt-summary", {"uly": f"{moneda}-USD"})
     data = (r or {}).get("data") or []
+    precios = _okx_precios(moneda) if data else {}
     filas = []
     for k in data:
-        inst = str(k.get("instId", ""))
-        m = re.search(r"-(\d{6})-(\d+(?:\.\d+)?)-([CP])$", inst)
+        m = OKX_INST.match(str(k.get("instId", "")))
         if not m:
             continue
         try:
-            vence = pd.Timestamp(f"20{m.group(1)}", tz="UTC") + pd.Timedelta(hours=8)
+            vence = pd.Timestamp(f"20{m.group(2)}", tz="UTC") + pd.Timedelta(hours=8)
         except ValueError:
             continue
         iv = _f(k.get("markVol"), 100)
-        d = _f(k.get("delta"))
+        # `deltaBS` Y NO `delta`. En la familia inversa (settle en moneda) OKX sirve en
+        # `delta` el delta DENOMINADO EN MONEDA, que para un call muy dentro del dinero
+        # tiende a K/S en vez de a 1: el 2026-10-07, con ETH a 2.576, el call de strike
+        # 1.100 a 22 dias figuraba con delta 0,427 (= 1100/2576) en vez de 0,9999. Con
+        # eso, buscar "el delta 0,50" devolvia el strike de la MITAD del spot y una IV de
+        # 91,9% donde Bybit medía 46,5%, y "el delta 25" no era un delta 25. `deltaBS` es
+        # el delta Black-Scholes y viene en el mismo payload; en la familia `_UM` los dos
+        # campos son identicos, asi que el cambio solo toca a la inversa.
+        d = _f(k.get("deltaBS"))
+        if d != d:
+            d = _f(k.get("delta"))
         if not (iv > 0) or d != d:
             continue
-        filas.append(dict(venue="okx", moneda=moneda, vence=vence,
+        venue, strike, tipo = OKX_FAM[m.group(1) or ""], _f(m.group(3)), m.group(4)
+        fwd = _f(k.get("fwdPx"))
+        medio = precios.get((venue, m.group(2), strike, tipo), float("nan"))
+        # La inversa cotiza en fraccion del subyacente; la `_UM` ya viene en USD.
+        mark = medio if venue == "okx_um" else medio * fwd
+        filas.append(dict(venue=venue, moneda=moneda, vence=vence,
                           dias=(vence - ahora).total_seconds() / 86400,
-                          strike=_f(m.group(2)), tipo=m.group(3), iv=iv, delta=d,
+                          strike=strike, tipo=tipo, iv=iv, delta=d,
                           iv_bid=_f(k.get("bidVol"), 100),
                           iv_ask=_f(k.get("askVol"), 100),
-                          mark=float("nan"), subyacente=_f(k.get("fwdPx")),
+                          mark=mark, subyacente=fwd,
                           oi=float("nan")))
     return pd.DataFrame(filas, columns=COLS) if filas else _vacia()
-
 
 def bajar(moneda, ahora=None):
     """Las dos cadenas de una moneda, apiladas. Un venue caido no tumba al otro."""
