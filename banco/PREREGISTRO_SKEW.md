@@ -195,3 +195,53 @@ nunca** — y ésa es la única razón por la que esto existe.
 
 _(en blanco: n = 0 el 2026-09-19. La primera compuerta que se puede correr es la de
 `prima_radar`, alrededor del 2026-11-20.)_
+
+## Estado de la recolección al 2026-10-08 — **no es un resultado, y la fecha se corrió**
+
+Ninguna de las dos compuertas se corrió ni se puede correr. Lo que sigue es el estado de la
+serie, escrito acá porque la fecha calculada en §4 ya no es la que corresponde.
+
+**`prima_radar` no juntó nada del 2026-09-19 al 10-07: 74 corridas, 74 en rojo.** `guardar`
+escribía el CSV con la `Z` y releía tz-aware contra una fila nueva naive; la siembra del
+19-sep sobrevivió sólo porque el archivo todavía no existía. Arreglado el 10-08 (PR #40).
+**Son 18 días de prima del straddle en el momento del disparo que no vuelven**, que es
+exactamente el dato que §6 dice que es la única razón por la que esto existe.
+
+**El skew perdió 11 días (09-20 → 09-30)** por el 403 de Bybit desde los runners más un
+`exit 1` que mataba el paso que commitea (PR #38). La implícita se recuperó porque el venue
+sirve ~25 días de ventana hacia atrás; la cadena de opciones de esos días, no.
+
+**Y el eje del delta estaba mal en OKX.** En la familia de settle en moneda, OKX sirve en
+`delta` el delta denominado en moneda, que cruza 0,50 en K≈S/2 y no en el dinero: con ETH a
+2.576, el call de strike 1.100 figuraba con delta 0,427 = 1100/2576. Hay que pedirle
+`deltaBS` (PR #41, mergeado el 10-08 01:31 UTC). **Las 5 filas de `skew_diario/okx_BTC.csv`
+y las 5 de `okx_ETH.csv` del 09-19 al 10-07 se midieron sobre ese eje.** La huella es `n`,
+que se parte al medio cuando se dejan de poolear las dos familias: 132-164 antes, 72-82
+después. La del 10-04 de ETH quedó con `mariposa25 = -41,15` e `iv_atm = 88,17%`.
+
+Las filas de Bybit no están afectadas: ahí `delta` es el Black-Scholes y siempre lo fue.
+
+### Lo que hay, en filas con precio
+
+| | BTC | ETH | SOL | XRP | DOGE | HYPE |
+|---|---|---|---|---|---|---|
+| `prima_radar`, filas con `straddle_pct` | 6 | 5 | 4 | 2 | 2 | 2 |
+
+Las de XRP, DOGE y HYPE son **todas de corridas locales**, y no van a crecer solas: esas
+tres tienen cadena corta únicamente en Bybit, que da 403 desde los runners de GitHub. Desde
+el CI el único venue que responde es OKX, que lista BTC, ETH y SOL. **Decisión abierta** —
+§6 ya dejó escrito que si esta dirección vive en algún lado es en BTC y ETH, donde el libro
+es angosto, así que acotar el universo a lo que el CI alcanza es defendible; pero es una
+decisión y todavía no se tomó.
+
+### La fecha de la compuerta de potencia
+
+§4 calculó n = 200 a 3,26 eventos/día, 61 días, contando desde el 2026-09-19 → el 20-nov.
+La serie arranca de hecho el **2026-10-08**, así que el mismo cálculo da **2026-12-08**.
+
+Si XRP y DOGE quedan afuera, el ritmo cae: los 3,26/día se midieron sobre las 5 monedas con
+opciones del universo de calibración, y **si los eventos se repartieran parejo entre ellas**
+—que es un supuesto, no una medición— quedarían ~2/día y n = 200 caería a mediados de enero.
+El número que manda es el que imprima la compuerta con el dato que haya, no éste.
+
+**No se mira ninguna de las dos antes de esa fecha, y no se afloja después.**
