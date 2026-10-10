@@ -57,6 +57,7 @@ EPISODIOS_MIN = 30              # menos que esto y no se afirma una mediana
 SIZE_MIN_USD = 1000             # nocional minimo en el tope, las DOS patas
 SKEW_MAX_MS = 1000              # si las 3 respuestas abarcan mas, se tira la muestra
 PERIODO = 0.5                   # segundos entre muestras
+HUECO_BLOQUE_S = 300            # un silencio mas largo que esto PARTE el bloque
 
 VENUES = ("binance", "okx", "bybit")
 
@@ -272,20 +273,58 @@ def episodios(F, col, umbral, periodo=None, exigir_size=True):
     return pd.DataFrame(dur)
 
 
+def _bloques(ts, hueco=HUECO_BLOQUE_S):
+    """Los tramos CONTINUOS de muestreo. Devuelve [(ini, fin, muestras), ...].
+
+    POR QUE EXISTE. `analizar` medía la ventana como `t.max() - t.min()`, y eso se puede
+    engañar de dos formas que ya pasaron las dos:
+
+      1. `cargar()` concatena TODOS los CSV del directorio. Pegar una sesion de agosto
+         con una de octubre daba una "ventana" de ~960 h, la guarda de las 24 h no se
+         disparaba y el veredicto salia como si la premisa de §4 estuviera cumplida.
+      2. Dentro de una misma sesion, si la maquina se suspende el span sigue creciendo
+         mientras no se muestrea nada. El 2026-10-08 tres huecos se comieron 8,33 de las
+         8,36 h —uno solo de 7,66 h— y el span decia 8,36 h igual.
+
+    Los dos casos inflan el numerador y dejan el denominador quieto. Separar en bloques
+    los hace visibles: lo que la regla mira es el bloque CONTINUO mas largo, que es lo
+    que §4 pide ("24 horas corridas"), y la cobertura dice cuanto se muestreo de verdad.
+    """
+    ts = np.sort(np.asarray(ts, dtype=float))
+    if len(ts) == 0:
+        return []
+    cortes = np.flatnonzero(np.diff(ts) > hueco)
+    ini = np.concatenate(([0], cortes + 1))
+    fin = np.concatenate((cortes, [len(ts) - 1]))
+    return [(float(ts[a]), float(ts[b]), int(b - a + 1)) for a, b in zip(ini, fin)]
+
+
 def analizar():
     D = cargar()
     if D.empty:
         print("no hay muestras todavia. Correr con --recolectar primero.")
         return 1
     D["fecha"] = pd.to_datetime(D.t, unit="s", utc=True)
-    horas = (D.t.max() - D.t.min()) / 3600
-    nm = D.t.nunique()
+    ts = np.sort(D.t.unique())
+    bl = _bloques(ts)
+    span = (ts[-1] - ts[0]) / 3600
+    cobertura = sum(f - i for i, f, _ in bl) / 3600
+    horas = max((f - i for i, f, _ in bl), default=0.0) / 3600   # el bloque mas largo
+    nm = len(ts)
     print("=" * 92)
     print("CORRIDA 10 — DISLOCACION ENTRE VENUES")
     print("=" * 92)
-    print(f"  muestras {nm:,}   ventana {horas:.2f} h   "
+    print(f"  muestras {nm:,}   bloque continuo mas largo {horas:.2f} h   "
           f"{D.fecha.min():%Y-%m-%d %H:%M} -> {D.fecha.max():%H:%M} UTC")
-    print(f"  frecuencia efectiva {nm/max(horas*3600,1):.2f} Hz   "
+    if len(bl) > 1:
+        peor = max(ts[k + 1] - ts[k] for k in range(len(ts) - 1))
+        print(f"  ATENCION: {len(bl)} bloques separados por silencios > {HUECO_BLOQUE_S}s."
+              f"   cobertura real {cobertura:.2f} h de un span de {span:.2f} h"
+              f"   (el silencio mas largo: {peor/3600:.2f} h)")
+        print("  La regla de §4 pide 24 h CORRIDAS, asi que manda el bloque mas largo,")
+        print("  no la suma ni el span. Las sesiones viejas se aparcan en un subdirectorio")
+        print("  de `.dislocacion/`, que `cargar()` no mira.")
+    print(f"  frecuencia efectiva {nm/max(cobertura*3600,1):.2f} Hz   "
           f"skew mediano entre venues {D.skew_ms.median():.0f} ms "
           f"(p90 {D.skew_ms.quantile(.9):.0f})")
     print(f"  regla: mediana de duracion < {DUR_MIN}s con filo > {UMBRAL_BASE} bps -> CIERRA")
@@ -369,7 +408,9 @@ def analizar():
     print(f"\n{'='*92}\nVEREDICTO\n{'='*92}")
     fila = R[R.umbral == UMBRAL_BASE].iloc[0]
     if horas < 24:
-        print(f"  PILOTO ({horas:.2f} h). El preregistro exige >= 24 h corridas.")
+        print(f"  PILOTO (bloque continuo mas largo: {horas:.2f} h"
+              f"{f'; cobertura {cobertura:.2f} h en {len(bl)} bloques' if len(bl) > 1 else ''}).")
+        print("  El preregistro exige >= 24 h CORRIDAS.")
         print("  Esto valida la caneria y adelanta la forma del resultado. NO es el veredicto.")
     if fila.n < EPISODIOS_MIN:
         print(f"  episodios con filo > {UMBRAL_BASE} bps: {int(fila.n)} "
