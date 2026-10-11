@@ -58,6 +58,7 @@ SIZE_MIN_USD = 1000             # nocional minimo en el tope, las DOS patas
 SKEW_MAX_MS = 1000              # si las 3 respuestas abarcan mas, se tira la muestra
 PERIODO = 0.5                   # segundos entre muestras
 HUECO_BLOQUE_S = 300            # un silencio mas largo que esto PARTE el bloque
+TOL_VENTANA_S = 60              # ver `analizar`: el span subestima la duracion pedida
 
 VENUES = ("binance", "okx", "bybit")
 
@@ -407,10 +408,18 @@ def analizar():
 
     print(f"\n{'='*92}\nVEREDICTO\n{'='*92}")
     fila = R[R.umbral == UMBRAL_BASE].iloc[0]
-    if horas < 24:
-        print(f"  PILOTO (bloque continuo mas largo: {horas:.2f} h"
+    # LA TOLERANCIA NO ES AFLOJAR LA REGLA, es un artefacto de medir el bloque como
+    # `t[-1] - t[0]`: `recolectar` corre `while time.time() < fin`, asi que la primera
+    # muestra cae un intervalo DESPUES del arranque y la ultima un intervalo ANTES del
+    # final. Una corrida de `--horas 24` da 23.999643 h y nunca 24.000000, o sea que
+    # `horas < 24` era insatisfacible: la corrida del 2026-10-10 muestreo las 24 h
+    # completas (86,398.7 s de 86,400) y salia marcada PILOTO. Con 60 s de tolerancia
+    # sigue sin pasar nada que no haya muestreado 24 h de verdad.
+    if horas < 24 - TOL_VENTANA_S / 3600:
+        print(f"  PILOTO (bloque continuo mas largo: {horas:.2f} h = {horas*3600:,.0f} s"
               f"{f'; cobertura {cobertura:.2f} h en {len(bl)} bloques' if len(bl) > 1 else ''}).")
-        print("  El preregistro exige >= 24 h CORRIDAS.")
+        print(f"  El preregistro exige >= 24 h CORRIDAS (86,400 s, tolerancia "
+              f"{TOL_VENTANA_S} s).")
         print("  Esto valida la caneria y adelanta la forma del resultado. NO es el veredicto.")
     if fila.n < EPISODIOS_MIN:
         print(f"  episodios con filo > {UMBRAL_BASE} bps: {int(fila.n)} "

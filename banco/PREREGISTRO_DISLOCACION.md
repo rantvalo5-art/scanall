@@ -222,7 +222,46 @@ en las dos patas**, y con el patrón por liquidez en la dirección declarada.
 
 # RESULTADOS
 
-## ESTADO DE LA RECOLECCIÓN — **INCOMPLETA. Esto NO es el veredicto.**
+## ESTADO DE LA RECOLECCIÓN — **COMPLETA el 2026-10-10.** Lo de abajo es el veredicto.
+
+> **24,00 h corridas**, del **2026-10-09 23:59 al 2026-10-10 23:59 UTC**: **91.247 muestras
+> útiles** (393 tiradas, 0,43%), 30 pares, **1,06 Hz** efectivo, skew mediano entre venues
+> 204 ms. **Cero huecos de más de 300 s**; el mayor fue de 176 s. **16.424.460 observaciones
+> par-ruta.**
+>
+> Supera la corrida de agosto en las dos dimensiones (21,57 h / 83.950 muestras) y es la
+> primera vez que la premisa de §4 —24 horas **corridas**— se cumple.
+
+### Por qué hicieron falta 24 h nuevas y no 2,5
+
+El bloque de agosto **no se podía continuar**. Lo de abajo quedó escrito el 30-ago y era
+correcto ese día; 39 días después, pegar 2,5 h a un bloque de agosto no da 24 h corridas, da
+dos bloques separados por 39 días. Y al intentarlo apareció que `analizar` lo habría aceptado:
+medía la ventana como `t.max() - t.min()` sobre **todos** los CSV que `cargar()` concatena, así
+que el span daba ~960 h, la guarda de las 24 h no se disparaba y el veredicto salía como si la
+premisa estuviera cumplida. Arreglado: la ventana se mide por **bloque continuo**.
+
+### Y el "detenido desde afuera" de agosto era la suspensión de la máquina
+
+El primer intento de octubre (8-oct) mostró el mecanismo: **tres huecos se comieron 8,33 de
+las 8,36 h**, uno solo de **7,66 h**, con la notebook dormida — y el colector, cuando
+muestreaba, iba a 0,77 s de hueco mediano contra los 0,76 s de agosto. No era lentitud ni
+fallas de los venues. El `standby` en AC estaba en 240 min. Eso explica las tres
+interrupciones de agosto, y por eso aquella corrida llegó a 21,57 h.
+
+> **Dos defectos de implementación encontrados al cerrar esto**, los dos en el sentido de
+> dejar pasar lo que no debía:
+>
+> 1. la ventana por `span` en vez de por bloque continuo (arriba);
+> 2. la guarda `horas < 24` era **insatisfacible**: `recolectar` corre
+>    `while time.time() < fin`, así que la primera muestra cae un intervalo después del
+>    arranque y la última uno antes del final. Esta corrida muestreó 86.398,7 s de 86.400 y
+>    salía marcada `PILOTO`. Se le puso una tolerancia de 60 s, con el motivo escrito: es un
+>    artefacto de medir el bloque como `t[-1] - t[0]`, no un aflojamiento de la regla.
+
+---
+
+## Lo que decía el 2026-08-30, cuando la recolección estaba incompleta
 
 > Al **2026-08-30 18:38 UTC**: **21,57 h de las 24 preregistradas** (90%), **83.950
 > muestras**, 30 pares, 7 minutos de huecos en total. **Falta la franja 18:38 → 21:04 UTC.**
@@ -306,6 +345,69 @@ Y el bid rezagado de OKX tenía **200 MANA = USD 15**.
 
 ---
 
-# VEREDICTO
+# VEREDICTO — **CIERRA.** No hay versión lenta del negocio.
 
-_(en blanco a proposito: la recoleccion no llego a las 24 h preregistradas)_
+Medido el **2026-10-10** sobre **24,00 h corridas**, 91.247 muestras, 16.424.460
+observaciones par-ruta.
+
+## El número que cierra
+
+| umbral del filo ejecutable | episodios | mediana |
+|---|---|---|
+| > 0 bps (bruto, antes de comisiones) | 25.763 | 4,12 s |
+| > 10 bps | 80 | 0,80 s |
+| **> 20 bps** (dos taker al tramo base) | **1** | 12,38 s |
+| > 30 bps | **0** | — |
+
+**Un episodio en 24 horas, y hacen falta 30 para afirmar una mediana.** Se cierra por la rama
+que §6 dejó escrita como la más fuerte: *"si sobre ≥ 24 h de muestreo a 2 Hz casi no hay
+episodios que superen 20 bps, eso NO es «no se pudo medir» — es la respuesta"*.
+
+**Y hay que ser preciso en cómo cierra: NO cierra por duración.** El único episodio duró
+**12,38 s**, o sea por encima del umbral de 2 s de la regla PRINCIPAL. Con n = 1 no se puede
+afirmar nada sobre la mediana, y el preregistro prohíbe reportarla con menos de 30. Lo que
+cierra esto es que **la oportunidad no aparece**, no que aparezca y sea corta. En el piloto de
+agosto los 2 episodios duraban una sola muestra (0,76 s) y cerraban por las dos ramas; con
+24 h completas, la rama de duración queda sin datos y la de ausencia alcanza sola.
+
+## La dirección declarada antes de medir no apareció
+
+§4 fijó que la hipótesis predice **más episodios y más largos cuanto más fino el par**, y que
+si saliera al revés sería señal de artefacto. Salió **ninguno de los dos**:
+
+| par | episodios > 20 bps |
+|---|---|
+| BTCUSDT · ETHUSDT · DOGEUSDT · LTCUSDT · INJUSDT · ALGOUSDT · AGLDUSDT | **0 en los siete** |
+| los 23 extra (enmienda post-piloto) | 1 |
+
+Cero en los siete pares primarios. No hay patrón por liquidez porque no hay episodios, así que
+tampoco hay artefacto que explicar.
+
+## El hallazgo lateral, y es el más útil de los tres días
+
+**El filo existe y no se puede tocar.** `INJUSDT` tiene filo positivo en el **37,91 %** de las
+observaciones, con p90 de **8,2 bps** — es, de lejos, el par más prometedor de los siete. Pero
+la columna de tamaño dice **0,1 %**: casi nunca hay USD 1.000 en el tope de las dos patas.
+
+| par | % obs con filo > 0 | p90 del filo | % con USD 1.000 en las dos patas |
+|---|---|---|---|
+| BTCUSDT | 49,15 % | 1,0 bps | **99,0 %** |
+| ETHUSDT | 46,39 % | 1,0 bps | 97,0 % |
+| INJUSDT | **37,91 %** | **8,2 bps** | **0,1 %** |
+| ALGOUSDT | 2,20 % | −1,7 bps | 0,3 % |
+| AGLDUSDT | 6,38 % | 0,0 bps | **0,0 %** |
+
+La relación es monótona y va en contra del negocio: **donde hay profundidad el filo es de 1 bps;
+donde el filo se asoma no hay con qué ejecutarlo.** En los 23 extra los máximos son enormes
+(RPLUSDT 254,8 bps, GMTUSDT 194,1 bps) con 8 % de cobertura de tamaño — la misma cosa. Es el
+mismo mecanismo que el piloto ya había mostrado en un caso puntual: la mejor oportunidad de
+21 horas fue una cotización rancia de **quince dólares**.
+
+## Qué queda cerrado y qué no
+
+**Cerrado:** la versión lenta del arbitraje entre venues, muestreando a ~1 Hz por REST. No hay
+ventana que un ejecutor sin colocation pueda tomar, y el motivo no es la velocidad: es que el
+filo y la profundidad están en pares distintos.
+
+**No cerrado, y §7 lo dejó fuera a propósito:** la versión rápida (websocket, colocation). Este
+preregistro **no la mide** y este veredicto **no dice nada** sobre ella.
