@@ -204,7 +204,12 @@ lo que corresponde es un forward test con fecha, no aumentar el tamaño.
 Corrido dos días después de la fecha, con todo lo de §3 y §4 tal como está escrito: universo
 `BREAKOUT`/`PREBREAK`/`COILING`, una alerta por (par, señal) cada 24h (`deduplicar` de
 `dt_vivo.py`), `r_7d` neto de 0,20 %, bloques fijos de 14 días contados desde la primera
-alerta. Dump fresco de `screener_outcomes` del mismo día.
+alerta. Dump fresco de `screener_outcomes` del mismo día. Para re-correrlo:
+
+```powershell
+py -3.13 dump_outcomes.py --tabla screener_outcomes
+py -3.13 -u swing/medir_7d.py
+```
 
 | | |
 |---|---|
