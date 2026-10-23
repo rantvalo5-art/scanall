@@ -97,6 +97,34 @@ en el camino que el handoff manda ejecutar en octubre. Están corregidos:
 3. **La anon key de fallback está vencida** (401). Sin `SUPABASE_KEY` el script moría con
    un `HTTPError` crudo; ahora dice qué pasó y de dónde sacar la vigente.
 
+### Chequeo del 2026-10-19 — LA REGLA DISPARA. El fade se cierra.
+
+Corrido el **2026-10-20** (un día después de la fecha), sin tocar ningún umbral. El que
+decide es el out-of-sample, `evaluar.py --desde 2026-08-17`: 2.300 alertas, 9 semanas,
+justo las preregistradas.
+
+| condición realista (fill 15m, solo perps) | 4h | 24h |
+|---|---|---|
+| n | 1.896 | 1.885 |
+| (a) media | **−0,224 %** | −0,029 % |
+| (b) sin top-3 | −0,327 % | −0,209 % |
+| (c) semanas positivas | 5/9 | 5/9 |
+| (d) sin el peor símbolo | −0,148 % | +0,156 % |
+| (e) bootstrap por semanas | p = 0,880 | p = 0,279 |
+| veredicto | **LA REGLA DISPARA** | **LA REGLA DISPARA** |
+
+**La media a 4h se dio vuelta**, que es exactamente la condición de §2 para cerrar sin
+esperar al 21-dic. Además se dio vuelta con cuatro de las cinco compuertas en contra a la
+vez, no por una sola en el borde. Las +0,75 % de agosto (§ anterior) eran 2 semanas, y el
+signo de ese vistazo temprano no anticipó nada, como se había advertido.
+
+La corrida sin `--desde` (in-sample + out-of-sample, 17 semanas) también dispara en las
+cuatro filas: los +0,035 % a 4h que le quedan son el in-sample tirando de la media para
+arriba.
+
+**Se cierra el fade.** Los chequeos del 2026-12-21 y del 2027-12-13 se cancelan, y
+`evaluar.py` queda para la historia.
+
 ---
 
 ## 3. Lo que se construyó (y por qué importa más que los cierres)
