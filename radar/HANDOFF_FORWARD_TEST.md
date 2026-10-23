@@ -224,6 +224,33 @@ nueva e ilíquida, donde `banco/libro.py` mide costos reales de 1,5× a 6,3× lo
 el banco. El número grande no es plata: es la cola cobrándose por adelantado. Sigue
 marcado como descriptivo y sin línea base.
 
+### 4.4. Re-medido el 2026-10-23: replica de nuevo y CONVERGE al preregistro
+
+Mismo comando, nada aflojado. 341 corridas entregadas → 192 barras de-solapadas, del
+2026-08-27 al 10-23 (9 semanas, 16.074 filas).
+
+| | preregistrado | 09-30 | 10-08 | **10-23** |
+|---|---|---|---|---|
+| spread por barra | +0,511 | +0,627 | +0,566 | **+0,472** |
+| MDE | — | ±0,334 | ±0,287 | **±0,219** |
+| % del preregistrado | — | 123 % | 111 % | **92 %** |
+
+```
+observado +0,472 por barra   MDE actual ±0,219   (192 barras / 4,24 = 45,3 efectivas)
+REPLICO: +0,472 supera el MDE, y es el 92% del +0,511 preregistrado.
+```
+
+Múltiplo de camino 1,23× (contra 1,21×), tasa 64,1 % sobre una línea base de 49,3 %, 86 %
+de barras positivas. **La serie baja medición a medición hacia el +0,511**, que es lo que
+§4.3 decía que había que esperar si el efecto es real: la primera medición exageraba, no
+el hallazgo. La pregunta de §4.3 ("si se sostiene arriba, preguntar por qué") ya no hace
+falta.
+
+El descriptivo del universo desplegado sigue igual de lejos: el **90 %** de los elegidos
+cae fuera de los 46 (era 86 %), con spread +3,846 y tasa 84,6 %. Sigue sin línea base.
+
+Acción: la de siempre, **no tocar nada del radar**. Lo abierto es §6 (ejecución).
+
 ---
 
 ## 5. La decisión — fijada el 2026-08-27, antes de que existiera un solo dato

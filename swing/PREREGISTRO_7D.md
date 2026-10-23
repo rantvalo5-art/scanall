@@ -199,4 +199,45 @@ lo que corresponde es un forward test con fecha, no aumentar el tamaño.
 
 # ────────────────── RESULTADOS (debajo de esta línea) ──────────────────
 
-*(vacío hasta el 2026-10-21)*
+## Medido el 2026-10-23 — SIN EFECTO, y con potencia para verlo
+
+Corrido dos días después de la fecha, con todo lo de §3 y §4 tal como está escrito: universo
+`BREAKOUT`/`PREBREAK`/`COILING`, una alerta por (par, señal) cada 24h (`deduplicar` de
+`dt_vivo.py`), `r_7d` neto de 0,20 %, bloques fijos de 14 días contados desde la primera
+alerta. Dump fresco de `screener_outcomes` del mismo día. Para re-correrlo:
+
+```powershell
+py -3.13 dump_outcomes.py --tabla screener_outcomes
+py -3.13 -u swing/medir_7d.py
+```
+
+| | |
+|---|---|
+| alertas dedup / con `price_7d` resuelto | 3.194 / **3.062** |
+| ventana | 2026-06-03 → 2026-10-16 |
+| bloques de 14 d | **10** (objetivo 10) — alertas por bloque 122 a 394 |
+
+**(C) POTENCIA — pasa.** σ por bloque **5,99** (la cuenta a priori daba ~5,0) y
+**MDE = 5,30 %**, debajo del tope de 6 %. Es un MDE peor que el 4,4 % extrapolado, pero
+dentro del margen que §4 dejó justamente para eso. Así que esto **no es "no se pudo
+medir"**: se pudo, y lo que hay es esto:
+
+| compuerta | medido | |
+|---|---|---|
+| media por bloque | **+0,911 %** | muy debajo del MDE de 5,30 % |
+| 1. bootstrap de bloques | p = 0,312 | FALLA |
+| 2. sin el mejor bloque | **−0,309 %** | el signo depende de un bloque |
+| 2. sin el mejor par (TUTUSDT) | +0,546 % | |
+| 3. bloques positivos | **40 %** (≥ 60 %) | FALLA |
+| 4. signo sin el mejor par | positivo | OK |
+
+**Veredicto: el swing no produce un retorno neto detectable a su propio horizonte.** Con 10
+bloques, un efecto de 5,3 % por trade o más se habría visto. Lo que aparece es +0,9 % que
+se vuelve negativo con sacar un solo bloque, y 6 de 10 bloques en rojo.
+
+Una salvedad: el último bloque está **incompleto** (9 de 14 días y 175 alertas), porque lo
+alertado después del 16-oct todavía no cumplió los 7 días. No cambia la lectura: el p y el
+porcentaje de bloques positivos fallan con o sin él.
+
+Como pidió §5, no se probó otro horizonte ni otro subconjunto. Lo que §6 dejaba abierto
+("si da positivo y supera el MDE, forward test con fecha") no aplica.
