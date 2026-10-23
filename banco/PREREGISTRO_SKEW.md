@@ -251,3 +251,44 @@ opciones del universo de calibración, y **si los eventos se repartieran parejo 
 El número que manda es el que imprima la compuerta con el dato que haya, no éste.
 
 **No se mira ninguna de las dos antes de esa fecha, y no se afloja después.**
+
+## Estado al 2026-10-23 — el apareo estaba roto, y la decisión del universo
+
+**Tampoco es un resultado.** Se contó n y nada más: cuántos disparos y cuántos tienen foto.
+No se miró ningún precio posterior ni ningún `pnl`.
+
+### Las fotos no caían en las barras
+
+Del 2026-10-08 al 10-23 (15,6 días, 58 barras de-solapadas):
+
+| | |
+|---|---|
+| barras del radar con una foto de prima a ±30 min | **21 de 58** (36 %) |
+| disparos sobre nombres con opciones (top-8 re-rankeado en los 46) | 77 · 4,9/día |
+| de esos, con su foto a ±30 min | **8** · 0,5/día |
+
+A 0,5/día el n = 200 de §4 caía en **más de un año**, con el workflow en verde todo el
+tiempo. La causa es la de `radar/HANDOFF_FORWARD_TEST.md` §4.1, pero ahora con dos crons:
+la prima corría a :12 de cada hora par suponiendo que el radar llegaba a :10, y GitHub
+atrasa y saltea cada workflow por su cuenta. Dos crons atrasados al azar casi nunca quedan
+a menos de 30 minutos.
+
+**Arreglo:** `prima_radar.yml` se dispara con `workflow_run` al terminar cada corrida del
+radar, y el cron queda de respaldo. El radar no se toca.
+
+### El universo: BTC, ETH y SOL — decidido ANTES de mirar
+
+La decisión que el estado del 10-08 dejó abierta se toma hoy, sin ningún resultado a la
+vista: **el universo de la medición es BTC, ETH y SOL**, lo que OKX lista y el CI alcanza.
+XRP, DOGE y HYPE quedan afuera. Hoy tenían 32 de los 77 disparos y ninguno con foto desde
+el CI (solo Bybit los lista, y desde los runners da 403). Lo respalda §6: si esto vive en
+algún lado es donde el libro es angosto.
+
+Las filas de XRP, DOGE y HYPE que haya no se borran, pero **no entran en la medición**, ni
+siquiera si después resultaran convenientes.
+
+### La fecha de la compuerta, otra vez
+
+En esas tres monedas hubo 45 disparos en 15,6 días, **2,9/día**. Si el apareo arreglado
+captura casi todos, n = 200 cae **alrededor de principios de enero de 2027**. Como antes,
+el número que manda es el que imprima la compuerta, no éste.
