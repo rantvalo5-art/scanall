@@ -292,3 +292,28 @@ siquiera si después resultaran convenientes.
 En esas tres monedas hubo 45 disparos en 15,6 días, **2,9/día**. Si el apareo arreglado
 captura casi todos, n = 200 cae **alrededor de principios de enero de 2027**. Como antes,
 el número que manda es el que imprima la compuerta, no éste.
+
+### La medición, escrita antes de poder correrla: `opciones/medir_prima.py`
+
+```powershell
+py -3.13 -u opciones/medir_prima.py
+```
+
+Hasta que haya 200 disparos apareados **solo cuenta**: eventos, fotos, ritmo y la fecha
+estimada. No baja ningún precio posterior a ninguna barra, así que se puede correr seguido
+para vigilar el apareo sin mirar nada. Pasada la guarda corre (C) → (P) → el signo, en ese
+orden y con cortes.
+
+Lo que §3 no fijaba, y queda fijado acá el 2026-10-23 sin ningún pnl calculado:
+
+- **Venue:** en cada foto, el de menor `spread_iv` entre `okx` y `okx_um`. Es un dato
+  previo al disparo, lo que miraría quien opera, nunca el resultado.
+- **Costo:** `straddle_pct × spread_iv / iv_atm`, el libro cruzado entero (entrar y
+  salir), con piso en el 2 % de la prima de la corrida 8.
+- **Final:** S en `min(barra + 4h, vencimiento)`. Si la opción vence antes, paga su
+  liquidación.
+- **Elegido:** top-8 re-rankeado por `n_surge` dentro de los 46, como `radar/medir.py`.
+
+Primera corrida, 2026-10-23: **7 de 45 disparos apareados**, el apareo viejo. La fecha
+que imprime (2027-09) es la de ese ritmo roto; con el arreglo del PR #46 tiene que
+acercarse a enero.
