@@ -92,6 +92,13 @@ CAL_CAMINO_ATR = 2.134
 # Y se elige `n_surge` sobre `oi_rel_168` —que mide 0,10 mejor, dentro del MDE— porque
 # sale de los mismos klines: no necesita que el par tenga perpetuo (el ~20% no lo tiene)
 # ni una request extra por simbolo. `oi_rel_168` se muestra al lado, informativo.
+# El universo calibrado se importa de `medir.py` y no se copia: el numero contra el que
+# se compara y el universo sobre el que se midio tienen que viajar juntos.
+from medir import UNIVERSO_PRE  # noqa: E402
+
+# Las monedas con opciones listadas, las mismas que `opciones/cadena.py` (MONEDAS).
+CON_OPCIONES = {"BTC", "ETH", "SOL", "XRP", "DOGE", "HYPE"}
+
 VENTANA = 168        # horas de la mediana movil de referencia
 BARRAS = 1000        # klines por simbolo (41 dias; hacen falta 720 para atr_base)
 ATR_BASE_H = 720     # mediana movil de 30d del ATR propio
@@ -300,31 +307,60 @@ def _sin_token(e):
     return re.sub(r"bot\d{6,12}:[A-Za-z0-9_-]{30,}", "bot***", str(e))
 
 
-def texto(F_top, k):
-    F = F_top.reset_index(drop=True)
-    out = [f"RADAR — {k} monedas con mas probabilidad de MOVERSE ({HORIZONTE_H}h)",
+def _marca(sym):
+    """De que lado de lo medido cae el par: `46` calibrado, `cola` no; `+op` si tiene
+    opciones listadas (las unicas que permiten cobrar magnitud sin direccion)."""
+    m = "46" if sym in UNIVERSO_PRE else "cola"
+    return m + ("+op" if sym.removesuffix("USDT") in CON_OPCIONES else "")
+
+
+def _tabla(F):
+    out = [f"{'#':>2} {'par':<13}{'actividad':>10}{'ATR/h':>8}"
+           f"{f'recorrido {HORIZONTE_H}h':>14}{'':>2}{'marca':<7}",
+           "-" * 56]
+    for i, r in enumerate(F.itertuples()):
+        out.append(f"{i+1:>2} {r.sym:<13}{r.n_surge:>9.1f}x{100*r.atr_base:>7.2f}%"
+                   f"{100*r.camino_24h_est:>13.1f}%{'':>2}{_marca(r.sym):<7}")
+    return out
+
+
+def texto(F, k):
+    """El mensaje. Recibe el universo ENTERO: la seccion validada se re-rankea adentro.
+
+    POR QUE DOS SECCIONES. Los numeros medidos (1,21x, 62,6%) son del top-8 DENTRO DE
+    LOS 46 de `deriv46`, y es lo unico que replico en vivo (`HANDOFF_FORWARD_TEST.md`
+    §4.2-§4.4). El top-8 del universo desplegado cae ~90% en la cola nueva e iliquida,
+    sin linea base y con costos de 1,5x a 6,3x. La version anterior ponia los numeros
+    calibrados arriba de ESA lista, o sea que prometia algo que no estaba medido para lo
+    que mostraba.
+
+    Esto es solo el texto: la seleccion, el ranking y lo que se guarda en `radar_runs` no
+    cambian, y el forward test sigue midiendo exactamente lo mismo.
+    """
+    V = F[F["sym"].isin(UNIVERSO_PRE)].sort_values("n_surge", ascending=False,
+                                                    kind="mergesort").head(k)
+    D = F[F["en_top"]]
+    cola = int((~D["sym"].isin(UNIVERSO_PRE)).sum())
+    out = [f"RADAR — magnitud, NO direccion ({HORIZONTE_H}h)",
            f"{time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}",
            "",
-           "NO dice direccion. Solo magnitud. Medido: las elegidas recorren "
-           f"{CAL_MULTIPLO:.2f}x lo que",
-           f"la moneda tipica, y superan la mediana el {100*CAL_TASA:.0f}% de las veces "
-           f"(base {100*CAL_TASA_BASE:.0f}%).",
+           f"LO VALIDADO: top-{k} dentro de los 46 calibrados",
+           f"Medido: recorren {CAL_MULTIPLO:.2f}x lo que la tipica de los 46 y superan",
+           f"la mediana el {100*CAL_TASA:.0f}% de las veces (base {100*CAL_TASA_BASE:.0f}%). "
+           "Replico en vivo.",
            ""]
-    out.append(f"{'#':>2} {'par':<14}{'actividad':>10}{'volumen':>9}"
-               f"{'OI 7d':>8}{'ATR/h':>8}{f'recorrido {HORIZONTE_H}h':>14}")
-    out.append("-" * 69)
-    for i, r in F.iterrows():
-        oi = "  n/d" if pd.isna(r.oi_rel_168) else f"{100*r.oi_rel_168:+5.0f}%"
-        out.append(f"{i+1:>2} {r.sym:<14}{r.n_surge:>9.1f}x{r.turnover:>8.1f}x"
-                   f"{oi:>8}{100*r.atr_base:>7.2f}%{100*r.camino_24h_est:>13.1f}%")
+    out += _tabla(V)
     out += ["",
-            "actividad = operaciones de la ultima hora contra su mediana de 7 dias",
-            "            (es el eje del ranking: lo unico validado)",
-            "OI 7d     = open interest contra su media de 7 dias (informativo)",
+            f"SIN CALIBRAR: top-{k} de todo el universo ({cola} de {len(D)} en la cola)",
+            "Sin linea base. La cola es iliquida: costos 1,5x a 6,3x lo supuesto.",
+            ""]
+    out += _tabla(D)
+    out += ["",
+            "actividad = operaciones de la ultima hora / su mediana de 7 dias",
             "ATR/h     = rango horario tipico del par",
-            f"recorrido = distancia total esperada en {HORIZONTE_H}h (maximo menos minimo),",
-            f"            = ATR/h x {CAL_CAMINO_ATR} (mediana medida del top-8).",
-            "            OJO: es camino RECORRIDO, no ganancia. Puede ser todo hacia abajo."]
+            f"recorrido = ATR/h x {CAL_CAMINO_ATR}, la mediana medida en {HORIZONTE_H}h.",
+            "            Es camino RECORRIDO, no ganancia: puede ser todo hacia abajo.",
+            "marca     = 46 calibrado | cola sin calibrar | +op tiene opciones"]
     return "\n".join(out)
 
 
@@ -355,7 +391,7 @@ def main():
     if a.json:
         print(TOP.to_json(orient="records", indent=2))
         return
-    t = texto(TOP, a.k)
+    t = texto(F, a.k)
     print(t)
 
     if a.telegram:
