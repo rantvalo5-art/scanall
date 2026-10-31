@@ -83,6 +83,7 @@ Con `B(x)` y `A(x)` = notional acumulado del bid y del ask a x % del precio:
 Cada una entra **cruda y residualizada contra `roc_24`**, y **en las dos direcciones**
 (`[bajo]`), como manda `ranking.scores()`. Más los **3 controles al azar**. Son
 8 × 2 × 2 + 3 = **35 rankings × 3 objetivos = 105 brazos**, todos al mismo FDR.
+*(93 después de la enmienda del 2026-10-31: ver abajo.)*
 
 **Objetivos:** `largo`, `corto` y `magnitud`, los tres siempre.
 
@@ -169,6 +170,25 @@ y se corre la reserva de §2.
 cobertura por par y por mes (`--solo-conteo`) y chequear que el último snapshot de cada
 hora caiga dentro de esa hora. Si un par tiene huecos de más del 10 %, se declara; no se
 rellena.
+
+---
+
+## ENMIENDA del 2026-10-31 — `imb_02` sale, antes de calcular nada
+
+Escribiendo el descargador apareció un dato del **formato**, no de ningún resultado: **el
+nivel de ±0,2 % no existe en los archivos hasta 2026**. Hasta el 2026-01-01 los archivos
+traen solo 1 a 5 % (y con el porcentaje como entero, `-5` y no `-5.00`); el 2026-03-01 ya
+trae 0,2 %. Son ~5 meses de los 3,6 años de la ventana: no alcanza ni para el corte por
+año de §4.
+
+**Se saca `imb_02` y no se reemplaza por nada.** Agregar otra feature sobre la marcha
+sería exactamente el tipo de decisión que el preregistro existe para evitar. Quedan **7
+features → 28 rankings + 3 controles = 31 × 3 objetivos = 93 brazos**, todos al mismo FDR.
+El resto del diseño no cambia.
+
+Al momento de esta enmienda no se calculó ninguna feature sobre la ventana, ni ningún
+retorno. Lo único que se corrió fue la prueba del descargador (BTC y PEPE, enero de 2023 y
+marzo de 2026): cobertura y rangos, nada más.
 
 ---
 
