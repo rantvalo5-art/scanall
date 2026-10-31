@@ -232,7 +232,7 @@ def _z(s):
     return (s - s.mean()) / sd if sd and np.isfinite(sd) else s * 0.0
 
 
-def scores(TB, neutralizar="roc_24", ambas=True):
+def scores(TB, neutralizar="roc_24", ambas=True, solo=None):
     """{nombre: serie} con los rankings a probar.
 
     Incluye la version RESIDUALIZADA de cada uno contra el momentum reciente. Ese es
@@ -269,8 +269,20 @@ def scores(TB, neutralizar="roc_24", ambas=True):
               for m in ("AdrActCnt", "AdrBalCnt", "TxCnt", "TxTfrCnt",
                         "IssTotNtv", "SplyCur", "CapMVRVCur")
               for suf in ("", "_chg7", "_chg30", "_z", "_pct")]
-    crudos = [c for c in precio + flujo + deriv + perp + cadena if c in TB.columns]
+    # LIBRO (`libro_hist.py`, PREREGISTRO_LIBRO): la profundidad del libro de los
+    # perpetuos, lo unico del mercado que es intencion NO ejecutada. Siete features, no
+    # ocho: `imb_02` salio por la enmienda del 2026-10-31 (el nivel no existe antes de
+    # 2026). `imb_*` son razones, ya comparables; el nivel de profundidad entra solo
+    # relativo (`_rel`) o en percentil (`_pct`), nunca crudo.
+    libro = ["imb_1", "imb_5", "imb_1_m24", "imb_1_chg4", "imb_1_pct",
+             "prof_1_rel", "prof_1_pct"]
+    crudos = [c for c in precio + flujo + deriv + perp + cadena + libro
+              if c in TB.columns]
     crudos = [c for c in crudos if c != "atr_base"]
+    # `solo`: el lote de UNA familia, para que el numero de brazos (y el FDR) sea el que
+    # fijo su preregistro y no el de todas las features que haya en el tablero.
+    if solo is not None:
+        crudos = [c for c in crudos if c in solo]
 
     S = {}
     for c in crudos:
@@ -554,6 +566,9 @@ def main():
     ap.add_argument("--derivados", action="store_true",
                     help="sumar las features de metricas.py (OI y posicionamiento de "
                          "futuros; ninguna es precio)")
+    ap.add_argument("--libro", action="store_true",
+                    help="SOLO las features del libro (libro_hist.py, PREREGISTRO_LIBRO). "
+                         "Corta la ventana en el inicio de la reserva.")
     ap.add_argument("--angosto", action="store_true",
                     help="panel solo-OHLC (sin las features de flujo)")
     ap.add_argument("--nula", action="store_true",
@@ -579,13 +594,26 @@ def main():
         cob = FM.notna().any(axis=1).mean()
         print(f"derivados: {len(M)} pares con perp | cobertura de filas {cob:.1%}")
 
+    if a.libro:
+        from libro_hist import FEATS, feat_libro, load_libro
+        # load_libro se niega a entrar en la reserva (2026-08-01 en adelante).
+        L = load_libro(list(panel), a.inicio, a.fin)
+        FL = feat_libro(L, TB[["sym", "t"]])
+        # El lote es del LIBRO: las features de precio y flujo del tablero se sacan de
+        # la lista de brazos (siguen en TB porque `roc_24` residualiza y `atr_base`
+        # normaliza). Si no, los 105 brazos del preregistro serian 300 y el FDR seria
+        # otro.
+        TB = pd.concat([TB, FL], axis=1)
+        cob = FL[FEATS].notna().any(axis=1).mean()
+        print(f"libro: {len(L)} pares con bookDepth | cobertura de filas {cob:.1%}")
+
     if a.nula:
         mde_del_azar(TB, k=a.k, costo=a.costo)
         print("\nAhora si: correr sin --nula para el lote real.")
         return
 
     mde = mde_del_azar(TB, k=a.k, costo=a.costo)
-    R = {**scores(TB), **controles(TB)}
+    R = {**scores(TB, solo=FEATS if a.libro else None), **controles(TB)}
     print(f"\n{len(R)} rankings x 3 objetivos = {len(R)*3} brazos")
 
     D = lote_rankings(TB, R, k=a.k, costo=a.costo, q=a.q,
