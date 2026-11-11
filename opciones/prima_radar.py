@@ -75,12 +75,31 @@ def foto(C, venue):
     W = V[(V.dias >= CORTO_MIN) & (V.dias <= CORTO_MAX)]
     if W.empty:
         return None
-    vence = W.sort_values("dias").iloc[0]["vence"]
-    E = W[W.vence == vence]
-    call = cadena._cerca(E[E.tipo == "C"], +0.50, tol=0.15)
-    put = cadena._cerca(E[E.tipo == "P"], -0.50, tol=0.15)
-    if call is None or put is None:
+    # EL MAS CORTO QUE TENGA LIBRO, no el mas corto a secas. Hasta el 2026-11-10 se
+    # tomaba el primero y, si sus ATM no tenian bid y ask, la fila salia con
+    # `straddle_pct` vacio: el 11% de las filas desde el 1-nov, todas en `okx_um` y casi
+    # todas con el vencimiento a menos de un dia. BTC y ETH no perdian nada porque
+    # `medir_prima` cae a `okx`, pero SOL no tiene familia inversa en OKX (ver
+    # `cadena.OKX_FAM`) y ese disparo se perdia entero. Saltar al siguiente vencimiento
+    # se decide por el libro EN EL MOMENTO DE LA FOTO, antes del disparo y sin mirar
+    # ningun resultado; `medir_prima` liquida en min(4h, vencimiento), asi que un
+    # vencimiento mas largo no cambia que se mide. Si ninguno tiene libro, se guarda el
+    # mas corto como antes (la IV sola sigue sirviendo de contexto).
+    elegido = None
+    for vence in W.sort_values("dias", kind="mergesort")["vence"].unique():
+        E = W[W.vence == vence]
+        call = cadena._cerca(E[E.tipo == "C"], +0.50, tol=0.15)
+        put = cadena._cerca(E[E.tipo == "P"], -0.50, tol=0.15)
+        if call is None or put is None:
+            continue
+        if elegido is None:
+            elegido = (vence, E, call, put)
+        if call.mark == call.mark and put.mark == put.mark:
+            elegido = (vence, E, call, put)
+            break
+    if elegido is None:
         return None
+    vence, E, call, put = elegido
 
     spot = float(E["subyacente"].median())
     prima = float(call.mark + put.mark)
