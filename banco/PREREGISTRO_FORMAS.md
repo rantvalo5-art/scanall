@@ -137,4 +137,64 @@ features del libro. Sigue intacta.
 
 # ────────────────── RESULTADOS (debajo de esta línea) ──────────────────
 
-*(vacío: n = 0 el 2026-11-13)*
+## RESULTADOS del 2026-11-13 — 0 de 210, CIERRA por §5.1
+
+```
+py -u ranking.py --derivados --formas --oos --pin deriv46 --pares 46 --k 8 \
+      --paso 24 --horizonte 24 --inicio 2021-08-01 --fin 2026-08-01
+```
+
+Con el código de `bdad162` (PR #58) tal cual se mergeó y antes de ver ningún número.
+Python 3.14 + pandas 2.3.3. Tablero idéntico al de la corrida 3: **70.899 filas · 1.752
+barras · 46 pares · 251 semanas**, cobertura de derivados **93,6 %**.
+
+### La nula
+
+| costo | objetivo | sd semanal | spread del azar | MDE |
+|---|---|---|---|---|
+| 0,20 % | largo | 0,3524 | −0,147 | ±0,0623 |
+| 0,20 % | corto | 0,3516 | −0,172 | ±0,0621 |
+| 0,50 % | largo | 0,3614 | −0,387 | ±0,0639 |
+| 0,50 % | corto | 0,3591 | −0,412 | ±0,0635 |
+
+El MDE coincide con la referencia de la corrida 3 (±0,062): mismo tablero, misma potencia.
+
+### El lote: ningún spread positivo
+
+**0 de 210 a 0,20 % y 0 de 210 a 0,50 %.** Los 210 caen en la primera compuerta (signo):
+**ningún brazo tiene spread positivo**, en ninguna forma ni en ningún objetivo. La mayor
+fracción de semanas positivas es **36 %**, contra el 60 % que se exige.
+
+| forma | objetivo | mejor | mediana | peor | control al azar |
+|---|---|---|---|---|---|
+| banda | largo | −0,125 | −0,163 | −0,242 | −0,171 |
+| banda | corto | −0,101 | −0,166 | −0,215 | −0,148 |
+| Δrank subió | largo | −0,108 | −0,160 | −0,217 | −0,171 |
+| Δrank subió | corto | −0,098 | −0,166 | −0,220 | −0,148 |
+| Δrank bajó | largo | −0,116 | −0,177 | −0,228 | −0,171 |
+| Δrank bajó | corto | −0,096 | −0,148 | −0,207 | −0,148 |
+
+El mejor de los 210 es `pos_168 Δrank bajo` en `corto`, con **−0,096**: +0,052 sobre el
+control, **dentro del MDE** (±0,062). Ni siquiera se separa del azar.
+
+### Lectura
+
+1. **Las formas nuevas rinden peor que el nivel.** El mejor brazo de la corrida 3 (top-k por
+   nivel) quedó en −0,033; el mejor de acá, en −0,096. Ir al medio de la distribución o
+   mirar el cambio de posición no destapa nada que el extremo escondiera. No hay una
+   relación en U invertida que el top-k estuviera tapando.
+2. **El corte por año y el fuera de muestra no corrieron**, porque no hubo finalistas
+   (§4). El tramo 2026-08 → 10 sigue sin usarse para estas formas.
+3. **Ninguna variante de "posicionamiento"** (`tt_*`, `ls_*`) se acerca a cero. En la
+   corrida 3 eran lo más cercano a una señal en `largo`; acá su mejor brazo es −0,108.
+
+### Lo que queda cerrado
+
+Por §5.1: **banda y Δrank quedan cerradas**, y con ellas la lista entera de
+`radar/HANDOFF_FORWARD_TEST.md` §7. **Para estas fuentes —precio, flujo del kline y
+posicionamiento de futuros— la dirección queda cerrada en las tres dimensiones que se
+probaron: nivel (corridas 1-3), resolución (5m, `MICRO`) y forma (este archivo).** No se
+prueba otro ancho de banda, otro paso de Δ, otro k ni otro horizonte.
+
+Lo que sigue vivo en el repo no es dirección: es la **magnitud** del radar (replicó tres
+veces) y su forward test de straddles (`PREREGISTRO_SKEW`, compuerta en n = 200).
