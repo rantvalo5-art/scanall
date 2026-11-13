@@ -53,7 +53,12 @@ import pandas as pd
 import requests
 
 SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
-SPOT = "https://api.binance.com"
+# El MIRROR y no `api.binance.com`, por la misma razon que `radar.py` (SPOT_HOSTS):
+# `api.binance.com` da 451 desde los runners de GitHub. Medido el 2026-11-13 en el primer
+# `medir_radar.yml`: con el host directo NINGUN camino bajo, todas las filas se cayeron y
+# el script murio con "ninguna fila cae en deriv46", que culpaba al filtro de volumen.
+# El mirror sirve los mismos klines y anda igual desde una maquina local.
+SPOT = os.environ.get("BINANCE_SPOT", "https://data-api.binance.vision")
 TABLA = "radar_runs"
 H = 4                       # horizonte, en horas — el mismo que se valido
                             # (`banco/horizonte_util.py`: 4h gana en multiplo,
@@ -201,6 +206,11 @@ def main():
 
     with ThreadPoolExecutor(12) as ex:
         D["camino"] = list(ex.map(camino, zip(D.symbol, D.t_ms, D.precio)))
+    if D["camino"].isna().all():
+        # que el motivo se lea en el log: sin precios no hay nada que comparar, y eso no
+        # es un problema del universo ni del filtro de volumen
+        sys.exit(f"FATAL: no se pudo bajar ningun precio de {SPOT} "
+                 f"({len(D):,} filas, todas sin camino). Probar con BINANCE_SPOT.")
     D = D[D["camino"].notna() & (D["atr_base"] > 0)]
     D["y"] = D["camino"] / D["atr_base"]
 

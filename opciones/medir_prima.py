@@ -67,7 +67,9 @@ VENTANA = pd.Timedelta(minutes=30)
 N_MIN = 200                 # §4: disparos apareados, de-solapados por barra
 PISO_COSTO = 0.02           # corrida 8: cruzar cuesta 1-2% de la prima
 REPS = 5000
-SPOT = "https://api.binance.com"
+# El mirror, no `api.binance.com`: da 451 desde los runners de GitHub (ver `radar/medir.py`).
+# Pasada la guarda, sin esto el pnl saldria sin un solo precio corrido desde Actions.
+SPOT = os.environ.get("BINANCE_SPOT", "https://data-api.binance.vision")
 
 
 # ───────────────────────────── el apareo (sin precios futuros) ─────────────────────────
