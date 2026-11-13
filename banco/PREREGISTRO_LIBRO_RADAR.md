@@ -205,4 +205,62 @@ brazo único original. Lo que se gana: si la mezcla útil no es 50/50, se encuen
 
 # ────────────────── RESULTADOS (debajo de esta línea) ──────────────────
 
-*(vacío: n = 0 el 2026-11-13)*
+## RESULTADOS del 2026-11-13 — CIERRA por §4.1: el libro empeora la elección del radar
+
+`py -u banco/libro_radar.py`, sin `--reserva`, con el código de `b78d188` (PR #55) tal
+cual se mergeó y antes de ver ningún número. Python 3.14 + pandas 2.3.3, como la corrida de
+`PREREGISTRO_LIBRO`. Tablero idéntico al de esa corrida: **332.412 filas · 7.668 barras de
+4h · 46 pares · 183 semanas**. `prof_1_rel` presente en el **98,1 %** de las filas.
+
+### Descriptivo, antes de Δ (§3.1 y §5.4)
+
+- **Correlación de rangos `n_surge` ~ `prof_1_rel` dentro de la barra: +0,028.** Casi
+  independientes. §5.4 temía que una correlación alta hiciera coincidir los top-8 y
+  llevara Δ a cero; no pasó eso.
+- **BASE contra el universo: +0,5415 ATR, 100 % de 183 semanas.** Es `n_surge` en este
+  tablero, y es el número que explica el resultado.
+
+### La principal (§3, con la enmienda)
+
+| w | solape | Δ | MDE_P | sem > 0 | sin top-3 | 2023 | 2024 | 2025 | 2026 | crudo | atr_ratio | veredicto |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 0,20 | 84,0 % | **−0,0162** | 0,0125 | 36 % | −0,0149 | −0,0040 | −0,0099 | −0,0108 | −0,0599 | −0,00018 | 1,00 | Δ ≤ MDE |
+| 0,35 | 67,6 % | −0,0979 | 0,0309 | 15 % | −0,0884 | −0,0604 | −0,0772 | −0,0817 | −0,2212 | −0,00133 | 0,99 | Δ ≤ MDE |
+| 0,50 | 55,5 % | −0,1632 | 0,0438 | 9 % | −0,1562 | −0,1092 | −0,1450 | −0,1311 | −0,3338 | −0,00209 | 0,98 | Δ ≤ MDE |
+| 0,65 | 45,8 % | −0,2162 | 0,0499 | 8 % | −0,2060 | −0,1726 | −0,1862 | −0,1708 | −0,4144 | −0,00262 | 0,98 | Δ ≤ MDE |
+| 0,80 | 36,8 % | −0,2791 | 0,0564 | 4 % | −0,2631 | −0,2316 | −0,2508 | −0,2197 | −0,5058 | −0,00303 | 0,98 | Δ ≤ MDE |
+
+**Ningún peso pasa la primera compuerta.** Los cinco Δ son negativos. Cuanto más pesa el
+libro, peor elige, y es monótono. El signo se repite en los cuatro años, sin los 3 pares
+que más aportan y en la vista cruda, así que no es un año malo ni un par ni un artefacto
+de escala (atr_ratio 0,98-1,00). El bootstrap no corre con Δ ≤ 0 (p = 1), y Holm no llega
+a decidir nada.
+
+### Por qué, y por qué no contradice a `PREREGISTRO_LIBRO` §6.3
+
+1. **No es redundancia.** Con correlación +0,03 el libro y la actividad son casi
+   independientes, y por eso cambia hasta el 63 % de los nombres del top-8. El problema es
+   que **cada lugar que el libro le saca a `n_surge` lo ocupa un nombre que se mueve
+   menos**. `n_surge` solo da +0,54 sobre el universo y `prof_1_rel` daba +0,16. Mezclar
+   una señal fuerte con una débil e independiente diluye la fuerte.
+2. **§6.3 medía otra cosa.** Que `prof_1_rel ~ sin n_surge` ordene magnitud (+0,093) es
+   una afirmación sobre **todo el ranking** de 46 nombres. Este test pregunta por **los 8
+   de arriba**, y ahí `n_surge` domina: el aporte del libro existe en el medio de la
+   distribución, no en la cola que elige el radar. Es el caso 1 de §1 ("el residuo no es
+   el incremento") con otro mecanismo del que se temía: no por solape, sino por tamaño.
+3. **Es el mismo resultado que `combo.py`**, ahora con una fuente que no es actividad.
+   El radar sigue con UNA feature.
+
+### Lo que queda
+
+- **§4.1 se aplica:** el radar no cambia, y la familia "libro para la elección del radar"
+  queda **cerrada en esta forma**. No se prueba otro peso, otra feature del libro ni otro k.
+- **La reserva 2026-08-01 → 2026-10-31 no se bajó.** Sigue intacta para cualquier test
+  futuro que la preregistre.
+- **`PREREGISTRO_SKEW` no se tocó:** el forward test de straddles sigue sobre el top-8 por
+  `n_surge`, con su compuerta en n = 200 apareados.
+- **§6 (implementación en vivo) queda sin objeto.** No hace falta juntar historia del
+  libro ni verificar `fapi` desde los runners por este motivo.
+- El hallazgo de `PREREGISTRO_LIBRO` sigue en pie tal cual se escribió: el libro trae
+  información de magnitud que la actividad no tiene. Lo que se descarta acá es **usarla
+  para elegir el top-8**, no que exista.
