@@ -1,0 +1,85 @@
+name: Medir el radar (a mano)
+
+# LOS CHEQUEOS DE SALUD DEL RADAR, con la clave de Supabase que vive en los secretos del
+# repo y no en ninguna maquina. Solo `workflow_dispatch`: se corre cuando se quiere mirar,
+# nunca solo. No escribe nada: el resultado queda en el log de esta corrida.
+#
+#   1. radar/medir.py          ¿sigue replicando? La serie fue 123 % -> 111 % -> 92 % del
+#                              +0,511 preregistrado (30-sep, 8-oct, 23-oct). Converger al
+#                              preregistro y decaer se ven igual hasta que hay otra medicion.
+#   2. opciones/medir_prima.py cuantos disparos del radar tienen foto de la prima. Con menos
+#                              de 200 apareados SOLO CUENTA y no baja ningun precio
+#                              (PREREGISTRO_SKEW): correrlo seguido no mira nada.
+#   3. oi_rel_168              ¿responde fapi.binance.com desde el runner? `radar.py` lo pide
+#                              para el top-8 y lo guarda en `radar_runs`, pero no lo imprime.
+#                              Si `api.binance.com` da 451 desde aca, fapi podria darlo
+#                              tambien, y la columna estaria vacia sin que nadie lo vea.
+#
+# Los tres pasos corren aunque falle el anterior: son preguntas independientes.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  medir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install requests "pandas==2.2.3" numpy
+
+      - name: "1. Radar: ¿sigue replicando?"
+        working-directory: radar
+        run: python -u medir.py
+
+      - name: "2. Prima: el apareo con el radar"
+        if: always()
+        run: python -u opciones/medir_prima.py
+
+      - name: "3. oi_rel_168: ¿responde fapi desde el runner?"
+        if: always()
+        run: |
+          python -u - <<'EOF'
+          import os, requests, pandas as pd
+          URL = "https://ecgdswroygkfckkaguxp.supabase.co/rest/v1/radar_runs"
+          key = os.environ["SUPABASE_KEY"]
+          h = {"apikey": key, "Authorization": f"Bearer {key}"}
+          desde = (pd.Timestamp.now(tz="UTC") - pd.Timedelta(days=14)).strftime("%Y-%m-%dT%H:%M:%SZ")
+          filas, off = [], 0
+          while True:
+              r = requests.get(URL, headers=h, timeout=30,
+                               params={"select": "run_at,symbol,oi_rel_168",
+                                       "run_at": f"gte.{desde}", "order": "run_at.asc",
+                                       "limit": 1000, "offset": off})
+              r.raise_for_status()
+              d = r.json(); filas += d
+              if len(d) < 1000: break
+              off += 1000
+          D = pd.DataFrame(filas, columns=["run_at", "symbol", "oi_rel_168"])
+          if D.empty:
+              raise SystemExit("sin filas en radar_runs en los ultimos 14 dias")
+          D["dia"] = pd.to_datetime(D["run_at"], utc=True, format="mixed").dt.strftime("%m-%d")
+          T = D.groupby("dia").agg(corridas=("run_at", "nunique"), filas=("symbol", "size"),
+                                   con_oi=("oi_rel_168", lambda s: int(s.notna().sum())))
+          # radar.py solo pide oi_rel para el top-8 de cada corrida: lo esperado es ~8 por corrida
+          T["esperado"] = T["corridas"] * 8
+          print(T.to_string())
+          tot, esp = int(T["con_oi"].sum()), int(T["esperado"].sum())
+          print(f"\noi_rel_168 lleno en {tot} filas de ~{esp} esperadas ({100 * tot / max(esp, 1):.0f} %)")
+          if tot == 0:
+              print("-> VACIO: fapi no responde desde el runner (o el radar no lo guarda). "
+                    "La columna es informativa, pero hoy no informa nada.")
+          EOF
