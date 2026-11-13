@@ -163,6 +163,46 @@ top-8 que se mide.
 
 ---
 
+## ENMIENDA del 2026-11-13 — cinco pesos en la principal, uno solo en la reserva
+
+Decidida por el usuario después de leer el diseño, **antes de calcular nada**: el estado
+de la cabecera sigue igual (ni la combinación, ni la correlación, ni la reserva). La
+objeción es razonable: pesos iguales es una elección tan arbitraria como cualquier otra,
+y si la mezcla útil es 30/70 el diseño original no la encuentra.
+
+Lo que **no** se puede es probar varios pesos sobre la reserva: con 13 semanas, el mejor
+de cinco gana por azar y la reserva deja de confirmar nada. Por eso se separan los papeles.
+
+**Reemplaza** a "pesos iguales" y "un solo brazo" de §2, y a "no se prueba otro peso" de
+§4.1. El resto del documento no cambia.
+
+1. **La grilla, fijada ahora.** COMBO(w) = `(1 − w) · pct(n_surge) + w · pct(prof_1_rel)`,
+   con **w ∈ {0,20 · 0,35 · 0,50 · 0,65 · 0,80}**. w = 0 es BASE. No se agregan pesos
+   después de ver la grilla, ni se refina alrededor del ganador.
+2. **En la principal, los cinco** pasan por las compuertas de §3, cada uno contra BASE.
+   La compuerta 4 (bootstrap) se corrige por **Holm sobre los 5**: el que tiene el menor p
+   necesita p < 0,01, el segundo p < 0,0125, y así. Los cinco pesos están muy
+   correlacionados, así que Holm es conservador. Se acepta ese costo a cambio de que no
+   haga falta ningún supuesto.
+3. **Elección:** entre los pesos que pasan **todas** las compuertas de P, el de mayor Δ.
+   Si ninguno pasa, es §4.1: se cierra.
+4. **Potencia de la reserva, con un número que no esté inflado por la elección.**
+
+       MDE_R = 2,8 · sd(Δ semanal del peso elegido) / √13
+
+   se compara contra la **mediana de Δ de los pesos que pasaron**, no contra el Δ del
+   elegido, que viene favorecido por ser el máximo. Si pasó uno solo, se usa la mitad de
+   su Δ. Si `MDE_R` supera ese número, la reserva no se baja (§4.2).
+5. **La reserva prueba un único brazo:** el peso elegido, con las compuertas R de §3 sin
+   cambios.
+6. **El script** (`libro_radar.py`) imprime la tabla de los cinco pesos completa, sin
+   ordenar por Δ, y la elección la hace el código con esta regla, no a mano.
+
+Lo que cuesta: con Holm, la principal necesita un efecto algo mayor para pasar que el
+brazo único original. Lo que se gana: si la mezcla útil no es 50/50, se encuentra.
+
+---
+
 # ────────────────── RESULTADOS (debajo de esta línea) ──────────────────
 
 *(vacío: n = 0 el 2026-11-13)*
