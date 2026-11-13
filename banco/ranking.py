@@ -569,6 +569,10 @@ def main():
     ap.add_argument("--libro", action="store_true",
                     help="SOLO las features del libro (libro_hist.py, PREREGISTRO_LIBRO). "
                          "Corta la ventana en el inicio de la reserva.")
+    # PREREGISTRO_LIBRO §6.3: si el libro sobrevive solo en magnitud, se corre otra vez
+    # residualizado contra `n_surge` (el radar) en vez de contra `roc_24`.
+    ap.add_argument("--neutralizar", default="roc_24",
+                    help="contra que feature se residualiza cada ranking (default roc_24)")
     ap.add_argument("--angosto", action="store_true",
                     help="panel solo-OHLC (sin las features de flujo)")
     ap.add_argument("--nula", action="store_true",
@@ -613,7 +617,8 @@ def main():
         return
 
     mde = mde_del_azar(TB, k=a.k, costo=a.costo)
-    R = {**scores(TB, solo=FEATS if a.libro else None), **controles(TB)}
+    R = {**scores(TB, neutralizar=a.neutralizar, solo=FEATS if a.libro else None),
+         **controles(TB)}
     print(f"\n{len(R)} rankings x 3 objetivos = {len(R)*3} brazos")
 
     D = lote_rankings(TB, R, k=a.k, costo=a.costo, q=a.q,

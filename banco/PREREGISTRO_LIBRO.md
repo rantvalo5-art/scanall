@@ -194,4 +194,99 @@ marzo de 2026): cobertura y rangos, nada más.
 
 # ────────────────── RESULTADOS (debajo de esta línea) ──────────────────
 
-*(vacío: n = 0 el 2026-10-30)*
+## RESULTADOS del 2026-11-12 — dirección muerta, magnitud viva y no es solo el radar
+
+### El dato (§7)
+
+`libro_hist.py --solo-conteo`: **1.978 par-meses, 46 de 46 pares**, 2023-01 → 2026-07. La
+reserva no se bajó. Cobertura de horas con snapshot completo **99,0 % a 99,9 %** por par,
+**0 días fallados**, ningún par con huecos de más del 10 %. El último snapshot de cada hora
+cae a 29-30 s del cierre (p50/p95), adentro de la hora como pedía §7. Los pares que arrancan
+en 2023-01 tienen un mes bajo el 90 %; los que listaron después, ninguno.
+
+### Cómo se corrió
+
+```
+py ranking.py --libro --nula --pin deriv46 --pares 46 --k 8 --paso 4 --horizonte 4 \
+              --inicio 2023-01-01 --fin 2026-08-01
+py ranking.py --libro        (mismos argumentos, sin --nula)
+py ranking.py --libro --neutralizar n_surge   (mismos argumentos; §6.3)
+```
+
+Tablero: **332.412 filas · 7.668 barras de 4h sin solape · 46 pares · 183 semanas**.
+Cobertura de features del libro: **98,2 %** de las filas. 93 brazos, como fijó la enmienda.
+
+Se corrió con Python 3.14 + pandas 2.3.3, no con el `py -3.13` del encabezado de los
+scripts (la sesión no tenía 3.13). La corrida §6.3 se hizo con un script equivalente a
+`main()` que llamaba a `scores(neutralizar="n_surge")`; el flag `--neutralizar` se agregó
+después, en el mismo commit que este resultado, para que se pueda repetir.
+
+### La nula (§3), antes de mirar ningún brazo
+
+| objetivo | sd semanal | spread del azar | MDE |
+|---|---|---|---|
+| largo | 0,0668 | −0,1648 | **±0,0138 ATR** |
+| corto | 0,0681 | −0,1636 | **±0,0141 ATR** |
+| magnitud | 0,0651 | −0,0014 | **±0,0135 ATR** |
+
+La referencia de §3 (~±0,07) estaba mal extrapolada: venía de la corrida 3, con barras de
+24h. Con barras de 4h hay seis por día en vez de una y la sd semanal cae de ~0,35 a ~0,07.
+Era referencia, no compuerta; no se cambió nada.
+
+### Dirección: 0 de 62 — §6.1 se cumple, la fuente queda cerrada para dirección
+
+Ningún brazo de `largo` ni de `corto` queda con spread positivo después del costo; las
+semanas positivas no pasan del 4 %. Los dos que más se separan del azar son de `largo`
+(`prof_1_pct` +0,018 y `imb_5` +0,014 sobre el control, en el borde del MDE), y los dos
+siguen negativos netos. **El libro no ordena dirección a 4h**, que es lo que anticipaba
+§5.1. No se prueba otro horizonte ni otra profundidad. La corrida a costo 0,50 % no se hizo:
+solo decide algo si sobrevive un brazo de dirección.
+
+### Magnitud: 14 de 31 sobreviven (contra `roc_24`)
+
+| ranking | spread | sin top-3 | sem > 0 |
+|---|---|---|---|
+| `prof_1_rel` | **+0,160** | +0,125 | 83 % |
+| `prof_1_pct` | +0,160 | +0,120 | 78 % |
+| `prof_1_rel ~ sin roc_24` | +0,113 | +0,084 | 80 % |
+| `imb_1_pct [bajo]` | +0,095 | +0,080 | 83 % |
+| `imb_1 [bajo]` | +0,073 | +0,060 | 74 % |
+| `imb_1_chg4 [bajo]` | +0,067 | +0,057 | 84 % |
+
+(más 8 brazos residualizados entre +0,02 y +0,05). `imb_5 [bajo]` (+0,087) cae por
+**artefacto de escala** (atr_ratio 0,92).
+
+**El signo salió al revés del prior de §5.2.** Lo esperado era `prof_1_rel [bajo]` —libro
+fino, más movimiento—, y ese brazo muere en el FDR (+0,016, p 0,084). Lo que sobrevive es el
+libro **más profundo que su propia mediana**. La lectura obvia es actividad: cuando entra
+flujo, los market makers también cargan el libro. Por eso §6.3 era la prueba que decidía.
+
+### §6.3: residualizado contra `n_surge` — 7 de 31 sobreviven
+
+| ranking | crudo | **~ sin n_surge** | sin top-3 | sem > 0 |
+|---|---|---|---|---|
+| `prof_1_rel` | +0,160 | **+0,093** | +0,067 | 74 % |
+| `prof_1_pct` | +0,160 | **+0,076** | +0,057 | 64 % |
+| `imb_1_chg4 [bajo]` | +0,067 | +0,034 | +0,030 | 69 % |
+| `imb_1 [bajo]` | +0,073 | +0,030 | +0,023 | 60 % |
+| `imb_1_pct [bajo]` | +0,095 | +0,028 | +0,021 | 68 % |
+| `prof_1_rel [bajo]` | +0,016 | +0,027 | +0,020 | 63 % |
+| `imb_1_chg4` | +0,043 | +0,015 | +0,010 | 63 % |
+
+Por la letra de §6.3: **el libro trae información de magnitud que la actividad no tiene.**
+`prof_1_rel` conserva ~58 % de su spread (+0,093 de +0,160) después de sacarle `n_surge`; el
+desbalance (`imb_*`) aporta poco, apenas sobre el MDE. **No le gana al radar** (§5.2): +0,16
+crudo contra el +0,51 de `n_surge` (no es la misma corrida y la comparación es aproximada).
+Es información que se suma a la del radar, no una que la reemplaza. Se declara §6.5: vale
+para los 46 sobrevivientes grandes y no se extrapola a la cola.
+
+**Límite declarado.** La residualización es lineal por barra sobre z-scores. `n_surge` tiene
+cola pesada, y parte de su efecto podría quedar en el residuo. Probarlo con rango o log
+sería un test que este preregistro no fija, y no se corrió.
+
+### Lo que sigue (no lo decide este documento)
+
+§6.3 termina en "importa para los straddles" y no fija un paso posterior. Lo que corresponde
+es un **preregistro nuevo** para el apareo con el radar (p. ej. el top-8 por `n_surge` +
+`prof_1_rel`), con la combinación, la mejora mínima y el uso de la reserva 2026-08 → 10
+fijados **antes** de bajarla. La reserva sigue sin mirar.
