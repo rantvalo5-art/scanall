@@ -1,8 +1,15 @@
-name: Medir el radar (a mano)
+name: Medir el radar
 
 # LOS CHEQUEOS DE SALUD DEL RADAR, con la clave de Supabase que vive en los secretos del
-# repo y no en ninguna maquina. Solo `workflow_dispatch`: se corre cuando se quiere mirar,
-# nunca solo. No escribe nada: el resultado queda en el log de esta corrida.
+# repo y no en ninguna maquina. Corre el 1 y el 15 de cada mes y a mano cuando se quiera.
+# No escribe nada en el repo: el resultado queda en el log y un resumen va a Telegram.
+#
+# POR QUE QUINCENAL (2026-11-13). La serie de replicas fue 123 % -> 111 % -> 92 % -> 79 %
+# del preregistrado, monotona a la baja. Cada medicion es ACUMULADA, asi que tapa lo
+# reciente: la cuenta aproximada de las ultimas ~3 semanas daba ~+0,22, con un MDE de
+# ~±0,37 que no distingue deterioro de ruido. Por eso, ademas del total (el test), se
+# corre `medir.py` solo sobre las ultimas 3 semanas: es DESCRIPTIVO, no tiene compuerta
+# propia y NO autoriza tocar el radar (HANDOFF_FORWARD_TEST.md §6).
 #
 #   1. radar/medir.py          ¿sigue replicando? La serie fue 123 % -> 111 % -> 92 % del
 #                              +0,511 preregistrado (30-sep, 8-oct, 23-oct). Converger al
@@ -18,6 +25,9 @@ name: Medir el radar (a mano)
 # Los tres pasos corren aunque falle el anterior: son preguntas independientes.
 on:
   workflow_dispatch:
+  schedule:
+    # el 1 y el 15 de cada mes, 13:00 UTC = 10:00 de Asuncion
+    - cron: "0 13 1,15 * *"
 
 permissions:
   contents: read
@@ -25,7 +35,14 @@ permissions:
 jobs:
   medir:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # la medicion total tardo ~12 min el 2026-11-13 (una request de velas por fila) y la
+    # de 3 semanas suma ~1/4 de eso
+    timeout-minutes: 45
+    defaults:
+      run:
+        # con `bash -e` a secas, un `| tee` esconde el exit code del script: pipefail lo
+        # devuelve y el paso sale en rojo si el script fallo
+        shell: bash
     env:
       SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
     steps:
@@ -41,18 +58,23 @@ jobs:
       - name: Install dependencies
         run: pip install requests "pandas==2.2.3" numpy
 
-      - name: "1. Radar: ¿sigue replicando?"
+      - name: "1. Radar: ¿sigue replicando? (el test, acumulado)"
         working-directory: radar
-        run: python -u medir.py
+        run: python -u medir.py 2>&1 | tee /tmp/total.txt
+
+      - name: "1b. Radar: solo las ultimas 3 semanas (DESCRIPTIVO)"
+        if: always()
+        working-directory: radar
+        run: python -u medir.py --desde "$(date -u -d '21 days ago' +%Y-%m-%d)" 2>&1 | tee /tmp/reciente.txt
 
       - name: "2. Prima: el apareo con el radar"
         if: always()
-        run: python -u opciones/medir_prima.py
+        run: python -u opciones/medir_prima.py 2>&1 | tee /tmp/prima.txt
 
       - name: "3. oi_rel_168: ¿responde fapi desde el runner?"
         if: always()
         run: |
-          python -u - <<'EOF'
+          python -u - <<'EOF' 2>&1 | tee /tmp/oi.txt
           import os, requests, pandas as pd
           URL = "https://ecgdswroygkfckkaguxp.supabase.co/rest/v1/radar_runs"
           key = os.environ["SUPABASE_KEY"]
@@ -83,3 +105,45 @@ jobs:
               print("-> VACIO: fapi no responde desde el runner (o el radar no lo guarda). "
                     "La columna es informativa, pero hoy no informa nada.")
           EOF
+
+      - name: "4. Resumen a Telegram"
+        if: always()
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.DAY_TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.DAY_TELEGRAM_CHAT_ID }}
+          LOG_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          # las lineas que deciden, tal cual las imprime cada script; si un paso fallo, se dice
+          linea() { grep -E "$2" "$1" 2>/dev/null | head -n "${3:-1}" || true; }
+          bloque() {
+            if [ ! -s "$1" ]; then echo "(sin salida)"; return; fi
+            r="$(linea "$1" '^(observado|REPLICO|NO REPLICO|TODAVIA NO ALCANZA|FATAL)' 2)"
+            echo "${r:-(no llego al veredicto: ver el log)}"
+          }
+          MSG="$(cat <<FIN
+          RADAR — medicion quincenal ($(date -u +%Y-%m-%d))
+
+          TOTAL desde 27-ago (el test, contra +0,511):
+          $(bloque /tmp/total.txt)
+
+          ULTIMAS 3 SEMANAS (descriptivo, sin compuerta):
+          $(bloque /tmp/reciente.txt)
+
+          PRIMA: $(linea /tmp/prima.txt '^apareados:')
+          $(linea /tmp/prima.txt 'se llega cerca|TODAVIA NO ALCANZA|NO SE PUDO|PREMISA' 2)
+
+          oi_rel_168: $(linea /tmp/oi.txt '^oi_rel_168 lleno')
+
+          Serie previa: 123% -> 111% -> 92% -> 79% (13-nov).
+          log: $LOG_URL
+          FIN
+          )"
+          echo "$MSG"
+          if [ -z "$TELEGRAM_TOKEN" ] || [ -z "$TELEGRAM_CHAT_ID" ]; then
+            echo "(sin TELEGRAM_TOKEN/TELEGRAM_CHAT_ID: no se envio)"; exit 0
+          fi
+          # texto plano, sin parse_mode: los guiones bajos de `oi_rel_168` romperian Markdown
+          curl -sS -o /dev/null -w "telegram: HTTP %{http_code}\n" \
+            "https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+            --data-urlencode "text=${MSG}"
