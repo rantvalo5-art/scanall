@@ -306,6 +306,136 @@ def scores(TB, neutralizar="roc_24", ambas=True, solo=None):
     return S
 
 
+# ------------------------------------------------------------------ PREREGISTRO_FORMAS
+# Las 35 de la corrida 3, FIJAS: 12 de precio, 6 de flujo, 17 de derivados. No es "lo que
+# haya en el tablero": `carry_acum` (agregada el 2026-08-28) queda afuera a proposito, para
+# que lo unico que cambie respecto de la corrida 3 sea la forma.
+FEATS_C3 = (["atr_24", "vol_24", "vol_168", "rango_168",
+             "roc_24", "roc_72", "roc_168", "roc_720",
+             "compresion", "dd_168", "dd_720", "pos_168"]
+            + ["desbal", "desbal_24", "desbal_168", "ticket_rel", "turnover", "n_surge"]
+            + ["oi_chg_1h", "oi_chg_4h", "oi_chg_24h", "oi_z", "oi_rel_168"]
+            + [f"{c}{s}" for c in ("tt_cuentas", "tt_pos", "ls_cuentas", "taker")
+               for s in ("", "_chg24", "_pct")])
+FORMAS_OBJ = ("largo", "corto")
+FORMAS_COSTOS = (0.20, 0.50)            # §3: un brazo que solo vive a 0,20 % no cuenta
+OOS_INI, OOS_FIN = "2026-08-01", "2026-11-01"
+OOS_CARGA = "2026-04-01"                # historia previa para WARMUP, atr_base y los _pct
+OOS_SEMANAS = 13
+
+
+def formas(TB, paso):
+    """§2 de PREREGISTRO_FORMAS: banda y Δrank sobre las 35, percentil DENTRO de la barra.
+
+    banda   −|pct − 0,5|: los k mas cerca de la mediana. No tiene ancho que elegir.
+    Δrank   pct(t) − pct(t − paso) del MISMO par. Si el par no estaba en la barra
+            anterior de la grilla, NaN: no compite en esa barra.
+    """
+    falta = [c for c in FEATS_C3 if c not in TB.columns]
+    if falta:
+        raise ValueError(f"faltan features de la corrida 3 (¿sin --derivados?): {falta}")
+    orden = TB.sort_values(["sym", "t"], kind="mergesort").index
+    t = TB.loc[orden, "t"]
+    sym = TB.loc[orden, "sym"]
+    contiguo = (t - t.groupby(sym).shift(1)) == paso * 3_600_000
+    S = {}
+    for c in FEATS_C3:
+        pct = TB.groupby("t")[c].rank(pct=True)
+        S[f"{c} banda"] = -(pct - 0.5).abs()
+        p = pct.loc[orden]
+        d = (p - p.groupby(sym).shift(1)).where(contiguo).reindex(TB.index)
+        S[f"{c} Δrank subio"] = d
+        S[f"{c} Δrank bajo"] = -d
+    return S
+
+
+def por_anio(TB, score, objetivo, k, costo):
+    """§4.1: spread medio semanal por año calendario."""
+    out = {}
+    for a, idx in TB.groupby(TB["dt"].dt.year).groups.items():
+        sem, _, _, _ = _spread_semanal(TB.loc[idx], score.loc[idx], k, f"y_{objetivo}",
+                                       costo)
+        out[int(a)] = float(sem.mean()) if sem is not None and len(sem) else np.nan
+    return out
+
+
+def formas_principal(TB, k, paso, q=Q_FDR):
+    """El lote de las formas a los dos costos, y los finalistas: SOBREVIVE a 0,20 % Y a
+    0,50 %, y sin cambiar de signo en ningun año. Devuelve (tabla a 0,20 %, finalistas)."""
+    R = {**formas(TB, paso), **controles(TB)}
+    print(f"\n{len(R) - 3} rankings x {len(FORMAS_OBJ)} objetivos = "
+          f"{(len(R) - 3) * len(FORMAS_OBJ)} brazos (formas)")
+    vivos, tablas = [], {}
+    for costo in FORMAS_COSTOS:
+        mde = mde_del_azar(TB, k=k, objetivos=FORMAS_OBJ, costo=costo)
+        D = lote_rankings(TB, R, k=k, objetivos=FORMAS_OBJ, costo=costo, q=q,
+                          mde=float(np.median(list(mde.values()))),
+                          mostrar=(costo == FORMAS_COSTOS[0]))
+        tablas[costo] = D
+        v = D[D["veredicto"] == "SOBREVIVE"]
+        vivos.append(set(zip(v["ranking"], v["objetivo"])))
+        print(f"\ncosto {costo:.2f}%: sobreviven {len(v)}")
+    ambos = sorted(set.intersection(*vivos))
+    print(f"\nsobreviven a {' y '.join(f'{c:.2f}%' for c in FORMAS_COSTOS)}: {len(ambos)}")
+
+    D0 = tablas[FORMAS_COSTOS[0]]
+    filas = []
+    for nombre, obj in ambos:
+        anios = por_anio(TB, R[nombre], obj, k, FORMAS_COSTOS[0])
+        r = D0[(D0["ranking"] == nombre) & (D0["objetivo"] == obj)].iloc[0]
+        malos = [a for a, v in anios.items() if not v > 0]
+        filas.append(dict(ranking=nombre, objetivo=obj, spread=r["spread"],
+                          sd_sem=r["sd_sem"], **{f"y{a}": v for a, v in anios.items()},
+                          regimen="ok" if not malos else
+                          "cambia de signo en " + ", ".join(map(str, malos))))
+        print(f"  {nombre:32s} {obj:6s} spread {r['spread']:+.4f} | por año "
+              + " ".join(f"{a}:{v:+.3f}" for a, v in anios.items()) + f" | {filas[-1]['regimen']}")
+    F = pd.DataFrame(filas)
+    finales = F[F["regimen"] == "ok"] if not F.empty else F
+    print(f"\nFINALISTAS (las siete compuertas, los dos costos y los años): {len(finales)}")
+    if finales.empty:
+        print("-> §5.1: banda y Δrank quedan cerradas, y con ellas la lista de §7 del "
+              "handoff del radar. No se prueba otro ancho, otro paso, otro k ni otro "
+              "horizonte.")
+    return D0, finales
+
+
+def formas_oos(finales, a):
+    """§4.2: el fuera de muestra, SOLO para finalistas y SOLO si las 13 semanas tienen
+    potencia. La potencia se decide con la principal, antes de calcular nada del tramo."""
+    if finales.empty:
+        print("\nsin finalistas: el fuera de muestra no corre (§4).")
+        return
+    con_potencia = []
+    print("\n" + "=" * 72 + "\nPOTENCIA DEL FUERA DE MUESTRA — antes de mirarlo\n" + "=" * 72)
+    for _, r in finales.iterrows():
+        mde_r = 2.80 * r["sd_sem"] / np.sqrt(OOS_SEMANAS)
+        ok = mde_r < r["spread"]
+        print(f"  {r.ranking:32s} {r.objetivo:6s} spread {r.spread:+.4f}  MDE_R ±{mde_r:.4f}"
+              f"  -> {'se mira' if ok else 'SIN POTENCIA: no se mira, sigue forward test'}")
+        if ok:
+            con_potencia.append((r["ranking"], r["objetivo"]))
+    if not con_potencia:
+        return
+
+    from metricas import feat_metricas, load_metrics
+    panel = load_panel(OOS_CARGA, OOS_FIN, n=a.pares, pin=a.pin, full=not a.angosto)
+    TB = tablero(panel, paso=a.paso, horizonte=a.horizonte)
+    M = load_metrics(list(panel), OOS_CARGA, OOS_FIN)
+    TB = pd.concat([TB, feat_metricas(M, TB[["sym", "t"]])], axis=1)
+    R = formas(TB, a.paso)                      # antes de cortar: Δrank mira la barra previa
+    TB = TB[TB["t"] >= pd.Timestamp(OOS_INI, tz="UTC").value // 10**6]
+    print("\n" + "=" * 72 + f"\nFUERA DE MUESTRA — {OOS_INI} -> {OOS_FIN}\n" + "=" * 72)
+    for nombre, obj in con_potencia:
+        res = []
+        for costo in FORMAS_COSTOS:
+            f = evaluar(TB, R[nombre].loc[TB.index], nombre, objetivo=obj, k=a.k, costo=costo)
+            res.append(f.get("spread", np.nan) > 0 and f.get("p", 1.0) < 0.05)
+            print(f"  {nombre:32s} {obj:6s} costo {costo:.2f}%  semanas {f.get('semanas', 0)}"
+                  f"  spread {f.get('spread', np.nan):+.4f}  p {f.get('p', 1.0):.4f}")
+        print(f"  -> {'PASA el fuera de muestra (§5.2: sigue forward test sin capital)' if all(res) else 'FALLA el fuera de muestra: era la muestra'}")
+
+
 def controles(TB, n=3, seed=0):
     """Rankings al azar, mismo k y mismas barras. Es la pieza central del test: si
     ningun score se separa de estos, la pregunta esta contestada sin que nada tenga
@@ -573,6 +703,14 @@ def main():
     # residualizado contra `n_surge` (el radar) en vez de contra `roc_24`.
     ap.add_argument("--neutralizar", default="roc_24",
                     help="contra que feature se residualiza cada ranking (default roc_24)")
+    # PREREGISTRO_FORMAS: banda y Δrank sobre las 35 de la corrida 3, largo y corto, a
+    # 0,20 % y 0,50 %, con el corte por año. `--oos` agrega el fuera de muestra, que solo
+    # corre para finalistas con potencia.
+    ap.add_argument("--formas", action="store_true",
+                    help="banda y Δrank (PREREGISTRO_FORMAS); requiere --derivados")
+    ap.add_argument("--oos", action="store_true",
+                    help="con --formas: fuera de muestra 2026-08 -> 10, solo si hay "
+                         "finalistas con potencia")
     ap.add_argument("--angosto", action="store_true",
                     help="panel solo-OHLC (sin las features de flujo)")
     ap.add_argument("--nula", action="store_true",
@@ -614,6 +752,17 @@ def main():
     if a.nula:
         mde_del_azar(TB, k=a.k, costo=a.costo)
         print("\nAhora si: correr sin --nula para el lote real.")
+        return
+
+    if a.formas:
+        if not a.derivados:
+            sys.exit("--formas usa el tablero de la corrida 3: falta --derivados")
+        D, finales = formas_principal(TB, k=a.k, paso=a.paso, q=a.q)
+        if a.out:
+            D.to_csv(a.out, index=False)
+            print(f"\ntabla -> {a.out}")
+        if a.oos:
+            formas_oos(finales, a)
         return
 
     mde = mde_del_azar(TB, k=a.k, costo=a.costo)
