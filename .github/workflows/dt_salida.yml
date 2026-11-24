@@ -1,0 +1,33 @@
+name: dt_salida
+# El chequeo de PREREGISTRO_SALIDA.md. SOLO a mano: nunca un schedule (§5).
+# Baja daytrader_outcomes con dump_outcomes.py y corre dt_salida.py. El resultado queda
+# en el log de este run: no se commitea ni se pushea nada.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  medir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install dependencies
+        run: pip install requests pandas==2.2.3 numpy
+      - name: Volcar daytrader_outcomes
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          PYTHONIOENCODING: "utf-8"
+        run: python -u dump_outcomes.py --tabla daytrader_outcomes --out outcomes_dump.json
+      - name: Run dt_salida
+        env:
+          PYTHONIOENCODING: "utf-8"
+        run: python -u dt_salida.py --fuente outcomes_dump.json
