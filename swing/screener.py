@@ -78,6 +78,9 @@ SUPABASE_URL = "https://ecgdswroygkfckkaguxp.supabase.co"
 # ── Configuración derivada (solo I/O; el scoring lo lee classify vía CFG) ───────
 INTERVALS         = _g("general", "INTERVALS", default=["1h", "4h", "1d", "1w"])
 LIMIT             = _g("general", "LIMIT", default=200)
+# Apagado tras PREREGISTRO_7D (2026-10-23, SIN EFECTO con potencia): el screener sigue
+# guardando alertas y outcomes en Supabase, pero no manda nada al celular.
+TELEGRAM_ENABLED  = _g("general", "TELEGRAM_ENABLED", default=True)
 TOP_N             = _g("general", "TOP_N", default=9999)
 MAX_WORKERS       = _g("general", "MAX_WORKERS", default=20)
 MIN_QUOTE_VOLUME  = _g("general", "MIN_QUOTE_VOLUME", default=1000000)
@@ -420,6 +423,8 @@ def _sin_token(e):
 
 
 def send_telegram(text):
+    if not TELEGRAM_ENABLED:
+        return
     try:
         r = SESSION.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",
@@ -504,6 +509,8 @@ def generate_chart_image(df, symbol, timeframe, ref_price=None):
 
 def send_telegram_photo(image_buf, caption):
     """Envía una imagen a Telegram con caption (límite 1024 chars)."""
+    if not TELEGRAM_ENABLED:
+        return
     if len(caption) > 1024:
         caption = caption[:1020] + "…"
     try:
