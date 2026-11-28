@@ -240,4 +240,52 @@ la regla de salida.
 
 # ────────────────── RESULTADOS (debajo de esta línea) ──────────────────
 
-*(vacío hasta el 2026-11-24)*
+## Medido el 2026-11-27 — PASA (C), y con potencia
+
+Corrido con `dt_salida.py` (PR #63) desde el workflow manual `dt_salida.yml`, run
+`46087109145`, tres días después de la fecha. La ventana quedó fijada por el script y no por
+el día de la corrida: **2026-09-07 → 2026-11-23** (exclusivo), semanas ISO completas W37–W47.
+La W36, la de la instrumentación, no cuenta (§2). Para re-correrlo: disparar `dt_salida.yml`.
+
+| | |
+|---|---|
+| filas en la tabla / universo / dedup | 32.647 / 4.803 / 3.510 |
+| dentro de la ventana, válidas | **1.745** (0 nulos, 0 empates) |
+| semanas | **11**, no las 12 de §4 — entradas por semana: media 158,6, min 92, max 310 |
+
+**(P) POTENCIA — pasa.** σ_semanal(P) **0,0304** (la cuenta a priori daba 0,06) →
+**MDE = 0,0256**, debajo del tope de 0,05. Con 11 semanas alcanza de sobra: la semana que
+falta no cambia la lectura.
+
+| semana | W37 | W38 | W39 | W40 | W41 | W42 | W43 | W44 | W45 | W46 | W47 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| P | 0,643 | 0,619 | 0,594 | 0,608 | 0,599 | 0,648 | 0,694 | 0,636 | 0,587 | 0,620 | 0,616 |
+
+| compuerta | medido | |
+|---|---|---|
+| media semanal de P | **0,624** | > 0,55 |
+| semanas con P > 0,55 | **11 de 11** | |
+| p de bloques (nula P ≤ 0,55, una cola) | **< 0,0002** (0 de 5.000) | α 0,025 |
+
+**Veredicto: PASA (C). El MFE llega antes que el MAE en el 62 % de las entradas,** y no
+depende de una semana: la peor da 0,587. El prior era BAJO (§1) y la expectativa de §6 era
+P ≈ 0,50: salió al revés.
+
+### Lo que esto NO es, y lo que el próximo preregistro tiene que resolver
+
+Tal como dice §6, **no es un negocio**: es permiso para escribir el preregistro de la regla
+de salida. Y ese preregistro arranca con un problema que este resultado no resuelve:
+
+> **Orden y magnitud no son independientes.** La aritmética de §4 (`P·MFE − (1−P)·|MAE|`)
+> usa las medianas de MFE y MAE como si no dependieran de cuál llega primero. Pero con
+> la deriva negativa que ya midió `dt_vivo.py` (−1,14 % a 4h), un camino que simplemente
+> baja pone el máximo **al principio** (cerca de la entrada) y el mínimo **al final**.
+> Eso da P > 0,5 con un MFE chico en esas mismas entradas. Es la explicación alternativa
+> que §1 ya había declarado ("que la alerta entre cerca de un techo y el precio
+> simplemente baje"), y este estadístico no la distingue.
+
+Así que lo primero que tiene que fijar el preregistro de la regla, **antes de mirar**, es
+cómo separa "el favorable viene primero y es cobrable" de "el favorable viene primero
+porque es la entrada misma". Por ejemplo: el MFE condicionado al orden, o un piso de
+minutos o de magnitud para contar un MFE como alcanzable. Lo que §5 prohíbe sigue igual:
+nada de barrer objetivos, stops ni ventanas sobre este mismo dato.
