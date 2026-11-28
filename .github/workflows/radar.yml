@@ -36,15 +36,31 @@ name: Radar (magnitud)
 #
 # Elegir por hora de reloj no depende del resultado de ninguna corrida, asi que densificar
 # el muestreo no mete sesgo: solo tapa los huecos que deja el scheduler.
+#
+# NOV-2026: EL SCHEDULER EMPEORO Y EL DISPARO PASA A CRON-JOB.ORG. Medido sobre 100
+# corridas (07-nov -> 26-nov): GitHub largo 5,25 por dia de las 12 pedidas (44%, era 65%
+# en agosto) y 46 de 99 huecos pasaron de 4h. Las corridas no fallan (duran ~30 s): es la
+# entrega. El screener, el swing y los outcomes ya iban por `repository_dispatch` desde
+# cron-job.org y llegan al 100%; el radar era el unico colgado del scheduler nativo.
+#
+# Ahora cron-job.org manda `run-radar` cada 2h a :10 con `client_payload.telegram`
+# (true en 0,4,8,12,16,20 y false en las de relleno). Los `schedule` quedan de RESPALDO
+# por si cron-job.org se cae, y ya NO avisan: si los dos disparan, el celular recibe uno
+# solo. El doble disparo tampoco infla el n, porque `medir.py` de-solapa (se queda con la
+# primera de cada grupo de menos de 4h).
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [run-radar]
   schedule:
-    # PRINCIPALES: guardan el universo Y mandan el top-8 al celular.
+    # RESPALDO: guardan el universo y no avisan (ver arriba).
     - cron: "10 0,4,8,12,16,20 * * *"
-    # DE RELLENO, a mitad de camino: guardan y NO avisan, para no multiplicar las
-    # notificaciones. Solo existen para que, cuando GitHub saltee o atrase una principal,
-    # haya igual una corrida cerca de la marca de 4h que el de-solape pueda tomar.
     - cron: "10 2,6,10,14,18,22 * * *"
+
+# Si cron-job.org y el respaldo caen juntos, que esperen en fila y no se pisen.
+concurrency:
+  group: radar
+  cancel-in-progress: false
 
 jobs:
   escanear:
@@ -69,8 +85,9 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           TELEGRAM_TOKEN: ${{ secrets.DAY_TELEGRAM_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.DAY_TELEGRAM_CHAT_ID }}
-          # Vacio en las corridas de relleno: guardan igual, pero sin avisar.
-          TELEGRAM_FLAG: "${{ (github.event_name != 'schedule' || github.event.schedule == '10 0,4,8,12,16,20 * * *') && '--telegram' || '' }}"
+          # Avisa a mano (workflow_dispatch) y en los disparos de cron-job.org que traen
+          # telegram=true. Vacio en el relleno y en el respaldo de `schedule`.
+          TELEGRAM_FLAG: "${{ (github.event_name == 'workflow_dispatch' || (github.event_name == 'repository_dispatch' && github.event.client_payload.telegram == true)) && '--telegram' || '' }}"
         # --supabase guarda el universo entero (lo que habilita medirlo despues) y va
         # SIEMPRE: las de relleno valen tanto como las principales para la medicion.
         # --telegram solo en las principales y a mano. Sacá el flag si no lo querés en
