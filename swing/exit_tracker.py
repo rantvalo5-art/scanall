@@ -204,6 +204,9 @@ def _sin_token(e):
 
 
 def send_telegram(text):
+    # Mismo interruptor que el screener de swing (general.TELEGRAM_ENABLED).
+    if not CONFIG.get("general", {}).get("TELEGRAM_ENABLED", True):
+        return
     try:
         r = requests.post(
             f"https://api.telegram.org/bot{os.environ['TELEGRAM_TOKEN']}/sendMessage",
