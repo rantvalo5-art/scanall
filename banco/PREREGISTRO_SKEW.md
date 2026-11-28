@@ -144,6 +144,15 @@ hoy**: con n = 0 no hay σ, y sin σ no hay MDE.
 `MDE = 2,8 · σ / √n`, con σ medido sobre el propio dato acumulado y n **de-solapado por
 barra** (dos disparos a menos de 4h comparten futuro).
 
+> **ENMIENDA 2026-11-28 — tolerancia de 5 min en el de-solape.** Desde el PR #64 el radar
+> lo dispara cron-job.org a horario exacto, y `run_at` es la hora del guardado: dos
+> disparos puntuales separados 4h pueden quedar a 3h59m40s por jitter, y el corte estricto
+> tiraba ~la mitad. `opciones/medir_prima.py` usa ahora la misma `desolapar()` de
+> `radar/medir.py`, con **≥ 4h − 5 min** (comparten a lo sumo 5 de 240 min, un 2 %). Se
+> decidió por el cambio de disparo, **antes de mirar ningún pnl** (que sigue sin mirarse
+> hasta n = 200). `--estricto` reproduce la regla vieja. El horizonte, la ventana de
+> apareo y la compuerta no cambian.
+
 - **`prima_radar`**: a 3,26 eventos/día, n = 200 cae alrededor del **2026-11-20**. Ésa es
   la fecha en que se corre **la compuerta**, no la medición. Si el MDE supera el costo de
   ida y vuelta del straddle, el veredicto es **"no se pudo medir"** y se sigue juntando.

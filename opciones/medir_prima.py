@@ -58,7 +58,7 @@ import requests
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "radar"))
-from medir import UNIVERSO_PRE, K, H, Z, bajar, camino  # noqa: E402
+from medir import UNIVERSO_PRE, K, H, Z, bajar, camino, desolapar  # noqa: E402
 
 MONEDAS = ("BTC", "ETH", "SOL")
 VENUES = ("okx", "okx_um")
@@ -74,13 +74,10 @@ SPOT = os.environ.get("BINANCE_SPOT", "https://data-api.binance.vision")
 
 # ───────────────────────────── el apareo (sin precios futuros) ─────────────────────────
 
-def barras(D):
-    """De-solapar a H horas, igual que `radar/medir.py`: la primera de cada grupo."""
-    ts, quedan, ult = sorted(pd.Series(D["run_at"].unique())), [], None
-    for t in ts:
-        if ult is None or (t - ult) >= pd.Timedelta(hours=H):
-            quedan.append(t)
-            ult = t
+def barras(D, estricto=False):
+    """De-solapar con la MISMA funcion que `radar/medir.py` (incluida la tolerancia de
+    5 min de la enmienda 2026-11-28): la primera de cada grupo."""
+    quedan = desolapar(pd.Series(D["run_at"].unique()), estricto=estricto)
     return D[D["run_at"].isin(quedan)]
 
 
@@ -170,14 +167,16 @@ def boot_p(v, seed=0):
 
 def main():
     ap = argparse.ArgumentParser(description="Forward test de la prima del radar")
-    ap.parse_args()
+    ap.add_argument("--estricto", action="store_true",
+                    help="de-solape con >= 4h exactas, la regla anterior a la enmienda")
+    a = ap.parse_args()
 
     D = bajar(DESDE)
     if D.empty:
         sys.exit("sin corridas del radar desde " + DESDE)
     D["run_at"] = pd.to_datetime(D["run_at"], utc=True, format="mixed")
     D = D[D["run_at"] <= pd.Timestamp.now(tz="UTC") - pd.Timedelta(hours=H + 1)]
-    B = barras(D)
+    B = barras(D, estricto=a.estricto)
     E = elegir(B)
     A = aparear(E, fotos())
     ev = A[A["elegido"]]

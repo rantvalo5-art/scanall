@@ -64,6 +64,28 @@ H = 4                       # horizonte, en horas — el mismo que se valido
                             # (`banco/horizonte_util.py`: 4h gana en multiplo,
                             #  tasa y t contra 8/24/72/168h)
 
+# ENMIENDA 2026-11-28 — TOLERANCIA DEL DE-SOLAPE. Desde el PR #64 el radar lo dispara
+# cron-job.org a horario exacto (:10 cada 2h). `run_at` es la hora de reloj del guardado,
+# no la del slot: dos corridas puntuales separadas 4h pueden quedar a 3h59m40s por unos
+# segundos de diferencia en la cola o en la descarga. Con el corte estricto `>= 4h`, ~la
+# mitad de esos pares se caia por jitter y no por solape real. Con 5 minutos de tolerancia
+# dos barras comparten a lo sumo 5 de sus 240 minutos de futuro (2%). Se decidio por el
+# cambio de DISPARO, antes de mirar ningun resultado con el. El horizonte H no cambia.
+# `--estricto` reproduce la regla vieja; la medicion del 1-dic reporta las dos.
+TOLERANCIA = pd.Timedelta(minutes=5)
+
+
+def desolapar(ts, estricto=False):
+    """Camina hacia adelante y se queda con la primera corrida de cada grupo de menos de
+    H horas (H − TOLERANCIA si no es `estricto`). Devuelve la lista de las que quedan."""
+    paso = pd.Timedelta(hours=H) - (pd.Timedelta(0) if estricto else TOLERANCIA)
+    quedan, ult = [], None
+    for t in sorted(ts):
+        if ult is None or (t - ult) >= paso:
+            quedan.append(t)
+            ult = t
+    return quedan
+
 # EL UNIVERSO SOBRE EL QUE SE PREREGISTRO EL +0,511: los 46 pares con perpetuo desde 2021
 # que `banco/` congelo como pin `deriv46`. Va escrito ACA y no leido de
 # `banco/.kline_cache/`, que no esta en git: el numero contra el que se compara y el
@@ -168,6 +190,8 @@ def main():
     ap = argparse.ArgumentParser(description="Forward test del radar")
     ap.add_argument("--desde", default="2020-01-01")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--estricto", action="store_true",
+                    help="de-solape con >= 4h exactas, la regla anterior a la enmienda")
     a = ap.parse_args()
 
     D = bajar(a.desde)
@@ -183,14 +207,12 @@ def main():
     # mezcladas con las automaticas. Se camina hacia adelante quedandose con la primera
     # de cada grupo. No se borra nada de la tabla: se filtra al medir.
     ts = sorted(pd.Series(D["run_at"].unique()))
-    quedan, ult = [], None
-    for t in ts:
-        if ult is None or (t - ult) >= pd.Timedelta(hours=H):
-            quedan.append(t)
-            ult = t
+    quedan = desolapar(ts, estricto=a.estricto)
+    regla = f"{H}h exactas (--estricto)" if a.estricto else f"{H}h - 5 min (enmienda 2026-11-28)"
+    print(f"de-solape: {regla}")
     if len(quedan) < len(ts):
         print(f"de-solape: {len(ts)} corridas -> {len(quedan)} "
-              f"({len(ts) - len(quedan)} descartadas por estar a menos de {H}h "
+              f"({len(ts) - len(quedan)} descartadas por estar a menos de {regla} "
               f"de la anterior)")
     D = D[D["run_at"].isin(quedan)]
 

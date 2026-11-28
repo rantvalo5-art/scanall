@@ -62,6 +62,14 @@ jobs:
         working-directory: radar
         run: python -u medir.py 2>&1 | tee /tmp/total.txt
 
+      # TRANSICION de la enmienda 2026-11-28 (tolerancia de 5 min en el de-solape): la misma
+      # medicion con la regla vieja, para ver lado a lado que el cambio no mueve el veredicto.
+      # Sacar este paso cuando las dos hayan coincidido en un par de mediciones.
+      - name: "1-estricto. Radar con la regla vieja (>= 4h exactas)"
+        if: always()
+        working-directory: radar
+        run: python -u medir.py --estricto 2>&1 | tee /tmp/total_estricto.txt
+
       - name: "1b. Radar: solo las ultimas 3 semanas (DESCRIPTIVO)"
         if: always()
         working-directory: radar
@@ -125,6 +133,7 @@ jobs:
 
           TOTAL desde 27-ago (el test, contra +0,511):
           $(bloque /tmp/total.txt)
+          (regla vieja, >= 4h exactas): $(linea /tmp/total_estricto.txt '^observado')
 
           ULTIMAS 3 SEMANAS (descriptivo, sin compuerta):
           $(bloque /tmp/reciente.txt)
@@ -134,7 +143,7 @@ jobs:
 
           oi_rel_168: $(linea /tmp/oi.txt '^oi_rel_168 lleno')
 
-          Serie previa: 123% -> 111% -> 92% -> 79% (13-nov).
+          Serie previa: 123% -> 111% -> 92% -> 79% (13-nov) -> 79% (15-nov).
           log: $LOG_URL
           FIN
           )"
