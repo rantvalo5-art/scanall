@@ -74,6 +74,15 @@ from radar_runs group by 1 order by 1;
 anterior e informa cuántas. Las 3 primeras corridas del 2026-08-27 son pruebas y van a
 colapsar a una — está bien.
 
+> **ENMIENDA 2026-11-28 — el corte pasa a 4h − 5 min.** Desde el PR #64 el radar lo dispara
+> cron-job.org a horario exacto (GitHub entregaba el 44 % de las corridas). `run_at` es la
+> hora de reloj del guardado, así que dos corridas puntuales separadas 4h pueden quedar a
+> 3h59m40s, y con `>= 4h` estricto ~la mitad de esos pares se caía por segundos, no por
+> solape. Con 5 minutos de tolerancia, dos barras comparten a lo sumo 5 de sus 240 minutos
+> de futuro (2 %). **Se decidió por el cambio de disparo, antes de medir con la regla
+> nueva.** H, el +0,511, el MDE y §5 no cambian. `medir.py --estricto` reproduce la regla
+> vieja, y `medir_radar.yml` corre las dos lado a lado mientras dure la transición.
+
 ---
 
 ## 3. Cómo leer la salida
